@@ -8,7 +8,7 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA. The browser application is 
 |---|---|
 | `src/` | GitHub Pages React PWA and Apps Script API client |
 | `public/` | PWA manifest, icon, and service worker |
-| `appsscript/` | Apps Script Web App API, repositories, calculator, locks, idempotency, Drive, OCR |
+| `appsscript/Code.gs` | Single-file Apps Script Web App API, repositories, calculator, locks, idempotency, Drive, OCR, and domain services |
 | `docs/` | Architecture, Data Model, API Contract, roadmap, and acceptance criteria |
 | `.github/workflows/pages.yml` | GitHub Pages build and deployment |
 
@@ -18,7 +18,7 @@ Run `pnpm install`, then set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script 
 
 ## Apps Script setup
 
-Create a Google Apps Script project, set its Script ID in a local `.clasp.json`, and push the `appsscript/` directory with clasp. In Script Properties configure `SHEET_ID`, `DRIVE_ROOT_FOLDER_ID`, `ALLOWED_ORIGINS`, and exactly one or both OCR credentials: `GEMINI_API_KEY` and `GOOGLE_CLOUD_VISION_API_KEY`. Never place these values in GitHub Pages variables or committed source.
+Create a Google Apps Script project, set its Script ID in a local `.clasp.json`, and push the single `appsscript/Code.gs` file together with `appsscript/appsscript.json`. In Script Properties configure `SHEET_ID`, `DRIVE_ROOT_FOLDER_ID`, `ALLOWED_ORIGINS`, and exactly one or both OCR credentials: `GEMINI_API_KEY` and `GOOGLE_CLOUD_VISION_API_KEY`. Never place these values in GitHub Pages variables or committed source.
 
 Run `Repositories.bootstrap()` once from the Apps Script editor to create the required Sheets tabs. Deploy as a Web App with the documented `doGet` and `doPost` entrypoints. Use the Web App URL as the GitHub Actions variable `VITE_APPS_SCRIPT_URL`.
 

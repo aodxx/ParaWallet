@@ -18,3 +18,8 @@
 - [x] Add clasp/appsscript deployment configuration and GitHub Pages workflow
 - [x] Add unit tests for calculations and RequestID idempotency; Apps Script integration and lock-boundary tests remain
 - [x] Run frontend build and repository tests; Apps Script checks and final architecture review remain
+- [x] Consolidate appsscript/Config.gs, Locking.gs, Calculator.gs, SheetsRepo.gs, and Services.gs into one appsscript/Code.gs
+- [x] Remove redundant Apps Script source files and mark Code.gs as the single deployment source
+- [x] Update Apps Script setup documentation for the single Code.gs workflow
+- [x] Validate consolidated Code.gs syntax, function structure, frontend tests, and frontend build
+- [x] Commit and push the consolidated Apps Script implementation to GitHub
