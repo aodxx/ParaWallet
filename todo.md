@@ -85,3 +85,16 @@
 - [ ] Set Apps Script property GOOGLE_OAUTH_CLIENT_ID to the same Client ID
 - [ ] Redeploy Code.gs as a new Apps Script Web App version
 - [ ] Verify Google sign-in and Google Sheets dashboard access end to end
+- [ ] Verify the newly deployed Apps Script health and diagnostics responses
+- [ ] Verify OAuth-authenticated dashboard access reaches the Google Sheets repositories
+- [ ] Confirm the signed-in Google email maps to an active Users row
+- [ ] Confirm live PWA reports connected status and loads real database data
+- [ ] Record any remaining Apps Script or Sheets permission error with the exact remedy
+- [ ] Confirm GOOGLE_OAUTH_CLIENT_ID exists in the Apps Script project behind the deployed Web App URL
+- [ ] Confirm the property name and Client ID value match the PWA OAuth audience exactly
+- [ ] Redeploy a new Apps Script Web App version after saving the property
+- [ ] Re-test authenticated dashboard access and Google Sheets synchronization
+- [ ] Remove the hard failure when GOOGLE_OAUTH_CLIENT_ID Script Property is missing
+- [ ] Add a documented public Client ID fallback in Code.gs without using Client Secret
+- [ ] Test Code.gs syntax and verify the deployed endpoint no longer returns MISSING_SCRIPT_PROPERTY
+- [ ] Test PWA build and live connection status after the repair

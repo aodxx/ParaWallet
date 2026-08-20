@@ -127,7 +127,9 @@ var Config = {
   geminiKey: function () { return this.get("GEMINI_API_KEY", false); },
   visionKey: function () { return this.get("GOOGLE_CLOUD_VISION_API_KEY", false); },
   allowedOrigins: function () { return this.get("ALLOWED_ORIGINS", false).split(",").filter(Boolean); },
-  googleClientId: function () { return this.get("GOOGLE_OAUTH_CLIENT_ID", true); }
+  // OAuth client IDs are public configuration. The Script Property can override this
+  // value, but a missing property must not block the MVP after deployment.
+  googleClientId: function () { return this.get("GOOGLE_OAUTH_CLIENT_ID", false) || "1056693340258-61rj2pms6mpvn9iqmaoc2vfrfbh6lg19.apps.googleusercontent.com"; }
 };
 
 var Auth = {
