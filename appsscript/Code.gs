@@ -11,6 +11,20 @@
  */
 
 // =====================================================
+// 0. ADMIN SETUP ENTRYPOINTS
+// =====================================================
+// Run setupParaWalletSheets() once from the Apps Script editor.
+// The executing account must have Editor access to SHEET_ID.
+function setupParaWalletSheets() {
+  return Repositories.bootstrap();
+}
+
+// Run validateParaWalletSheets() to inspect schema without changing data.
+function validateParaWalletSheets() {
+  return Repositories.validateSchema();
+}
+
+// =====================================================
 // 1. WEB APP ENTRYPOINTS, REQUEST ROUTER & RESPONSES
 // =====================================================
 

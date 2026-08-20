@@ -35,3 +35,7 @@
 - [x] Verify append() and rows_() map every header consistently for all Sheets tabs
 - [x] Check bootstrap idempotency, blank-sheet behavior, and pre-existing-sheet edge cases
 - [x] Fix bootstrap/Data Model mismatches and push the verified correction if needed
+- [x] Add an explicit Apps Script setup function that invokes Repositories.bootstrap()
+- [x] Expose only a manual admin setup path rather than allowing unauthenticated bootstrap writes
+- [x] Document that the deployer must have Editor access to the ยางพารา Spreadsheet before initialization
+- [ ] Verify the 12 Data Model tabs appear after the user runs the setup action
