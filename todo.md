@@ -129,3 +129,7 @@
 - [x] Redesign dashboard and primary action surfaces for one-handed use
 - [x] Redesign sale/OCR, settlement, garden, agreement, and notification flows for mobile
 - [x] Validate responsive CSS/build at mobile, tablet, and desktop breakpoint definitions; live-device screenshot validation remains recommended after deployment
+- [x] Reconcile PRD.md with docs/MOBILE_DESIGN_DIRECTION.md and the deployed mobile UI
+- [x] Update PRD mobile UX, navigation, responsive, accessibility, and reliability requirements
+- [x] Add mobile-specific acceptance criteria and release-scope items
+- [x] Validate PRD terminology and commit the synchronized documentation
