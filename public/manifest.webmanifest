@@ -1,0 +1,11 @@
+{
+  "name": "ParaWallet",
+  "short_name": "ParaWallet",
+  "description": "ระบบกระเป๋าคู่สำหรับสวนยางพารา",
+  "start_url": "/ParaWallet/",
+  "display": "standalone",
+  "background_color": "#f7faf4",
+  "theme_color": "#184d36",
+  "lang": "th",
+  "icons": [{ "src": "/ParaWallet/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
