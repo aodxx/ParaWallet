@@ -132,11 +132,35 @@ var Repositories = {
   sheet_: function (name) { return SpreadsheetApp.openById(Config.spreadsheetId()).getSheetByName(name); },
   bootstrap: function () {
     var book = SpreadsheetApp.openById(Config.spreadsheetId());
+    var created = [];
+    var initialized = [];
+    var validated = [];
     SHEETS.forEach(function (name) {
-      var sheet = book.getSheetByName(name) || book.insertSheet(name);
-      if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS[name]);
+      var sheet = book.getSheetByName(name);
+      if (!sheet) {
+        sheet = book.insertSheet(name);
+        created.push(name);
+      }
+      if (sheet.getLastRow() === 0) {
+        sheet.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);
+        sheet.setFrozenRows(1);
+        initialized.push(name);
+      } else {
+        assertHeaders_(sheet, name);
+        validated.push(name);
+      }
     });
-    return { sheets: SHEETS };
+    return { sheets: SHEETS, created: created, initialized: initialized, validated: validated };
+  },
+  validateSchema: function () {
+    var book = SpreadsheetApp.openById(Config.spreadsheetId());
+    return SHEETS.map(function (name) {
+      var sheet = book.getSheetByName(name);
+      if (!sheet) return { name: name, status: "missing", expected: HEADERS[name] };
+      if (sheet.getLastRow() === 0) return { name: name, status: "empty", expected: HEADERS[name] };
+      var actual = readHeaders_(sheet);
+      return { name: name, status: headersEqual_(actual, HEADERS[name]) ? "ok" : "mismatch", expected: HEADERS[name], actual: actual };
+    });
   },
   rows_: function (name) {
     var sheet = this.sheet_(name);
@@ -181,6 +205,9 @@ var Calculator = {
   }
 };
 function round_(value) { return Math.round((Number(value) + Number.EPSILON) * 100) / 100; }
+function readHeaders_(sheet) { return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (value) { return String(value); }); }
+function headersEqual_(actual, expected) { return actual.length === expected.length && expected.every(function (header, index) { return actual[index] === header; }); }
+function assertHeaders_(sheet, name) { var actual = readHeaders_(sheet); if (!headersEqual_(actual, HEADERS[name])) throw new Error("SCHEMA_MISMATCH:" + name + ": expected [" + HEADERS[name].join(",") + "] but found [" + actual.join(",") + "]"); }
 
 // =====================================================
 // 6. GOOGLE DRIVE STORAGE & OCR ADAPTERS

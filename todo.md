@@ -31,3 +31,7 @@
 - [x] Connect the PWA to the verified Apps Script URL via a safe frontend fallback; GitHub Actions variable could not be set due token permissions
 - [x] Add the provided Spreadsheet ID and Apps Script deployment notes to the setup documentation
 - [x] Run frontend tests and build after connecting the real endpoint configuration
+- [x] Verify bootstrap() creates every Data Model tab with the exact expected header order
+- [x] Verify append() and rows_() map every header consistently for all Sheets tabs
+- [x] Check bootstrap idempotency, blank-sheet behavior, and pre-existing-sheet edge cases
+- [x] Fix bootstrap/Data Model mismatches and push the verified correction if needed
