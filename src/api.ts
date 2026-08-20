@@ -21,7 +21,7 @@ export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary
 
 const apiUrl = (import.meta.env.VITE_APPS_SCRIPT_URL || "").replace(/\/$/, "");
 
-function newRequestId() {
+export function newRequestId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
