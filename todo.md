@@ -23,3 +23,11 @@
 - [x] Update Apps Script setup documentation for the single Code.gs workflow
 - [x] Validate consolidated Code.gs syntax, function structure, frontend tests, and frontend build
 - [x] Commit and push the consolidated Apps Script implementation to GitHub
+- [x] Locate or create the Google Drive root folder named ยางพารา
+- [x] Create or confirm receipts, slips, and evidence subfolders under ยางพารา
+- [ ] Set DRIVE_ROOT_FOLDER_ID in Apps Script PropertiesService and verify the storage path
+- [x] Verify the provided Apps Script Web App URL returns a valid API response
+- [x] Verify the provided Spreadsheet ID is documented as SHEET_ID without exposing credentials
+- [x] Connect the PWA to the verified Apps Script URL via a safe frontend fallback; GitHub Actions variable could not be set due token permissions
+- [x] Add the provided Spreadsheet ID and Apps Script deployment notes to the setup documentation
+- [x] Run frontend tests and build after connecting the real endpoint configuration

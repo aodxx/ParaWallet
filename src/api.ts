@@ -19,7 +19,7 @@ export type Garden = { id: string; name: string; province?: string; district?: s
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
 export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; pendingReviews: number; monthlySales: number };
 
-const apiUrl = (import.meta.env.VITE_APPS_SCRIPT_URL || "").replace(/\/$/, "");
+const apiUrl = (import.meta.env.VITE_APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwiW2tuD_RQUgygjZz-jIEfCLe03s6kdXXyz2Z2ZG8mUDwjvfA_luGrl4SpZ253UeH3/exec").replace(/\/$/, "");
 
 export function newRequestId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
