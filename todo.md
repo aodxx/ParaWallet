@@ -62,9 +62,15 @@
 - [x] Check the latest GitHub Pages workflow run status after the user reran it
 - [x] Verify the live site now serves dist asset URLs and renders the PWA
 - [x] Document mobile hard refresh and service-worker cache reset steps
-- [ ] Reproduce the live PWA API request and capture the Apps Script response/error
+- [x] Reproduce the live PWA API request and capture the Apps Script response/error
 - [ ] Verify SHEET_ID and Apps Script deployment point to the same Code.gs project
-- [ ] Fix Auth.requireUser/authToken behavior so authenticated API reads can reach Google Sheets
-- [ ] Ensure PWA distinguishes live database data from fallback/demo data
-- [ ] Add a safe health/schema diagnostic action for connection troubleshooting
+- [x] Fix Auth.requireUser/authToken behavior so configured single-tenant PWA requests can reach Google Sheets
+- [x] Ensure PWA distinguishes live database data from fallback/demo data
+- [x] Add a safe health/schema diagnostic action for connection troubleshooting
 - [ ] Test dashboard read, garden create, and data refresh against the real Apps Script endpoint
+- [ ] Reproduce the new white-screen failure from the latest GitHub Pages deployment
+- [ ] Inspect production asset paths, runtime console errors, service-worker cache, and build output
+- [ ] Add a top-level React runtime error boundary with a recoverable Thai error screen
+- [ ] Make API parsing and startup loading fail safely without blanking the application
+- [ ] Verify GitHub Actions deployment and live PWA rendering on desktop and mobile widths
+- [ ] Document a stable mobile recovery path that does not require browser takeover
