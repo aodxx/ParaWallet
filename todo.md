@@ -80,3 +80,8 @@
 - [x] Persist and attach the signed-in ID token to API requests safely
 - [x] Add OAuth configuration and failure-state instructions for Google Cloud Console
 - [ ] Test signed-out, invalid-token, unregistered-user, and authenticated dashboard states
+- [ ] Rotate the exposed Google OAuth Client Secret in Google Cloud Console
+- [x] Configure VITE_GOOGLE_CLIENT_ID for GitHub Pages using the provided public Client ID; repository-variable API was unavailable, so the workflow uses a public fallback
+- [ ] Set Apps Script property GOOGLE_OAUTH_CLIENT_ID to the same Client ID
+- [ ] Redeploy Code.gs as a new Apps Script Web App version
+- [ ] Verify Google sign-in and Google Sheets dashboard access end to end
