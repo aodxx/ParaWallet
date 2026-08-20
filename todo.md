@@ -94,7 +94,25 @@
 - [ ] Confirm the property name and Client ID value match the PWA OAuth audience exactly
 - [ ] Redeploy a new Apps Script Web App version after saving the property
 - [ ] Re-test authenticated dashboard access and Google Sheets synchronization
-- [ ] Remove the hard failure when GOOGLE_OAUTH_CLIENT_ID Script Property is missing
-- [ ] Add a documented public Client ID fallback in Code.gs without using Client Secret
-- [ ] Test Code.gs syntax and verify the deployed endpoint no longer returns MISSING_SCRIPT_PROPERTY
-- [ ] Test PWA build and live connection status after the repair
+- [x] Remove the hard failure when GOOGLE_OAUTH_CLIENT_ID Script Property is missing
+- [x] Add a documented public Client ID fallback in Code.gs without using Client Secret
+- [x] Test Code.gs syntax and verify the deployed endpoint no longer returns MISSING_SCRIPT_PROPERTY
+- [x] Test PWA build and live connection status after the repair
+- [x] Confirm Users sheet headers and active-row status for aodaod3826@gmail.com
+- [x] Register the signed-in Google account with owner role and required user fields
+- [x] Verify the user has garden/member scope needed for dashboard access; no garden rows exist yet, so dashboard will show an empty garden state
+- [ ] Re-test authenticated dashboard access after registration
+- [ ] Add a tapper user row with role=tapper and active status
+- [ ] Add owner-controlled garden member invite/add workflow
+- [ ] Link tapper to a garden through GardenMembers with role=tapper and active status
+- [ ] Ensure tapper dashboard visibility is scoped to assigned gardens and agreements
+- [ ] Test separate Owner and Tapper Google accounts end to end
+- [ ] Register pantipa3826@gmail.com / สมหมาย as an active tapper user
+- [ ] Identify the target garden before creating the GardenMembers relationship
+- [ ] Add the tapper GardenMembers row for the selected garden
+- [ ] Verify tapper sign-in and scoped garden visibility
+- [ ] Audit current manifest, favicon, Apple touch icon, and service-worker asset references
+- [ ] Create standard PNG icons for 48, 72, 96, 128, 144, 152, 192, 384, and 512 pixels
+- [ ] Create a maskable 512-pixel icon with safe-area padding
+- [ ] Update PWA manifest and HTML metadata for cross-device installation
+- [ ] Test production build and live icon asset responses
