@@ -51,3 +51,20 @@
 - [x] Add PWA screens/forms for gardens, agreements, sales, wallets, settlements, OCR review, notifications, and reports
 - [ ] Add Apps Script integration tests or deterministic contract tests for remaining workflows
 - [x] Run final frontend acceptance checks, frontend tests, Apps Script syntax check, and production build; real Spreadsheet bootstrap remains pending user execution
+- [x] Reproduce the white-screen issue on https://aodxx.github.io/ParaWallet/
+- [x] Inspect deployed HTML, JavaScript/CSS asset URLs, browser runtime errors, and service-worker scope
+- [x] Confirm the Vite base path and workflow asset paths are correct; the live site is using legacy branch-root publishing
+- [x] Add deployment workflow verification for the project subpath
+- [x] Verify workflow build and document mobile cache refresh steps
+- [x] Switch repository GitHub Pages source from legacy branch root to GitHub Actions workflow
+- [x] Confirm deployed HTML references built dist assets and not /src/main.tsx after switching Pages source
+- [x] Verify the live site renders after the Pages source-mode correction
+- [x] Check the latest GitHub Pages workflow run status after the user reran it
+- [x] Verify the live site now serves dist asset URLs and renders the PWA
+- [x] Document mobile hard refresh and service-worker cache reset steps
+- [ ] Reproduce the live PWA API request and capture the Apps Script response/error
+- [ ] Verify SHEET_ID and Apps Script deployment point to the same Code.gs project
+- [ ] Fix Auth.requireUser/authToken behavior so authenticated API reads can reach Google Sheets
+- [ ] Ensure PWA distinguishes live database data from fallback/demo data
+- [ ] Add a safe health/schema diagnostic action for connection troubleshooting
+- [ ] Test dashboard read, garden create, and data refresh against the real Apps Script endpoint

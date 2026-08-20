@@ -20,6 +20,7 @@ export default function App() {
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [connected, setConnected] = useState(false);
   const [showGardenForm, setShowGardenForm] = useState(false);
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [showReceiptForm, setShowReceiptForm] = useState(false);
@@ -33,6 +34,7 @@ export default function App() {
     try {
       const dashboard = await api.dashboard();
       setData(dashboard);
+      setConnected(true);
       const garden = dashboard.garden || gardens[0];
       if (garden?.id) {
         const [gardenRows, saleRows, agreementRows, walletRow, settlementRows] = await Promise.all([
@@ -50,7 +52,8 @@ export default function App() {
       }
       if (target === "notifications") setNotifications(await api.notifications.list());
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "ยังเชื่อมต่อ Apps Script ไม่ได้ จึงแสดงข้อมูลตัวอย่าง");
+      setConnected(false);
+      setMessage(error instanceof Error ? error.message : "ยังเชื่อมต่อ Google Sheets ไม่ได้");
     } finally {
       setLoading(false);
     }
@@ -76,6 +79,7 @@ export default function App() {
       <div className="brand"><span className="brand-mark"><Leaf size={22} /></span><span><b>ParaWallet</b><small>DUAL WALLET SYSTEM</small></span></div>
       <div className="top-actions"><div className="role-switch"><button className={role === "owner" ? "selected" : ""} onClick={() => setRole("owner")}>Owner</button><button className={role === "tapper" ? "selected" : ""} onClick={() => setRole("tapper")}>Tapper</button></div><button className="icon-button" onClick={() => openScreen("notifications")} aria-label="การแจ้งเตือน"><Bell size={20} /></button></div>
     </header>
+    {message && <div className={`sync-banner ${connected ? "connected" : "disconnected"}`} role="status"><strong>{connected ? "เชื่อมต่อฐานข้อมูลแล้ว" : "ยังไม่ได้เชื่อมต่อฐานข้อมูล"}</strong><span>{message}</span><button onClick={() => void refresh()} disabled={loading}>{loading ? "กำลังตรวจสอบ..." : "ลองใหม่"}</button></div>}
     <div className="layout">
       <aside className="sidebar">
         <div className="garden-selector"><small>กำลังดูข้อมูล</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong><span>{activeGarden ? `${activeGarden.areaRai || 0} ไร่ · ${(activeGarden.treeCount || 0).toLocaleString()} ต้น` : "เชื่อมต่อ Apps Script เพื่อเริ่มต้น"}</span></div>

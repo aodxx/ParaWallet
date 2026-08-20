@@ -56,6 +56,7 @@ function parseRequest_(e) {
 
 function routeAction_(request) {
   if (request.action === "health.get") return healthCheck_();
+  if (request.action === "diagnostics.get") return diagnosticsCheck_();
   var user = Auth.requireUser(request.authToken);
   switch (request.action) {
     case "dashboard.get": return Services.dashboard(user);
@@ -89,6 +90,23 @@ function routeAction_(request) {
 }
 
 function healthCheck_() { return { service: "parawallet-appsscript", status: "ok", timestamp: new Date().toISOString() }; }
+function diagnosticsCheck_() {
+  var result = { service: "parawallet-appsscript", status: "ok", timestamp: new Date().toISOString(), sheetIdConfigured: false, sheetAccessible: false, missingSheets: [], registeredUsers: 0 };
+  try {
+    result.sheetIdConfigured = Boolean(Config.get("SHEET_ID", false));
+    if (!result.sheetIdConfigured) { result.status = "error"; result.error = "MISSING_SCRIPT_PROPERTY:SHEET_ID"; return result; }
+    var book = SpreadsheetApp.openById(Config.spreadsheetId());
+    result.sheetAccessible = Boolean(book && book.getId());
+    result.missingSheets = SHEETS.filter(function (name) { return !book.getSheetByName(name); });
+    var usersSheet = book.getSheetByName("Users");
+    if (usersSheet && usersSheet.getLastRow() > 1) result.registeredUsers = usersSheet.getLastRow() - 1;
+    if (result.missingSheets.length) { result.status = "warning"; result.error = "SHEETS_NOT_INITIALIZED"; }
+  } catch (error) {
+    result.status = "error";
+    result.error = error && error.message ? error.message : String(error);
+  }
+  return result;
+}
 function okResponse_(requestId, data) { return { status: "ok", requestId: requestId, data: data }; }
 function errorResponse_(code, message, requestId) { return { status: "error", requestId: requestId, error: { code: code, message: message } }; }
 function jsonResponse_(body) { return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON); }
@@ -112,10 +130,16 @@ var Config = {
 
 var Auth = {
   requireUser: function (token) {
-    var email = token || Session.getActiveUser().getEmail();
-    if (!email) throw new Error("AUTH_REQUIRED");
+    // GitHub Pages calls an anonymous Apps Script Web App, so active user may be blank.
+    // Configure PUBLIC_USER_EMAIL for the current single-tenant MVP. Replace this
+    // boundary with Google OAuth before opening the app to multiple accounts.
+    var activeEmail = Session.getActiveUser().getEmail();
+    var effectiveEmail = Session.getEffectiveUser().getEmail();
+    var configuredEmail = Config.get("PUBLIC_USER_EMAIL", false) || Config.get("DEFAULT_USER_EMAIL", false);
+    var email = String(token || activeEmail || configuredEmail || effectiveEmail || "").trim();
+    if (!email) throw new Error("AUTH_REQUIRED: set PUBLIC_USER_EMAIL to a registered Users.email");
     var user = Repositories.findUserByEmail(email);
-    if (!user) throw new Error("USER_NOT_REGISTERED");
+    if (!user) throw new Error("USER_NOT_REGISTERED:" + email);
     return user;
   }
 };
