@@ -26,7 +26,8 @@ jobs:
       - run: pnpm build
         env:
           VITE_APPS_SCRIPT_URL: ${{ vars.VITE_APPS_SCRIPT_URL }}
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          # Client ID is public configuration; the repository variable can override it when permissions allow.
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || '1056693340258-61rj2pms6mpvn9iqmaoc2vfrfbh6lg19.apps.googleusercontent.com' }}
           VITE_BASE_PATH: /ParaWallet/
       - uses: actions/upload-pages-artifact@v3
         with:
