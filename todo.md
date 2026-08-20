@@ -74,9 +74,9 @@
 - [x] Make API parsing and startup loading fail safely without blanking the application
 - [x] Verify GitHub Actions deployment and live PWA rendering on desktop and mobile widths
 - [x] Document a stable mobile recovery path that does not require browser takeover
-- [ ] Remove Session.getActiveUser/getEffectiveUser from the production authentication path
-- [ ] Add Google Identity Services sign-in to the GitHub Pages PWA
-- [ ] Verify Google OpenID Connect ID tokens in Apps Script without userinfo.email scope
-- [ ] Persist and attach the signed-in ID token to API requests safely
-- [ ] Add OAuth configuration and failure-state instructions for Google Cloud Console
+- [x] Remove Session.getActiveUser/getEffectiveUser from the production authentication path
+- [x] Add Google Identity Services sign-in to the GitHub Pages PWA
+- [x] Verify Google OpenID Connect ID tokens in Apps Script without userinfo.email scope
+- [x] Persist and attach the signed-in ID token to API requests safely
+- [x] Add OAuth configuration and failure-state instructions for Google Cloud Console
 - [ ] Test signed-out, invalid-token, unregistered-user, and authenticated dashboard states
