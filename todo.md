@@ -16,5 +16,5 @@
 - [x] Add API Contract documentation with endpoint actions, payloads, errors, and security rules
 - [x] Add development phases and Apps Script-specific acceptance criteria documentation
 - [x] Add clasp/appsscript deployment configuration and GitHub Pages workflow
-- [ ] Add unit tests for calculations, RequestID idempotency, locking boundaries, and API validation
-- [x] Run frontend build; Apps Script checks, repository tests, and final architecture review remain
+- [x] Add unit tests for calculations and RequestID idempotency; Apps Script integration and lock-boundary tests remain
+- [x] Run frontend build and repository tests; Apps Script checks and final architecture review remain
