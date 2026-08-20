@@ -111,8 +111,21 @@
 - [ ] Identify the target garden before creating the GardenMembers relationship
 - [ ] Add the tapper GardenMembers row for the selected garden
 - [ ] Verify tapper sign-in and scoped garden visibility
-- [ ] Audit current manifest, favicon, Apple touch icon, and service-worker asset references
-- [ ] Create standard PNG icons for 48, 72, 96, 128, 144, 152, 192, 384, and 512 pixels
-- [ ] Create a maskable 512-pixel icon with safe-area padding
-- [ ] Update PWA manifest and HTML metadata for cross-device installation
-- [ ] Test production build and live icon asset responses
+- [x] Audit current manifest, favicon, Apple touch icon, and service-worker asset references
+- [x] Create standard PNG icons for 48, 72, 96, 128, 144, 152, 192, 384, and 512 pixels
+- [x] Create a maskable 512-pixel icon with safe-area padding
+- [x] Update PWA manifest and HTML metadata for cross-device installation
+- [x] Test production build and live icon asset responses
+- [x] Audit PRD.md requirements against current repository implementation and deployment evidence
+- [x] Reconcile PRD gaps with todo.md, code markers, tests, and Google Sheets state
+- [x] Classify unfinished items by production validation, security, reliability, usability, and deferred feature
+- [x] Produce a prioritized P0-P2 roadmap with acceptance gates
+- [x] Define reusable triggers and scope for the PWA + Apps Script + Sheets/Drive delivery skill
+- [x] Initialize a new skill package with required SKILL.md and resource folders
+- [x] Write reusable workflow instructions, checklists, failure handling, and acceptance gates
+- [x] Validate the skill package and deliver its SKILL.md attachment
+- [x] Audit current mobile layout, navigation, touch targets, hierarchy, and Owner/Tapper task flows
+- [x] Define a mobile-first visual system and bottom-navigation information architecture
+- [x] Redesign dashboard and primary action surfaces for one-handed use
+- [x] Redesign sale/OCR, settlement, garden, agreement, and notification flows for mobile
+- [x] Validate responsive CSS/build at mobile, tablet, and desktop breakpoint definitions; live-device screenshot validation remains recommended after deployment
