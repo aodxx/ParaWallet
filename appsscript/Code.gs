@@ -71,6 +71,7 @@ function routeAction_(request) {
     case "buyers.list": return Services.listBuyers(user, request.payload);
     case "sales.create": return Services.createSale(user, request.payload);
     case "sales.list": return Services.listSales(user, request.payload);
+    case "sales.duplicateCheck": return Services.duplicateCheck(user, request.payload);
     case "sales.confirm": return Services.confirmSale(user, request.payload);
     case "sales.dispute": return Services.disputeSale(user, request.payload);
     case "wallets.me": return Services.wallet(user, request.payload);
@@ -473,6 +474,23 @@ Services.listSales = function (user, payload) {
   return sales;
 };
 
+Services.duplicateCheck = function (user, payload) {
+  requireGarden_(user, payload.gardenId);
+  var targetDate = payload.saleDate ? new Date(payload.saleDate).getTime() : NaN;
+  var amount = numeric_(payload.grossSale || payload.netReceived);
+  var weight = numeric_(payload.netWeight || payload.weightKg);
+  var matches = rows_("Sales").filter(function (row) {
+    if (id_(row.gardenId) !== id_(payload.gardenId)) return false;
+    var sameDate = targetDate && new Date(row.saleDate).getTime() === targetDate;
+    var sameBuyer = payload.buyerName && String(row.buyerName || "").trim().toLowerCase() === String(payload.buyerName).trim().toLowerCase();
+    var sameAmount = amount > 0 && Math.abs(numeric_(row.grossSale) - amount) < 0.01;
+    var sameWeight = weight > 0 && Math.abs(numeric_(row.netWeight || row.weightKg) - weight) < 0.01;
+    var sameTicket = payload.ticketNumber && id_(row.ticketNumber) === id_(payload.ticketNumber);
+    return sameTicket || (sameDate && sameBuyer && (sameAmount || sameWeight));
+  });
+  return { possibleDuplicate: matches.length > 0, matches: matches.slice(0, 5) };
+};
+
 Services.confirmSale = function (user, payload) {
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
@@ -569,4 +587,16 @@ Services.report = function (user, payload) {
   var confirmed = sales.filter(function (row) { return row.status === "confirmed"; });
   var summary = { from: payload.from || "", to: payload.to || "", salesCount: sales.length, confirmedSales: confirmed.length, grossSales: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0)), ownerShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0)), tapperShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0)), deductions: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.buyerDeductions) + numeric_(row.sharedExpenses); }, 0)), settlements: round_(settlements.filter(function (row) { return row.status === "confirmed"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0)), outstanding: settlementOutstanding_(payload.gardenId, requireGarden_(user, payload.gardenId).garden.ownerId).outstanding };
   return { summary: summary, rows: sales };
+};
+
+
+Services.extractReceipt = function (user, payload) {
+  requireTapper_(user, payload.gardenId);
+  var file = DriveStorage.save(payload.data, payload.mimeType, payload.filename, "receipts", user.id);
+  var result = OCR.extract(payload.data, payload.mimeType);
+  var receiptId = Utilities.getUuid();
+  Repositories.append("Receipts", { id: receiptId, fileId: file.fileId, fileUrl: "", imageHash: payload.imageHash || "", ocrRawJson: JSON.stringify(result.fields || {}), ocrConfidenceJson: JSON.stringify({ confidence: result.confidence, needsReview: result.needsReview }), createdBy: user.id, manualNetAmount: false, createdAt: nowIso_() });
+  Repositories.append("OcrRecords", { id: Utilities.getUuid(), fileId: file.fileId, provider: result.provider, status: result.needsReview ? "needs_review" : "ready", confidence: result.confidence, rawJson: JSON.stringify(result.fields || {}), reviewedBy: "", createdAt: nowIso_() });
+  writeAudit_(user, "receipt_ocr_extracted", "receipt", receiptId, null, { provider: result.provider, confidence: result.confidence }, payload.requestId);
+  return { receiptId: receiptId, file: file, ocr: result, status: result.needsReview ? "ocr_review" : "ready" };
 };

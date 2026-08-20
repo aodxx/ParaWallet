@@ -64,6 +64,7 @@ export const api = {
   sales: {
     create: (payload: Record<string, unknown>) => callApi("sales.create", payload),
     list: (payload: { gardenId: string; from?: string; to?: string; status?: string; productTypeId?: string }) => callApi<unknown, Sale[]>("sales.list", payload),
+    duplicateCheck: (payload: Record<string, unknown>) => callApi("sales.duplicateCheck", payload),
     confirm: (saleId: string) => callApi("sales.confirm", { saleId }),
     dispute: (payload: { saleId: string; reason: string; note?: string; evidenceFileId?: string }) => callApi("sales.dispute", payload),
   },

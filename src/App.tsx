@@ -22,6 +22,8 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [showGardenForm, setShowGardenForm] = useState(false);
   const [showSaleForm, setShowSaleForm] = useState(false);
+  const [showReceiptForm, setShowReceiptForm] = useState(false);
+  const [showAgreementForm, setShowAgreementForm] = useState(false);
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const activeGarden = data.garden || gardens[0];
 
@@ -84,10 +86,10 @@ export default function App() {
         <div className="page-heading"><div><p>{new Date().toLocaleDateString("th-TH", { dateStyle: "full" })}</p><h1>{screenTitle(screen)}</h1><span>{role === "owner" ? "ภาพรวมสิทธิในเงิน รายการตรวจสอบ และยอดคงค้าง" : "รายได้ของคุณ เงินเจ้าของที่ถืออยู่ และรายการส่งเงิน"}</span></div><button className="period">เดือนนี้⌄</button></div>
         {message && <div className="notice">{message}</div>}
         {loading && <div className="notice">กำลังโหลดข้อมูลจาก Google Apps Script...</div>}
-        {screen === "overview" && <Overview data={data} wallet={wallet} role={role} onSale={() => setShowSaleForm(true)} onSettlement={() => setShowSettlementForm(true)} />}
+        {screen === "overview" && <Overview data={data} wallet={wallet} role={role} onSale={() => setShowSaleForm(true)} onReceipt={() => setShowReceiptForm(true)} onSettlement={() => setShowSettlementForm(true)} />}
         {screen === "sales" && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onRefresh={() => refresh("sales")} />}
         {screen === "gardens" && <GardensScreen gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} onCreate={() => setShowGardenForm(true)} />}
-        {screen === "agreements" && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} />}
+        {screen === "agreements" && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
         {screen === "settlements" && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} />}
         {screen === "reports" && <ReportsScreen garden={activeGarden} />}
         {screen === "notifications" && <NotificationsScreen notifications={notifications} onRead={async (id) => { await api.notifications.read(id); setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item)); }} />}
@@ -95,24 +97,26 @@ export default function App() {
     </div>
     {showGardenForm && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); void refresh("gardens"); }} />}
     {showSaleForm && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); void refresh("sales"); }} />}
+    {showReceiptForm && <ReceiptForm garden={activeGarden} agreement={agreements[0]} onClose={() => setShowReceiptForm(false)} onSaved={() => { setShowReceiptForm(false); void refresh("sales"); }} />}
+    {showAgreementForm && <AgreementForm garden={activeGarden} onClose={() => setShowAgreementForm(false)} onSaved={() => { setShowAgreementForm(false); void refresh("agreements"); }} />}
     {showSettlementForm && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={() => { setShowSettlementForm(false); void refresh("settlements"); }} />}
   </div>;
 }
 
 function screenTitle(screen: Screen) { return ({ overview: "ภาพรวมการแบ่งรายได้", sales: "รายการขายยาง", gardens: "สวนและแปลง", agreements: "ข้อตกลงแบ่งรายได้", settlements: "การส่งเงิน", reports: "รายงาน", notifications: "การแจ้งเตือน" } as Record<Screen, string>)[screen]; }
 
-function Overview({ data, wallet, role, onSale, onSettlement }: { data: DashboardData; wallet: WalletData | null; role: Role; onSale: () => void; onSettlement: () => void }) {
+function Overview({ data, wallet, role, onSale, onReceipt, onSettlement }: { data: DashboardData; wallet: WalletData | null; role: Role; onSale: () => void; onReceipt: () => void; onSettlement: () => void }) {
   const owner = wallet?.owner.totalEntitlement ?? data.wallet.owner;
   const tapper = wallet?.tapper.totalIncome ?? data.wallet.tapper;
   const outstanding = wallet?.owner.outstanding ?? data.wallet.outstanding;
-  return <><section className="metrics"><Metric label={role === "owner" ? "สิทธิของเจ้าของสวน" : "รายได้ของฉัน"} value={money(role === "owner" ? owner : tapper)} icon={<WalletCards />} /><Metric label="เงินเจ้าของที่ยังอยู่กับคนกรีด" value={money(outstanding)} icon={<CircleDollarSign />} /><Metric label="ยอดรอตรวจสอบ" value={money(data.wallet.outstanding)} icon={<FileText />} /><Metric label="ขายยางสะสม" value={money(data.monthlySales)} icon={<Sprout />} /></section><section className="hero-grid"><div className="sales-card"><div><small>ยอดขายรวมเดือนนี้</small><strong>{money(data.monthlySales)}</strong><span className="growth">Dual ledger <i>ข้อมูลจาก Apps Script</i></span></div><div className="bars">{[42,58,48,70,62,83,76,94].map((height, i) => <div key={i} style={{ height: `${height}%` }}><span>ส.{i + 1}</span></div>)}</div></div><div className="wallet-card"><div className="card-title"><span><WalletCards size={20} />กระเป๋าคู่</span><small>สิทธิในเงิน ไม่ใช่เงินฝาก</small></div><WalletLine label="เจ้าของสวน" amount={money(owner)} percent={60} color="green" /><WalletLine label="คนกรีดยาง" amount={money(tapper)} percent={40} color="gold" /><p className="balance">เจ้าของยังรอรับ {money(outstanding)}</p></div></section><section className="quick-actions"><button onClick={onSale}><ScanLine size={18} />สแกน/บันทึกรายการขาย</button><button onClick={onSettlement}><WalletCards size={18} />บันทึกการส่งเงิน</button><button onClick={() => window.alert("ใช้เมนูรายงานเพื่อเลือกช่วงวันที่และ export CSV")}>รายงานและส่งออก</button></section></>;
+  return <><section className="metrics"><Metric label={role === "owner" ? "สิทธิของเจ้าของสวน" : "รายได้ของฉัน"} value={money(role === "owner" ? owner : tapper)} icon={<WalletCards />} /><Metric label="เงินเจ้าของที่ยังอยู่กับคนกรีด" value={money(outstanding)} icon={<CircleDollarSign />} /><Metric label="ยอดรอตรวจสอบ" value={money(data.wallet.outstanding)} icon={<FileText />} /><Metric label="ขายยางสะสม" value={money(data.monthlySales)} icon={<Sprout />} /></section><section className="hero-grid"><div className="sales-card"><div><small>ยอดขายรวมเดือนนี้</small><strong>{money(data.monthlySales)}</strong><span className="growth">Dual ledger <i>ข้อมูลจาก Apps Script</i></span></div><div className="bars">{[42,58,48,70,62,83,76,94].map((height, i) => <div key={i} style={{ height: `${height}%` }}><span>ส.{i + 1}</span></div>)}</div></div><div className="wallet-card"><div className="card-title"><span><WalletCards size={20} />กระเป๋าคู่</span><small>สิทธิในเงิน ไม่ใช่เงินฝาก</small></div><WalletLine label="เจ้าของสวน" amount={money(owner)} percent={60} color="green" /><WalletLine label="คนกรีดยาง" amount={money(tapper)} percent={40} color="gold" /><p className="balance">เจ้าของยังรอรับ {money(outstanding)}</p></div></section><section className="quick-actions"><button onClick={onReceipt}><ScanLine size={18} />สแกนใบเสร็จ OCR</button><button onClick={onSale}><FileText size={18} />บันทึกรายการขายเอง</button><button onClick={onSettlement}><WalletCards size={18} />บันทึกการส่งเงิน</button><button onClick={() => window.alert("ใช้เมนูรายงานเพื่อเลือกช่วงวันที่และ export CSV")}>รายงานและส่งออก</button></section></>;
 }
 
-function SalesScreen({ sales, role, onSale, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onRefresh: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>รายการขายล่าสุด</h2><p>รายการที่อ้างอิงกลับไปยังบิลและ Agreement snapshot</p></div><div className="panel-actions"><button className="secondary" onClick={onRefresh}>รีเฟรช</button><button className="primary" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button></div></div>{sales.length === 0 ? <Empty text="ยังไม่มีรายการขายจากสวนที่เลือก" /> : <div className="data-list">{sales.map((sale) => <article className="data-row" key={sale.id}><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{sale.saleDate} · {sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span></div><div><strong>{money(sale.grossSale || 0)}</strong><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div>{role === "owner" && sale.status === "pending_owner_review" && <button className="link-button" onClick={() => window.alert("เปิดหน้ารายละเอียดเพื่อยืนยันหรือคัดค้านรายการ")}>ตรวจสอบ</button>}</article>)}</div>}</section>; }
+function SalesScreen({ sales, role, onSale, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onRefresh: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>รายการขายล่าสุด</h2><p>รายการที่อ้างอิงกลับไปยังบิลและ Agreement snapshot</p></div><div className="panel-actions"><button className="secondary" onClick={onRefresh}>รีเฟรช</button><button className="primary" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button></div></div>{sales.length === 0 ? <Empty text="ยังไม่มีรายการขายจากสวนที่เลือก" /> : <div className="data-list">{sales.map((sale) => <article className="data-row" key={sale.id}><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{sale.saleDate} · {sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span></div><div><strong>{money(sale.grossSale || 0)}</strong><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div>{role === "owner" && sale.status === "pending_owner_review" && <div className="panel-actions"><button className="link-button" onClick={async () => { await api.sales.confirm(sale.id); onRefresh(); }}>ยืนยัน</button><button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลที่คัดค้านรายการ"); if (reason) { await api.sales.dispute({ saleId: sale.id, reason }); onRefresh(); } }}>คัดค้าน</button></div>}</article>)}</div>}</section>; }
 
 function GardensScreen({ gardens, onCreate }: { gardens: Garden[]; onCreate: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>สวนและแปลง</h2><p>จัดการพื้นที่ จำนวนต้นยาง และข้อมูลสวน</p></div><button className="primary" onClick={onCreate}><Plus size={16} />เพิ่มสวน</button></div>{gardens.length === 0 ? <Empty text="ยังไม่มีสวนที่เชื่อมต่อกับบัญชี" /> : <div className="card-grid">{gardens.map((garden) => <div className="info-card" key={garden.id}><span className="eyebrow">ACTIVE GARDEN</span><h3>{garden.name}</h3><p>{garden.province || "ไม่ระบุจังหวัด"} · {garden.district || "ไม่ระบุอำเภอ"}</p><strong>{garden.areaRai || 0} ไร่ · {(garden.treeCount || 0).toLocaleString()} ต้น</strong></div>)}</div>}</section>; }
 
-function AgreementsScreen({ agreements, garden, role }: { agreements: Agreement[]; garden?: Garden; role: Role }) { return <section className="panel"><div className="panel-head"><div><h2>ข้อตกลงแบ่งรายได้</h2><p>{garden?.name || "เลือกสวนก่อนสร้างข้อตกลง"} · ทุก version ไม่กระทบรายการย้อนหลัง</p></div>{role === "owner" && <button className="secondary" onClick={() => window.alert("แบบฟอร์มสร้าง Agreement จะเชื่อมกับ Apps Script เมื่อมี Tapper ID")}>สร้าง version ใหม่</button>}</div>{agreements.length === 0 ? <Empty text="ยังไม่มี Agreement ที่ active" /> : <div className="data-list">{agreements.map((agreement) => <article className="data-row" key={agreement.id}><div><strong>Version {agreement.version}</strong><span>มีผล {agreement.effectiveFrom} · {agreement.status}</span></div><div><strong>{agreement.ownerPercentage}/{agreement.tapperPercentage}</strong><span>Owner / Tapper</span></div></article>)}</div>}</section>; }
+function AgreementsScreen({ agreements, garden, role, onCreate }: { agreements: Agreement[]; garden?: Garden; role: Role; onCreate: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>ข้อตกลงแบ่งรายได้</h2><p>{garden?.name || "เลือกสวนก่อนสร้างข้อตกลง"} · ทุก version ไม่กระทบรายการย้อนหลัง</p></div>{role === "owner" && <button className="secondary" onClick={onCreate}>สร้าง version ใหม่</button>}</div>{agreements.length === 0 ? <Empty text="ยังไม่มี Agreement ที่ active" /> : <div className="data-list">{agreements.map((agreement) => <article className="data-row" key={agreement.id}><div><strong>Version {agreement.version}</strong><span>มีผล {agreement.effectiveFrom} · {agreement.status}</span></div><div><strong>{agreement.ownerPercentage}/{agreement.tapperPercentage}</strong><span>Owner / Tapper</span></div></article>)}</div>}</section>; }
 
 function SettlementsScreen({ settlements, wallet, role, onCreate }: { settlements: Settlement[]; wallet: WalletData | null; role: Role; onCreate: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>การส่งเงินและยอดคงค้าง</h2><p>เงินของเจ้าของที่ยังอยู่กับคนกรีด: {money(wallet?.owner.outstanding || 0)}</p></div><button className="primary" onClick={onCreate}><Plus size={16} />บันทึกการส่งเงิน</button></div>{settlements.length === 0 ? <Empty text="ยังไม่มี settlement ในช่วงนี้" /> : <div className="data-list">{settlements.map((item) => <article className="data-row" key={item.id}><div><strong>{money(item.amount)}</strong><span>{item.method} · {item.transferDate || "ไม่ระบุวันที่"}</span></div><span className={`status ${item.status}`}>{labelStatus(item.status)}</span></article>)}</div>}</section>; }
 
@@ -131,3 +135,62 @@ function Empty({ text }: { text: string }) { return <div className="empty-state"
 function Metric({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) { return <div className="metric"><div><small>{label}</small><strong>{value}</strong><span>ข้อมูลล่าสุด</span></div><i>{icon}</i></div>; }
 function WalletLine({ label, amount, percent, color }: { label: string; amount: string; percent: number; color: string }) { return <div className="wallet-line"><div><span><b className={color} />{label}</span><strong>{amount}</strong></div><div className="progress"><i className={color} style={{ width: `${percent}%` }} /></div></div>; }
 function labelStatus(status: string) { return ({ pending_owner_review: "รอตรวจ", confirmed: "ยืนยันแล้ว", disputed: "โต้แย้ง", pending_owner_confirmation: "รอเจ้าของยืนยัน", partially_confirmed: "ยืนยันบางส่วน" } as Record<string, string>)[status] || status; }
+
+
+function ReceiptForm({ garden, agreement, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; onClose: () => void; onSaved: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({ saleDate: dateToday(), buyerName: "", productType: "", weightKg: "", unitPrice: "", grossSale: "", buyerDeductions: "0" });
+  const [receiptFileId, setReceiptFileId] = useState("");
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [status, setStatus] = useState("upload");
+  const [duplicate, setDuplicate] = useState<{ possibleDuplicate: boolean; matches?: Sale[] }>({ possibleDuplicate: false });
+  const [busy, setBusy] = useState(false);
+  const handleFile = async (selected: File | null) => {
+    if (!selected) return;
+    setFile(selected);
+    setBusy(true);
+    try {
+      const data = await readFileAsDataUrl_(selected);
+      const result = await api.receipts.extract({ data, mimeType: selected.type, filename: selected.name });
+      const extracted = (result as { ocr?: { fields?: Record<string, unknown>; confidence?: number; needsReview?: boolean }; file?: { fileId?: string } }).ocr;
+      const next = extracted?.fields || {};
+      setFields((current) => ({ ...current, ...Object.fromEntries(Object.entries(next).map(([key, value]) => [key, String(value ?? "")])) }));
+      setReceiptFileId(String((result as { file?: { fileId?: string } }).file?.fileId || ""));
+      setConfidence(Number(extracted?.confidence || 0));
+      setStatus(extracted?.needsReview ? "needs_review" : "ready");
+    } catch (error) {
+      setStatus("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const checkDuplicate = async () => {
+    if (!garden) return;
+    const result = await api.sales.duplicateCheck({ gardenId: garden.id, saleDate: fields.saleDate, buyerName: fields.buyerName, grossSale: Number(fields.grossSale || 0), weightKg: Number(fields.weightKg || 0) });
+    setDuplicate(result as { possibleDuplicate: boolean; matches?: Sale[] });
+    return result as { possibleDuplicate: boolean; matches?: Sale[] };
+  };
+  const submit = async () => {
+    if (!garden || !agreement) return;
+    setBusy(true);
+    try {
+      const duplicateResult = await checkDuplicate();
+      if (duplicateResult?.possibleDuplicate && status !== "confirmed_duplicate") { setStatus("duplicate"); return; }
+      await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, saleDate: fields.saleDate, buyerName: fields.buyerName, productType: fields.productType, weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), grossSale: Number(fields.grossSale || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId: receiptFileId, ocrConfidence: confidence || 0, manualEntry: false });
+      onSaved();
+    } finally { setBusy(false); }
+  };
+  const setField = (key: string, value: string) => setFields((current) => ({ ...current, [key]: value }));
+  return <Modal title="สแกนบิลและตรวจสอบ OCR" onClose={onClose}><div className="form-grid"><label>รูปบิล<input type="file" accept="image/*" capture="environment" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label>{file && <div className="calculation-preview"><span>ไฟล์: {file.name}</span><strong>{busy ? "กำลังอ่าน OCR..." : `สถานะ ${status}`}</strong></div>}<label>วันที่ขาย<input type="date" value={fields.saleDate} onChange={(e) => setField("saleDate", e.target.value)} /></label><label>ร้านรับซื้อ<input value={fields.buyerName} onChange={(e) => setField("buyerName", e.target.value)} /></label><label>ประเภทสินค้า<input value={fields.productType} onChange={(e) => setField("productType", e.target.value)} /></label><label>น้ำหนักสุทธิ (กก.)<input type="number" step="0.01" value={fields.weightKg} onChange={(e) => setField("weightKg", e.target.value)} /></label><label>ราคา/กก.<input type="number" step="0.01" value={fields.unitPrice} onChange={(e) => setField("unitPrice", e.target.value)} /></label><label>ยอดก่อนหัก<input type="number" step="0.01" value={fields.grossSale} onChange={(e) => setField("grossSale", e.target.value)} /></label><label>รายการหัก<input type="number" step="0.01" value={fields.buyerDeductions} onChange={(e) => setField("buyerDeductions", e.target.value)} /></label>{confidence !== null && <div className={`calculation-preview ${confidence < 0.7 ? "low-confidence" : ""}`}><span>OCR confidence: {(confidence * 100).toFixed(0)}%</span><strong>{confidence < 0.7 ? "ต้องตรวจสอบข้อมูลที่อ่านได้ต่ำ" : "ตรวจสอบข้อมูลก่อนยืนยัน"}</strong></div>}{duplicate.possibleDuplicate && <div className="calculation-preview low-confidence"><span>พบรายการที่อาจซ้ำ {duplicate.matches?.length || 0} รายการ</span><strong>ตรวจสอบก่อนกดยืนยันอีกครั้ง</strong></div>}<button className="secondary" onClick={() => void checkDuplicate()} disabled={!garden || busy}>ตรวจรายการซ้ำ</button><button className="primary" onClick={() => void submit()} disabled={!garden || !agreement || busy || !fields.saleDate}>{status === "duplicate" ? "ยืนยันว่าเป็นบิลคนละรายการ" : busy ? "กำลังบันทึก..." : "ยืนยันข้อมูลและสร้างรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี Agreement ที่ active ก่อนสร้างรายการขาย</small>}</div></Modal>;
+}
+
+function readFileAsDataUrl_(file: File) { return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = reject; reader.readAsDataURL(file); }); }
+
+
+function AgreementForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ tapperId: "", ownerPercentage: "60", tapperPercentage: "40", effectiveFrom: dateToday() });
+  const [busy, setBusy] = useState(false);
+  const total = Number(form.ownerPercentage || 0) + Number(form.tapperPercentage || 0);
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!garden || total !== 100) return; setBusy(true); try { await api.agreements.create({ gardenId: garden.id, tapperId: form.tapperId, ownerPercentage: Number(form.ownerPercentage), tapperPercentage: Number(form.tapperPercentage), effectiveFrom: form.effectiveFrom }); onSaved(); } finally { setBusy(false); } };
+  return <Modal title="สร้างข้อตกลงแบ่งรายได้" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>Tapper ID<input required value={form.tapperId} onChange={(e) => setForm({ ...form, tapperId: e.target.value })} placeholder="รหัสผู้กรีดจาก Users" /></label><label>เริ่มมีผลวันที่<input required type="date" value={form.effectiveFrom} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} /></label><label>สัดส่วน Owner (%)<input type="number" min="0" max="100" value={form.ownerPercentage} onChange={(e) => setForm({ ...form, ownerPercentage: e.target.value })} /></label><label>สัดส่วน Tapper (%)<input type="number" min="0" max="100" value={form.tapperPercentage} onChange={(e) => setForm({ ...form, tapperPercentage: e.target.value })} /></label><div className="calculation-preview"><span>รวมสัดส่วน</span><strong className={total === 100 ? "" : "form-hint"}>{total}% {total === 100 ? "พร้อมบันทึก" : "ต้องรวมให้ได้ 100%"}</strong></div><button className="primary" disabled={busy || !garden || total !== 100}>{busy ? "กำลังบันทึก..." : "สร้าง Agreement version"}</button></form></Modal>;
+}
