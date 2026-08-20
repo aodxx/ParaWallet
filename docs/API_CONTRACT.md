@@ -1,27 +1,75 @@
 # ParaWallet Apps Script API Contract
 
-All requests are JSON POST bodies to the deployed Web App URL. Apps Script returns a JSON envelope with `status`, `requestId`, and either `data` or an `error` object. The frontend never calls Google Sheets or Drive directly.
+All requests are JSON POST bodies sent to the deployed Google Apps Script Web App URL. The frontend never writes Google Sheets or Google Drive directly. Apps Script is the source of truth for authentication boundaries, permissions, calculations, locking, idempotency, audit, and state transitions.
 
-| Action | Method | Payload | Mutation |
-|---|---|---|---|
-| health.get | POST | none | No |
-| dashboard.get | POST | none | No |
-| gardens.list | POST | none | No |
-| sales.create | POST | gardenId, agreementId, saleDate, productType, weightKg, unitPrice, deductions | Yes |
-| payments.create | POST | gardenId, saleId?, toUserId, amount, method, reference, paidAt | Yes |
-| payments.confirm | POST | paymentId | Yes |
-| receipts.extract | POST | data, mimeType, filename | Yes: Drive + OCR records |
-
-A successful response has the following shape:
+## Request and response envelope
 
 ```json
-{"status":"ok","requestId":"2026-...","data":{}}
+{
+  "action": "sales.create",
+  "requestId": "uuid-or-client-generated-id",
+  "authToken": "optional-approved-session-token",
+  "payload": {}
+}
 ```
 
-An error response has the following shape:
+Successful responses use:
 
 ```json
-{"status":"error","requestId":"2026-...","error":{"code":"REQUEST_ID_REQUIRED","message":"requestId is required"}}
+{"status":"ok","requestId":"...","data":{}}
 ```
 
-Every mutation is validated server-side. Apps Script checks the authenticated user, role, garden membership, agreement ownership, and allowed state transition before entering a `LockService` critical section. It then checks the RequestID record/cache. If the RequestID already exists, the original response is returned and no Sheet or Drive write occurs.
+Errors use:
+
+```json
+{"status":"error","requestId":"...","error":{"code":"CODE","message":"Human-readable message"}}
+```
+
+Every mutation must include a unique `requestId`. A repeated RequestID returns the cached original response and must not append a second Sheet row or create a second Drive file.
+
+## Action contract
+
+| Action | Required payload | Role / scope | Mutation |
+|---|---|---|---:|
+| `health.get` | none | public health check | No |
+| `dashboard.get` | none | authenticated user | No |
+| `gardens.list` | none | Owner/member gardens | No |
+| `gardens.create` | name, location/area fields | Owner | Yes |
+| `gardens.update` | gardenId plus editable fields | Garden Owner | Yes |
+| `plots.list` | gardenId | Garden member | No |
+| `plots.create` | gardenId, name | Garden Owner | Yes |
+| `members.list` | gardenId | Garden member | No |
+| `agreements.list` | gardenId | Garden member | No |
+| `agreements.create` | gardenId, tapperId, percentages, effectiveFrom | Garden Owner | Yes |
+| `products.list` | none | Authenticated user | No |
+| `buyers.list` | gardenId | Garden member | No |
+| `receipts.extract` | base64 data, mimeType, filename | Tapper/member | Yes: Drive/OCR |
+| `sales.create` | gardenId, agreementId, saleDate, product, weight, price | Tapper | Yes: sale/wallet/audit/notification |
+| `sales.list` | gardenId, optional filters | Garden member | No |
+| `sales.confirm` | saleId | Garden Owner | Yes: status/wallet/audit/notification |
+| `sales.dispute` | saleId, reason, optional note/evidence | Garden member | Yes: dispute/status/audit/notification |
+| `wallets.me` | gardenId | Garden member | No |
+| `settlements.create` | gardenId, amount, method, allocation fields | Owner or Tapper | Yes: settlement/allocation/audit/notification |
+| `settlements.confirm` | settlementId | Garden Owner | Yes: status/audit/notification |
+| `payments.create` | gardenId, amount, method, recipient fields | Garden member | Yes |
+| `payments.confirm` | paymentId | Garden Owner | Yes |
+| `notifications.list` | none | Current user | No |
+| `notifications.read` | notificationId | Notification owner | Yes |
+| `reports.summary` | gardenId, from, to | Garden member | No |
+
+## Apps Script setup actions
+
+These are editor-only functions and are not exposed as unauthenticated Web App actions:
+
+```javascript
+setupParaWalletSheets();
+validateParaWalletSheets();
+```
+
+`setupParaWalletSheets()` creates missing tabs and writes the exact Data Model headers. If an existing tab has a different header order, it fails with `SCHEMA_MISMATCH:<tab>` rather than overwriting data.
+
+## Security and transaction boundary
+
+Every authenticated action must resolve a registered user, verify garden ownership or active membership, enforce the role-specific permission, validate the state transition, and then enter a `LockService` critical section for writes. File bytes go to Drive, while Sheets store metadata and references only. API keys remain in Apps Script `PropertiesService`.
+
+The current repository is an architecture-ready MVP scaffold. Before production, the placeholder token/email resolver in `Auth.requireUser()` must be replaced by an approved identity provider and the remaining state-specific permission tests must be completed.

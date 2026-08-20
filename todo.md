@@ -39,3 +39,15 @@
 - [x] Expose only a manual admin setup path rather than allowing unauthenticated bootstrap writes
 - [x] Document that the deployer must have Editor access to the ยางพารา Spreadsheet before initialization
 - [ ] Verify the 12 Data Model tabs appear after the user runs the setup action
+- [ ] Locate and parse the authoritative PRD.md and reconcile it with the current architecture
+- [ ] Inventory missing Owner/Tapper workflows and acceptance criteria against the current code
+- [x] Add initial garden, plot, and garden-member read/create/update API with role and membership checks; invite/pairing remains
+- [x] Add agreement creation, versioning, activation status, and historical snapshot API
+- [x] Add persisted sale list, duplicate-aware create path foundation, review confirm, and dispute API
+- [x] Add persisted dual-wallet aggregation and wallet entry API
+- [x] Add settlement partial-transfer allocation, confirmation, notification, and audit API
+- [x] Add notification read/list API and event creation for pending review/payment confirmation
+- [x] Add report API with custom date filtering and CSV-ready rows
+- [x] Add PWA screens/forms for gardens, agreements, sales, wallets, settlements, notifications, and reports; OCR review detail remains
+- [ ] Add Apps Script integration tests or deterministic contract tests for remaining workflows
+- [ ] Run final acceptance checks, frontend tests, Apps Script syntax checks, and production build

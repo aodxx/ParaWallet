@@ -41,7 +41,7 @@ function doPost(e) {
     if (cached) return jsonResponse_(cached);
     var result = routeAction_(request);
     var response = okResponse_(request.requestId, result);
-    Idempotency.put(request.requestId, response);
+    Idempotency.put(request.requestId, response, request.action);
     return jsonResponse_(response);
   } catch (error) {
     return jsonResponse_(errorResponse_("API_ERROR", error && error.message ? error.message : String(error), request && request.requestId ? request.requestId : "unknown"));
@@ -60,9 +60,28 @@ function routeAction_(request) {
   switch (request.action) {
     case "dashboard.get": return Services.dashboard(user);
     case "gardens.list": return Repositories.gardensForUser(user.id);
+    case "gardens.create": return Services.createGarden(user, request.payload);
+    case "gardens.update": return Services.updateGarden(user, request.payload);
+    case "plots.list": return Services.listPlots(user, request.payload);
+    case "plots.create": return Services.createPlot(user, request.payload);
+    case "members.list": return Services.listMembers(user, request.payload);
+    case "agreements.list": return Services.listAgreements(user, request.payload);
+    case "agreements.create": return Services.createAgreement(user, request.payload);
+    case "products.list": return Services.listProducts(user);
+    case "buyers.list": return Services.listBuyers(user, request.payload);
     case "sales.create": return Services.createSale(user, request.payload);
+    case "sales.list": return Services.listSales(user, request.payload);
+    case "sales.confirm": return Services.confirmSale(user, request.payload);
+    case "sales.dispute": return Services.disputeSale(user, request.payload);
+    case "wallets.me": return Services.wallet(user, request.payload);
+    case "settlements.list": return Services.listSettlements(user, request.payload);
+    case "settlements.create": return Services.createSettlement(user, request.payload);
+    case "settlements.confirm": return Services.confirmSettlement(user, request.payload);
     case "payments.create": return Services.createPayment(user, request.payload);
     case "payments.confirm": return Services.confirmPayment(user, request.payload);
+    case "notifications.list": return Services.listNotifications(user);
+    case "notifications.read": return Services.readNotification(user, request.payload);
+    case "reports.summary": return Services.report(user, request.payload);
     case "receipts.extract": return Services.extractReceipt(user, request.payload);
     default: throw new Error("UNKNOWN_ACTION:" + request.action);
   }
@@ -115,10 +134,26 @@ var Locking = {
 var Idempotency = {
   get: function (requestId) {
     var cache = CacheService.getScriptCache().get("request:" + requestId);
-    return cache ? JSON.parse(cache) : null;
+    if (cache) return JSON.parse(cache);
+    try {
+      var row = rows_("Requests").filter(function (item) { return id_(item.requestId) === id_(requestId); })[0];
+      if (row && row.responseJson) return JSON.parse(row.responseJson);
+    } catch (error) {
+      // Requests may not exist before the administrator runs setupParaWalletSheets().
+    }
+    return null;
   },
-  put: function (requestId, response) {
-    CacheService.getScriptCache().put("request:" + requestId, JSON.stringify(response), 21600);
+  put: function (requestId, response, action) {
+    var encoded = JSON.stringify(response);
+    CacheService.getScriptCache().put("request:" + requestId, encoded, 21600);
+    try {
+      Locking.run("request:" + requestId, function () {
+        var exists = rows_("Requests").some(function (item) { return id_(item.requestId) === id_(requestId); });
+        if (!exists) Repositories.append("Requests", { requestId: requestId, action: action || "", status: response.status, responseJson: encoded, createdAt: nowIso_() });
+      });
+    } catch (error) {
+      // Cache remains available when setup has not yet created the Requests tab.
+    }
   }
 };
 
@@ -126,15 +161,25 @@ var Idempotency = {
 // 4. GOOGLE SHEETS SCHEMA & REPOSITORIES
 // =====================================================
 
-var SHEETS = ["Users", "Gardens", "GardenMembers", "Agreements", "Sales", "Payments", "WalletTransactions", "Notifications", "AuditLogs", "Requests", "OcrRecords", "Files"];
+var SHEETS = ["Users", "Gardens", "Plots", "GardenMembers", "Agreements", "ProductTypes", "Buyers", "Receipts", "Sales", "SaleDeductions", "Payments", "WalletTransactions", "WalletEntries", "Settlements", "SettlementAllocations", "Disputes", "Adjustments", "Notifications", "AuditLogs", "Requests", "OcrRecords", "Files"];
 var HEADERS = {
   Users: ["id","email","name","role","status","createdAt"],
-  Gardens: ["id","ownerId","name","province","district","areaRai","treeCount","status","createdAt","updatedAt"],
+  Gardens: ["id","ownerId","name","locationText","province","district","areaRai","treeCount","status","createdAt","updatedAt"],
+  Plots: ["id","gardenId","name","notes","status","createdAt","updatedAt"],
   GardenMembers: ["id","gardenId","userId","role","status","createdAt"],
-  Agreements: ["id","gardenId","ownerId","tapperId","version","ownerPercentage","tapperPercentage","effectiveFrom","effectiveTo","expenseRules","status","createdAt"],
-  Sales: ["id","gardenId","agreementId","tapperId","saleDate","buyerName","productType","weightKg","unitPrice","grossSale","buyerDeductions","sharedExpenses","splitBase","ownerShare","tapperShare","status","receiptFileId","ocrConfidence","createdAt"],
+  Agreements: ["id","gardenId","ownerId","tapperId","version","ownerPercentage","tapperPercentage","sharedExpenseRulesJson","ownerExpenseRulesJson","tapperExpenseRulesJson","advanceRuleJson","effectiveFrom","effectiveTo","expenseRules","status","createdAt"],
+  ProductTypes: ["id","name","unit","calculationType","configJson","active","createdAt"],
+  Buyers: ["id","name","branch","contact","notes","status","createdAt"],
+  Receipts: ["id","fileId","fileUrl","imageHash","ocrRawJson","ocrConfidenceJson","createdBy","manualNetAmount","createdAt"],
+  Sales: ["id","gardenId","plotId","agreementId","tapperId","receiptId","buyerId","saleDate","ticketNumber","productTypeId","buyerName","productType","grossWeight","tareWeight","netWeight","drc","weightKg","unitPrice","pricePerUnit","grossSale","buyerDeductions","sharedExpenses","splitBase","ownerShare","tapperShare","netReceived","status","manualEntry","receiptFileId","ocrConfidence","createdAt","updatedAt"],
+  SaleDeductions: ["id","saleId","deductionType","description","amount","responsibility","createdAt"],
   Payments: ["id","gardenId","saleId","fromUserId","toUserId","amount","method","reference","proofFileId","status","paidAt","createdAt"],
   WalletTransactions: ["id","gardenId","userId","type","amount","sourceType","sourceId","requestId","createdAt"],
+  WalletEntries: ["id","walletOwnerUserId","saleId","settlementId","entryType","direction","amount","status","createdAt"],
+  Settlements: ["id","gardenId","tapperId","ownerId","method","amount","transferDate","bank","referenceNo","slipFileId","location","note","status","createdAt"],
+  SettlementAllocations: ["id","settlementId","saleId","amount","createdAt"],
+  Disputes: ["id","saleId","openedBy","reason","note","evidenceFileId","status","resolvedAt","createdAt"],
+  Adjustments: ["id","saleId","userId","adjustmentType","amount","reason","status","createdAt"],
   Notifications: ["id","userId","type","title","body","readAt","createdAt"],
   AuditLogs: ["id","actorId","entityType","entityId","action","beforeJson","afterJson","requestId","createdAt"],
   Requests: ["requestId","action","status","responseJson","createdAt"],
@@ -294,4 +339,234 @@ var Services = {
     Repositories.append("OcrRecords", { id: Utilities.getUuid(), fileId: file.fileId, provider: result.provider, status: result.needsReview ? "needs_review" : "ready", confidence: result.confidence, rawJson: JSON.stringify(result.fields), createdAt: new Date().toISOString() });
     return { file: file, ocr: result };
   }
+};
+
+
+// =====================================================
+// 8. PRD WORKFLOW SERVICES
+// =====================================================
+
+function nowIso_() { return new Date().toISOString(); }
+function jsonOrEmpty_(value) { return value ? JSON.stringify(value) : ""; }
+function parseJson_(value, fallback) { try { return value ? JSON.parse(value) : fallback; } catch (error) { return fallback; } }
+function rows_(name) { return Repositories.rows_(name); }
+function id_(value) { return String(value || ""); }
+function findById_(name, value) { return rows_(name).filter(function (row) { return id_(row.id) === id_(value); })[0] || null; }
+function requireGarden_(user, gardenId) {
+  var garden = findById_("Gardens", gardenId);
+  if (!garden) throw new Error("GARDEN_NOT_FOUND");
+  var isOwner = id_(garden.ownerId) === id_(user.id);
+  var member = rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && id_(row.userId) === id_(user.id) && row.status === "active"; })[0];
+  if (!isOwner && !member) throw new Error("GARDEN_ACCESS_DENIED");
+  return { garden: garden, isOwner: isOwner, member: member || null };
+}
+function requireOwner_(user, gardenId) { var access = requireGarden_(user, gardenId); if (!access.isOwner && user.role !== "admin") throw new Error("OWNER_PERMISSION_REQUIRED"); return access; }
+function requireTapper_(user, gardenId) { var access = requireGarden_(user, gardenId); if (access.isOwner || (access.member && access.member.role !== "tapper")) throw new Error("TAPPER_PERMISSION_REQUIRED"); return access; }
+function writeAudit_(actor, action, entityType, entityId, beforeValue, afterValue, requestId) {
+  Repositories.append("AuditLogs", { id: Utilities.getUuid(), actorId: actor.id, entityType: entityType, entityId: entityId, action: action, beforeJson: jsonOrEmpty_(beforeValue), afterJson: jsonOrEmpty_(afterValue), requestId: requestId || "", createdAt: nowIso_() });
+}
+function notifyUser_(userId, type, title, body) {
+  if (!userId) return;
+  Repositories.append("Notifications", { id: Utilities.getUuid(), userId: userId, type: type, title: title, body: body, readAt: "", createdAt: nowIso_() });
+}
+function updateRowById_(name, recordId, patch) {
+  var sheet = Repositories.sheet_(name);
+  var values = sheet.getDataRange().getValues();
+  var headers = values.shift() || [];
+  var idIndex = headers.indexOf("id");
+  if (idIndex < 0) throw new Error("ID_COLUMN_MISSING:" + name);
+  for (var i = 0; i < values.length; i++) {
+    if (id_(values[i][idIndex]) === id_(recordId)) {
+      Object.keys(patch).forEach(function (key) { var index = headers.indexOf(key); if (index >= 0) values[i][index] = patch[key]; });
+      sheet.getRange(i + 2, 1, 1, headers.length).setValues([values[i]]);
+      return true;
+    }
+  }
+  return false;
+}
+function filterByDate_(items, from, to, dateKey) {
+  var start = from ? new Date(from).getTime() : -Infinity;
+  var end = to ? new Date(to).getTime() + 86400000 - 1 : Infinity;
+  return items.filter(function (item) { var time = new Date(item[dateKey] || item.createdAt).getTime(); return isNaN(time) || (time >= start && time <= end); });
+}
+function numeric_(value) { var number = Number(value); return isNaN(number) ? 0 : number; }
+
+Services.createGarden = function (user, payload) {
+  if (user.role !== "owner" && user.role !== "admin") throw new Error("OWNER_PERMISSION_REQUIRED");
+  return Locking.run("garden:create:" + user.id, function () {
+    var gardenId = Utilities.getUuid();
+    Repositories.append("Gardens", { id: gardenId, ownerId: user.id, name: payload.name, locationText: payload.locationText || "", province: payload.province || "", district: payload.district || "", areaRai: payload.areaRai || 0, treeCount: payload.treeCount || 0, status: "active", createdAt: nowIso_(), updatedAt: nowIso_() });
+    Repositories.append("GardenMembers", { id: Utilities.getUuid(), gardenId: gardenId, userId: user.id, role: "owner", status: "active", createdAt: nowIso_() });
+    writeAudit_(user, "garden_created", "garden", gardenId, null, payload, payload.requestId);
+    return findById_("Gardens", gardenId);
+  });
+};
+
+Services.updateGarden = function (user, payload) {
+  requireOwner_(user, payload.gardenId);
+  var before = findById_("Gardens", payload.gardenId);
+  if (!before) throw new Error("GARDEN_NOT_FOUND");
+  var patch = { name: payload.name, locationText: payload.locationText, province: payload.province, district: payload.district, areaRai: payload.areaRai, treeCount: payload.treeCount, status: payload.status, updatedAt: nowIso_() };
+  updateRowById_("Gardens", payload.gardenId, patch);
+  writeAudit_(user, "garden_updated", "garden", payload.gardenId, before, patch, payload.requestId);
+  return findById_("Gardens", payload.gardenId);
+};
+
+Services.listPlots = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Plots").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && row.status !== "archived"; }); };
+Services.createPlot = function (user, payload) {
+  requireOwner_(user, payload.gardenId);
+  var plotId = Utilities.getUuid();
+  Repositories.append("Plots", { id: plotId, gardenId: payload.gardenId, name: payload.name, notes: payload.notes || "", status: "active", createdAt: nowIso_(), updatedAt: nowIso_() });
+  return findById_("Plots", plotId);
+};
+Services.listMembers = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && row.status === "active"; }); };
+
+Services.listAgreements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); }); };
+Services.createAgreement = function (user, payload) {
+  requireOwner_(user, payload.gardenId);
+  var existing = Services.listAgreements(user, payload);
+  var ownerPercentage = numeric_(payload.ownerPercentage);
+  var tapperPercentage = numeric_(payload.tapperPercentage);
+  if (round_(ownerPercentage + tapperPercentage) !== 100) throw new Error("PERCENTAGES_MUST_SUM_TO_100");
+  var agreementId = Utilities.getUuid();
+  var version = existing.length ? numeric_(existing[0].version) + 1 : 1;
+  Repositories.append("Agreements", { id: agreementId, gardenId: payload.gardenId, ownerId: user.id, tapperId: payload.tapperId, version: version, ownerPercentage: ownerPercentage, tapperPercentage: tapperPercentage, sharedExpenseRulesJson: jsonOrEmpty_(payload.sharedExpenseRules), ownerExpenseRulesJson: jsonOrEmpty_(payload.ownerExpenseRules), tapperExpenseRulesJson: jsonOrEmpty_(payload.tapperExpenseRules), advanceRuleJson: jsonOrEmpty_(payload.advanceRule), effectiveFrom: payload.effectiveFrom, effectiveTo: payload.effectiveTo || "", expenseRules: jsonOrEmpty_(payload.expenseRules), status: "active", createdAt: nowIso_() });
+  writeAudit_(user, "agreement_created", "agreement", agreementId, null, payload, payload.requestId);
+  if (payload.tapperId) notifyUser_(payload.tapperId, "agreement_created", "มีข้อตกลงใหม่", "เจ้าของสวนสร้างข้อตกลงเวอร์ชัน " + version);
+  return findById_("Agreements", agreementId);
+};
+Services.listProducts = function () { return rows_("ProductTypes").filter(function (row) { return row.active !== false && row.active !== "false"; }); };
+Services.listBuyers = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Buyers").filter(function (row) { return row.status !== "archived"; }); };
+
+function activeAgreement_(gardenId, agreementId) {
+  var agreement = agreementId ? findById_("Agreements", agreementId) : rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && row.status === "active"; }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); })[0];
+  if (!agreement) throw new Error("AGREEMENT_NOT_FOUND");
+  if (id_(agreement.gardenId) !== id_(gardenId)) throw new Error("AGREEMENT_GARDEN_MISMATCH");
+  return agreement;
+}
+
+Services.createSale = function (user, payload) {
+  requireTapper_(user, payload.gardenId);
+  return Locking.run("sale:" + payload.gardenId, function () {
+    var agreement = activeAgreement_(payload.gardenId, payload.agreementId);
+    var weight = payload.netWeight || payload.weightKg || 0;
+    var gross = payload.grossSale !== undefined ? numeric_(payload.grossSale) : numeric_(weight) * numeric_(payload.pricePerUnit || payload.unitPrice);
+    var calc = Calculator.sale({ weightKg: weight, unitPrice: payload.pricePerUnit || payload.unitPrice, buyerDeductions: payload.buyerDeductions, sharedExpenses: payload.sharedExpenses, ownerPercentage: agreement.ownerPercentage, tapperPercentage: agreement.tapperPercentage });
+    if (payload.netReceived !== undefined && numeric_(payload.netReceived) !== calc.splitBase) throw new Error("NET_RECEIVED_MISMATCH");
+    var saleId = Utilities.getUuid();
+    Repositories.append("Sales", { id: saleId, gardenId: payload.gardenId, plotId: payload.plotId || "", agreementId: agreement.id, tapperId: user.id, receiptId: payload.receiptId || "", buyerId: payload.buyerId || "", saleDate: payload.saleDate, ticketNumber: payload.ticketNumber || "", productTypeId: payload.productTypeId || "", buyerName: payload.buyerName || "", productType: payload.productType || "", grossWeight: payload.grossWeight || weight, tareWeight: payload.tareWeight || 0, netWeight: weight, drc: payload.drc || "", weightKg: weight, unitPrice: payload.unitPrice || payload.pricePerUnit, pricePerUnit: payload.pricePerUnit || payload.unitPrice, grossSale: gross || calc.grossSale, buyerDeductions: payload.buyerDeductions || 0, sharedExpenses: payload.sharedExpenses || 0, splitBase: calc.splitBase, ownerShare: calc.ownerShare, tapperShare: calc.tapperShare, netReceived: payload.netReceived || calc.splitBase, status: "pending_owner_review", manualEntry: payload.manualEntry === true, receiptFileId: payload.receiptFileId || "", ocrConfidence: payload.ocrConfidence || "", createdAt: nowIso_(), updatedAt: nowIso_() });
+    Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: agreement.ownerId, saleId: saleId, settlementId: "", entryType: "sale_entitlement", direction: "credit", amount: calc.ownerShare, status: "pending", createdAt: nowIso_() });
+    Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: user.id, saleId: saleId, settlementId: "", entryType: "tapper_income", direction: "credit", amount: calc.tapperShare, status: "pending", createdAt: nowIso_() });
+    notifyUser_(agreement.ownerId, "sale_pending_review", "มีรายการขายใหม่รอตรวจ", "รายการขาย " + saleId + " รอการยืนยัน");
+    writeAudit_(user, "sale_created", "sale", saleId, null, { payload: payload, agreementSnapshot: agreement, calculation: calc }, payload.requestId);
+    return { id: saleId, agreementSnapshot: agreement, calculation: calc, status: "pending_owner_review" };
+  });
+};
+
+Services.listSales = function (user, payload) {
+  requireGarden_(user, payload.gardenId);
+  var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); });
+  sales = filterByDate_(sales, payload.from, payload.to, "saleDate");
+  if (payload.status) sales = sales.filter(function (row) { return row.status === payload.status; });
+  if (payload.productTypeId) sales = sales.filter(function (row) { return id_(row.productTypeId) === id_(payload.productTypeId); });
+  sales.sort(function (a, b) { return new Date(b.saleDate || b.createdAt).getTime() - new Date(a.saleDate || a.createdAt).getTime(); });
+  return sales;
+};
+
+Services.confirmSale = function (user, payload) {
+  var sale = findById_("Sales", payload.saleId);
+  if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireOwner_(user, sale.gardenId);
+  if (sale.status !== "pending_owner_review" && sale.status !== "ocr_review") throw new Error("SALE_NOT_REVIEWABLE");
+  if (numeric_(sale.grossSale) < numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses) + numeric_(sale.ownerShare) + numeric_(sale.tapperShare)) throw new Error("LEDGER_IMBALANCE");
+  updateRowById_("Sales", sale.id, { status: "confirmed", updatedAt: nowIso_() });
+  rows_("WalletEntries").filter(function (row) { return id_(row.saleId) === id_(sale.id); }).forEach(function (entry) { updateRowById_("WalletEntries", entry.id, { status: "confirmed" }); });
+  writeAudit_(user, "sale_confirmed", "sale", sale.id, sale, { status: "confirmed" }, payload.requestId);
+  notifyUser_(sale.tapperId, "sale_confirmed", "เจ้าของยืนยันรายการขาย", "รายการขาย " + sale.id + " ได้รับการยืนยันแล้ว");
+  return findById_("Sales", sale.id);
+};
+
+Services.disputeSale = function (user, payload) {
+  var sale = findById_("Sales", payload.saleId);
+  if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireGarden_(user, sale.gardenId);
+  if (!payload.reason) throw new Error("DISPUTE_REASON_REQUIRED");
+  var disputeId = Utilities.getUuid();
+  Repositories.append("Disputes", { id: disputeId, saleId: sale.id, openedBy: user.id, reason: payload.reason, note: payload.note || "", evidenceFileId: payload.evidenceFileId || "", status: "open", resolvedAt: "", createdAt: nowIso_() });
+  updateRowById_("Sales", sale.id, { status: "disputed", updatedAt: nowIso_() });
+  var recipient = id_(user.id) === id_(sale.tapperId) ? findById_("Agreements", sale.agreementId).ownerId : sale.tapperId;
+  notifyUser_(recipient, "sale_disputed", "มีรายการขายถูกคัดค้าน", payload.reason);
+  writeAudit_(user, "sale_disputed", "sale", sale.id, sale, { status: "disputed", disputeId: disputeId, reason: payload.reason }, payload.requestId);
+  return { disputeId: disputeId, saleId: sale.id, status: "disputed" };
+};
+
+function settlementOutstanding_(gardenId, ownerId) {
+  var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && row.status === "confirmed"; });
+  var total = sales.reduce(function (sum, sale) { return sum + numeric_(sale.ownerShare); }, 0);
+  var settlements = rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && id_(row.ownerId) === id_(ownerId) && row.status === "confirmed"; });
+  var paid = settlements.reduce(function (sum, item) { return sum + numeric_(item.amount); }, 0);
+  return { entitlement: round_(total), received: round_(paid), outstanding: round_(Math.max(0, total - paid)) };
+}
+
+Services.wallet = function (user, payload) {
+  var access = requireGarden_(user, payload.gardenId);
+  var garden = access.garden;
+  var agreementRows = rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(garden.id); });
+  var ownerId = garden.ownerId;
+  var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(garden.id); });
+  var confirmed = sales.filter(function (row) { return row.status === "confirmed"; });
+  var pending = sales.filter(function (row) { return row.status === "pending_owner_review" || row.status === "ocr_review"; });
+  var disputed = sales.filter(function (row) { return row.status === "disputed"; });
+  var tapperId = access.member && access.member.role === "tapper" ? user.id : (payload.tapperId || "");
+  var ownerEntitlement = confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0);
+  var tapperIncome = confirmed.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0);
+  var settlement = settlementOutstanding_(garden.id, ownerId);
+  return { gardenId: garden.id, role: user.role, agreementCount: agreementRows.length, owner: { totalEntitlement: round_(ownerEntitlement), totalReceived: settlement.received, outstanding: settlement.outstanding, pending: pending.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0), disputed: disputed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) }, tapper: { totalIncome: round_(tapperIncome), ownerMoneyHeld: settlement.outstanding, ownerMoneyTransferred: settlement.received, pendingReviews: pending.length } };
+};
+
+Services.createSettlement = function (user, payload) {
+  requireGarden_(user, payload.gardenId);
+  var access = requireGarden_(user, payload.gardenId);
+  var isOwner = access.isOwner;
+  if (!isOwner && user.role !== "tapper") throw new Error("SETTLEMENT_PERMISSION_DENIED");
+  if (numeric_(payload.amount) <= 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
+  var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId).outstanding;
+  if (numeric_(payload.amount) > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
+  var settlementId = Utilities.getUuid();
+  Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: payload.tapperId || user.id, ownerId: payload.ownerId || access.garden.ownerId, method: payload.method, amount: payload.amount, transferDate: payload.transferDate || nowIso_(), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: payload.slipFileId || "", location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_() });
+  var remaining = numeric_(payload.amount);
+  rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && row.status === "confirmed"; }).sort(function (a, b) { return new Date(a.saleDate).getTime() - new Date(b.saleDate).getTime(); }).forEach(function (sale) {
+    if (remaining <= 0) return;
+    var allocated = Math.min(remaining, numeric_(sale.ownerShare));
+    var already = rows_("SettlementAllocations").filter(function (row) { return id_(row.saleId) === id_(sale.id); }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0);
+    allocated = Math.min(allocated, Math.max(0, numeric_(sale.ownerShare) - already));
+    if (allocated > 0) { Repositories.append("SettlementAllocations", { id: Utilities.getUuid(), settlementId: settlementId, saleId: sale.id, amount: allocated, createdAt: nowIso_() }); remaining = round_(remaining - allocated); }
+  });
+  notifyUser_(access.garden.ownerId, "settlement_pending", "มีรายการส่งเงินรอยืนยัน", "ยอด " + payload.amount);
+  writeAudit_(user, "settlement_created", "settlement", settlementId, null, payload, payload.requestId);
+  return findById_("Settlements", settlementId);
+};
+
+Services.listSettlements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return new Date(b.transferDate || b.createdAt).getTime() - new Date(a.transferDate || a.createdAt).getTime(); }); };
+
+Services.confirmSettlement = function (user, payload) {
+  var settlement = findById_("Settlements", payload.settlementId);
+  if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireOwner_(user, settlement.gardenId);
+  updateRowById_("Settlements", settlement.id, { status: "confirmed" });
+  writeAudit_(user, "settlement_confirmed", "settlement", settlement.id, settlement, { status: "confirmed" }, payload.requestId);
+  notifyUser_(settlement.tapperId, "settlement_confirmed", "เจ้าของยืนยันการรับเงิน", "ยอด " + settlement.amount);
+  return findById_("Settlements", settlement.id);
+};
+
+Services.listNotifications = function (user) { return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); }); };
+Services.readNotification = function (user, payload) { var notification = rows_("Notifications").filter(function (row) { return id_(row.id) === id_(payload.notificationId) && id_(row.userId) === id_(user.id); })[0]; if (!notification) throw new Error("NOTIFICATION_NOT_FOUND"); updateRowById_("Notifications", notification.id, { readAt: nowIso_() }); return findById_("Notifications", notification.id); };
+
+Services.report = function (user, payload) {
+  requireGarden_(user, payload.gardenId);
+  var sales = filterByDate_(rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }), payload.from, payload.to, "saleDate");
+  var settlements = filterByDate_(rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }), payload.from, payload.to, "transferDate");
+  var confirmed = sales.filter(function (row) { return row.status === "confirmed"; });
+  var summary = { from: payload.from || "", to: payload.to || "", salesCount: sales.length, confirmedSales: confirmed.length, grossSales: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0)), ownerShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0)), tapperShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0)), deductions: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.buyerDeductions) + numeric_(row.sharedExpenses); }, 0)), settlements: round_(settlements.filter(function (row) { return row.status === "confirmed"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0)), outstanding: settlementOutstanding_(payload.gardenId, requireGarden_(user, payload.gardenId).garden.ownerId).outstanding };
+  return { summary: summary, rows: sales };
 };
