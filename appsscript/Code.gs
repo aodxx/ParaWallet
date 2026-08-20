@@ -8,6 +8,7 @@
  * GEMINI_API_KEY (optional)
  * GOOGLE_CLOUD_VISION_API_KEY (optional)
  * ALLOWED_ORIGINS (optional)
+ * GOOGLE_OAUTH_CLIENT_ID (required for Google Sign-In)
  */
 
 // =====================================================
@@ -125,22 +126,31 @@ var Config = {
   driveRootId: function () { return this.get("DRIVE_ROOT_FOLDER_ID", true); },
   geminiKey: function () { return this.get("GEMINI_API_KEY", false); },
   visionKey: function () { return this.get("GOOGLE_CLOUD_VISION_API_KEY", false); },
-  allowedOrigins: function () { return this.get("ALLOWED_ORIGINS", false).split(",").filter(Boolean); }
+  allowedOrigins: function () { return this.get("ALLOWED_ORIGINS", false).split(",").filter(Boolean); },
+  googleClientId: function () { return this.get("GOOGLE_OAUTH_CLIENT_ID", true); }
 };
 
 var Auth = {
   requireUser: function (token) {
-    // GitHub Pages calls an anonymous Apps Script Web App, so active user may be blank.
-    // Configure PUBLIC_USER_EMAIL for the current single-tenant MVP. Replace this
-    // boundary with Google OAuth before opening the app to multiple accounts.
-    var activeEmail = Session.getActiveUser().getEmail();
-    var effectiveEmail = Session.getEffectiveUser().getEmail();
-    var configuredEmail = Config.get("PUBLIC_USER_EMAIL", false) || Config.get("DEFAULT_USER_EMAIL", false);
-    var email = String(token || activeEmail || configuredEmail || effectiveEmail || "").trim();
-    if (!email) throw new Error("AUTH_REQUIRED: set PUBLIC_USER_EMAIL to a registered Users.email");
-    var user = Repositories.findUserByEmail(email);
-    if (!user) throw new Error("USER_NOT_REGISTERED:" + email);
+    var claims = this.verifyGoogleIdToken_(token);
+    var user = Repositories.findUserByEmail(claims.email);
+    if (!user) throw new Error("USER_NOT_REGISTERED:" + claims.email);
+    user.googleSubject = claims.sub;
     return user;
+  },
+  verifyGoogleIdToken_: function (token) {
+    var raw = String(token || "").trim();
+    if (!raw) throw new Error("AUTH_REQUIRED: sign in with Google first");
+    var response = UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(raw), { method: "get", muteHttpExceptions: true });
+    if (response.getResponseCode() !== 200) throw new Error("INVALID_GOOGLE_ID_TOKEN");
+    var claims;
+    try { claims = JSON.parse(response.getContentText()); } catch (error) { throw new Error("INVALID_GOOGLE_ID_TOKEN"); }
+    var issuerOk = claims.iss === "accounts.google.com" || claims.iss === "https://accounts.google.com";
+    var audienceOk = claims.aud === Config.googleClientId();
+    var expiresAt = Number(claims.exp || 0);
+    var email = String(claims.email || "").trim().toLowerCase();
+    if (!issuerOk || !audienceOk || !claims.sub || !email || String(claims.email_verified) !== "true" || expiresAt <= Math.floor(new Date().getTime() / 1000)) throw new Error("INVALID_GOOGLE_ID_TOKEN");
+    return { sub: String(claims.sub), email: email };
   }
 };
 

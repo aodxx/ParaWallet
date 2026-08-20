@@ -27,6 +27,9 @@ export type WalletData = { gardenId: string; role: Role; owner: { totalEntitleme
 export type ReportData = { summary: { from: string; to: string; salesCount: number; confirmedSales: number; grossSales: number; ownerShare: number; tapperShare: number; deductions: number; settlements: number; outstanding: number }; rows: Sale[] };
 
 const apiUrl = (import.meta.env.VITE_APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwiW2tuD_RQUgygjZz-jIEfCLe03s6kdXXyz2Z2ZG8mUDwjvfA_luGrl4SpZ253UeH3/exec").replace(/\/$/, "");
+let currentAuthToken = "";
+export function setAuthToken(token: string) { currentAuthToken = token; }
+export function getAuthToken() { return currentAuthToken; }
 
 export function newRequestId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
@@ -35,7 +38,7 @@ export function newRequestId() {
 export async function callApi<TPayload, TResult>(action: string, payload?: TPayload, options: { signal?: AbortSignal; authToken?: string } = {}): Promise<TResult> {
   if (!apiUrl) throw new Error("VITE_APPS_SCRIPT_URL is not configured");
   const requestId = newRequestId();
-  const body: ApiRequest<TPayload> = { action, requestId, payload, authToken: options.authToken };
+  const body: ApiRequest<TPayload> = { action, requestId, payload, authToken: options.authToken ?? currentAuthToken };
   const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
   const envelope = (await response.json()) as ApiResponse<TResult>;
   if (envelope.status !== "ok") throw new Error(envelope.error?.message || "Apps Script request failed");

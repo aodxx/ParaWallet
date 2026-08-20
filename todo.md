@@ -68,9 +68,15 @@
 - [x] Ensure PWA distinguishes live database data from fallback/demo data
 - [x] Add a safe health/schema diagnostic action for connection troubleshooting
 - [ ] Test dashboard read, garden create, and data refresh against the real Apps Script endpoint
-- [ ] Reproduce the new white-screen failure from the latest GitHub Pages deployment
-- [ ] Inspect production asset paths, runtime console errors, service-worker cache, and build output
-- [ ] Add a top-level React runtime error boundary with a recoverable Thai error screen
-- [ ] Make API parsing and startup loading fail safely without blanking the application
-- [ ] Verify GitHub Actions deployment and live PWA rendering on desktop and mobile widths
-- [ ] Document a stable mobile recovery path that does not require browser takeover
+- [x] Reproduce the new white-screen failure from the latest GitHub Pages deployment
+- [x] Inspect production asset paths, runtime console errors, service-worker cache, and build output
+- [x] Add a top-level React runtime error boundary with a recoverable Thai error screen
+- [x] Make API parsing and startup loading fail safely without blanking the application
+- [x] Verify GitHub Actions deployment and live PWA rendering on desktop and mobile widths
+- [x] Document a stable mobile recovery path that does not require browser takeover
+- [ ] Remove Session.getActiveUser/getEffectiveUser from the production authentication path
+- [ ] Add Google Identity Services sign-in to the GitHub Pages PWA
+- [ ] Verify Google OpenID Connect ID tokens in Apps Script without userinfo.email scope
+- [ ] Persist and attach the signed-in ID token to API requests safely
+- [ ] Add OAuth configuration and failure-state instructions for Google Cloud Console
+- [ ] Test signed-out, invalid-token, unregistered-user, and authenticated dashboard states

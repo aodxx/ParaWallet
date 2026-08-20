@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { api, Agreement, DashboardData, Garden, Notification, Role, Sale, Settlement, WalletData } from "./api";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { api, Agreement, DashboardData, Garden, Notification, Role, Sale, Settlement, WalletData, setAuthToken } from "./api";
+import GoogleSignIn from "./GoogleSignIn";
 import { Bell, CircleDollarSign, FileText, Leaf, Menu, Plus, ScanLine, Settings2, Sprout, WalletCards, X } from "lucide-react";
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
@@ -7,10 +8,13 @@ type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | 
 const fallback: DashboardData = { role: "owner", garden: { id: "demo-garden", name: "สวนเขาแก้ว", province: "สงขลา", district: "หาดใหญ่", areaRai: 18, treeCount: 2460, status: "active" }, wallet: { owner: 18420, tapper: 12280, outstanding: 5643, currency: "THB" }, pendingReviews: 3, monthlySales: 30420 };
 const money = (value: number) => `฿${Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 const dateToday = () => new Date().toISOString().slice(0, 10);
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+const AUTH_STORAGE_KEY = "parawallet.googleIdToken";
 
 export default function App() {
   const [role, setRole] = useState<Role>("owner");
   const [screen, setScreen] = useState<Screen>("overview");
+  const [authToken, setAuthTokenState] = useState(() => localStorage.getItem(AUTH_STORAGE_KEY) || "");
   const [data, setData] = useState<DashboardData>(fallback);
   const [gardens, setGardens] = useState<Garden[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -59,7 +63,23 @@ export default function App() {
     }
   };
 
-  useEffect(() => { void refresh("overview"); }, []);
+  useEffect(() => {
+    setAuthToken(authToken);
+    if (authToken) void refresh("overview");
+    else { setConnected(false); setMessage("กรุณาเข้าสู่ระบบด้วย Google ก่อนเชื่อมต่อฐานข้อมูล"); }
+  }, [authToken]);
+
+  const handleCredential = useCallback((token: string) => {
+    localStorage.setItem(AUTH_STORAGE_KEY, token);
+    setAuthTokenState(token);
+    setMessage("กำลังตรวจสอบบัญชี Google กับระบบ...");
+  }, []);
+  const handleSignOut = useCallback(() => {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setAuthToken("");
+    setAuthTokenState("");
+    window.google?.accounts?.id?.disableAutoSelect?.();
+  }, []);
 
   const nav = useMemo(() => [
     ["overview", "ภาพรวม", <Leaf size={18} />],
@@ -73,11 +93,13 @@ export default function App() {
 
   const openScreen = (next: Screen) => { setScreen(next); void refresh(next); };
 
+  if (!authToken) return <AuthScreen clientId={googleClientId} message={message} onCredential={handleCredential} onError={setMessage} />;
+
   return <div className="app-shell">
     <header className="topbar">
       <button className="icon-button mobile-only" aria-label="เปิดเมนู"><Menu size={21} /></button>
       <div className="brand"><span className="brand-mark"><Leaf size={22} /></span><span><b>ParaWallet</b><small>DUAL WALLET SYSTEM</small></span></div>
-      <div className="top-actions"><div className="role-switch"><button className={role === "owner" ? "selected" : ""} onClick={() => setRole("owner")}>Owner</button><button className={role === "tapper" ? "selected" : ""} onClick={() => setRole("tapper")}>Tapper</button></div><button className="icon-button" onClick={() => openScreen("notifications")} aria-label="การแจ้งเตือน"><Bell size={20} /></button></div>
+      <div className="top-actions"><button className="secondary signout-button" onClick={handleSignOut}>ออกจากระบบ</button><div className="role-switch"><button className={role === "owner" ? "selected" : ""} onClick={() => setRole("owner")}>Owner</button><button className={role === "tapper" ? "selected" : ""} onClick={() => setRole("tapper")}>Tapper</button></div><button className="icon-button" onClick={() => openScreen("notifications")} aria-label="การแจ้งเตือน"><Bell size={20} /></button></div>
     </header>
     {message && <div className={`sync-banner ${connected ? "connected" : "disconnected"}`} role="status"><strong>{connected ? "เชื่อมต่อฐานข้อมูลแล้ว" : "ยังไม่ได้เชื่อมต่อฐานข้อมูล"}</strong><span>{message}</span><button onClick={() => void refresh()} disabled={loading}>{loading ? "กำลังตรวจสอบ..." : "ลองใหม่"}</button></div>}
     <div className="layout">
@@ -108,6 +130,10 @@ export default function App() {
 }
 
 function screenTitle(screen: Screen) { return ({ overview: "ภาพรวมการแบ่งรายได้", sales: "รายการขายยาง", gardens: "สวนและแปลง", agreements: "ข้อตกลงแบ่งรายได้", settlements: "การส่งเงิน", reports: "รายงาน", notifications: "การแจ้งเตือน" } as Record<Screen, string>)[screen]; }
+
+function AuthScreen({ clientId, message, onCredential, onError }: { clientId: string; message: string; onCredential: (token: string) => void; onError: (message: string) => void }) {
+  return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE ACCESS</p><h1>เข้าสู่ระบบ ParaWallet</h1><p>ใช้บัญชี Google เพื่อยืนยันตัวตน แล้วระบบจะโหลดข้อมูลเฉพาะสวนและสิทธิ์ของคุณจาก Google Sheets</p><GoogleSignIn clientId={clientId} onCredential={onCredential} onError={onError} />{message && <div className="notice">{message}</div>}<small>ระบบจะไม่เรียกใช้ Session.getEffectiveUser และจะไม่เก็บรหัสผ่าน Google</small></section></main>;
+}
 
 function Overview({ data, wallet, role, onSale, onReceipt, onSettlement }: { data: DashboardData; wallet: WalletData | null; role: Role; onSale: () => void; onReceipt: () => void; onSettlement: () => void }) {
   const owner = wallet?.owner.totalEntitlement ?? data.wallet.owner;
