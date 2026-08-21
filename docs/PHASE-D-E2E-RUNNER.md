@@ -21,7 +21,7 @@
 1. เปิด Apps Script project เดิมที่อยู่เบื้องหลัง Web App URL ของ ParaWallet
 2. สำรอง `Code.gs` เดิมไว้ก่อน แล้วแทนที่ด้วย `appsscript/Code.gs` ฉบับล่าสุดจาก repository โดยคงสถาปัตยกรรม single-file ไว้
 3. กด Save และรัน `previewAuthorizedE2ETest()` ก่อน ฟังก์ชันนี้เป็น read-only และควรแสดงสวนป่าพะยอมกับรายการที่มีอยู่ก่อนรัน
-4. จากผลการทดสอบครั้งแรก หากแท็บ `Agreements` แสดงหัวตาราง legacy 12 คอลัมน์ ให้รัน `repairParaWalletAgreementSchema()` หนึ่งครั้ง ฟังก์ชันนี้ซ่อมเฉพาะกรณีที่หัวตารางตรงกับ legacy schema ที่รู้จักเท่านั้น
+4. จากผลการทดสอบครั้งแรก หากแท็บ `Agreements` แสดงหัวตาราง legacy 12 คอลัมน์ ให้รัน `repairParaWalletAgreementSchema()` หนึ่งครั้ง ฟังก์ชันนี้ซ่อมเฉพาะกรณีที่หัวตารางขึ้นต้นด้วย legacy schema ที่รู้จัก และช่องท้ายที่เหลือเป็นค่าว่างเท่านั้น
 5. รัน `previewAuthorizedE2ETest()` อีกครั้งเพื่อตรวจว่า Agreement แสดง `status=active`, `effectiveFrom` และเปอร์เซ็นต์ 60/40 อยู่ในคอลัมน์ที่ถูกต้อง
 6. หาก preview ถูกต้อง ให้รัน `runAuthorizedE2ETestOnce()` เพียงครั้งเดียว แล้วอนุญาตสิทธิ์ Apps Script หากระบบร้องขอ
 7. รัน `getAuthorizedE2ETestResult()` และเปิด Execution log เพื่ออ่านผลสรุป หากสำเร็จจะมีสถานะ `completed` และผลลัพธ์ถูกเก็บใน Script Properties
@@ -29,7 +29,7 @@
 
 ## การป้องกันความเสียหาย
 
-ฟังก์ชันนี้ไม่รับข้อมูลจาก HTTP request, ใช้ Script Lock, ตรวจสอบ Garden/Users/GardenMembers ก่อนทำรายการ, ใช้ request IDs คงที่สำหรับ test run, ตรวจสอบรายการเดิมก่อนเพิ่มซ้ำ และตั้งสถานะ `PARAWALLET_E2E_PAHPAYOM_STATUS=completed` หลังตรวจสอบหลักฐานครบเท่านั้น หากรันสำเร็จแล้ว การรันซ้ำจะหยุดด้วย `E2E_ALREADY_COMPLETED`
+ก่อนสร้าง Agreement หรือ Sale runner จะตรวจหัวตาราง `Agreements` ให้ตรงกับ Data Model ปัจจุบัน หากยังไม่ถูกซ่อมจะหยุดด้วย `E2E_AGREEMENTS_SCHEMA_REPAIR_REQUIRED` ฟังก์ชันนี้ไม่รับข้อมูลจาก HTTP request, ใช้ Script Lock, ตรวจสอบ Garden/Users/GardenMembers ก่อนทำรายการ, ใช้ request IDs คงที่สำหรับ test run, ตรวจสอบรายการเดิมก่อนเพิ่มซ้ำ และตั้งสถานะ `PARAWALLET_E2E_PAHPAYOM_STATUS=completed` หลังตรวจสอบหลักฐานครบเท่านั้น หากรันสำเร็จแล้ว การรันซ้ำจะหยุดด้วย `E2E_ALREADY_COMPLETED`
 
 การคำนวณและการเปลี่ยนสถานะยังผ่าน `Services.createAgreement`, `Services.createSale`, `Services.confirmSale`, `Services.createSettlement` และ `Services.confirmSettlement` ซึ่งเป็นเส้นทางเดียวกับ backend ปกติ ไม่ใช่การเขียน Sheet โดยตรงจาก Frontend
 

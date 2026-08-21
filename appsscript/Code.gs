@@ -769,6 +769,9 @@ function runAuthorizedE2ETestOnce() {
 
     var gardenId = "garden-pahpayom-001";
     var ownerId = "user-owner-001";
+    var agreementHeader = readHeaders_(Repositories.sheet_("Agreements"));
+    var expectedAgreementHeader = HEADERS.Agreements;
+    if (!headersEqual_(agreementHeader, expectedAgreementHeader)) throw new Error("E2E_AGREEMENTS_SCHEMA_REPAIR_REQUIRED");
     var tapperId = "user-tapper-001";
     var runTag = "E2E-PAHPAYOM-001";
     var saleRequestId = runTag + "-SALE";
@@ -879,9 +882,11 @@ function repairParaWalletAgreementSchema() {
   var legacy = ["id", "gardenId", "ownerId", "tapperId", "version", "ownerPercentage", "tapperPercentage", "effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"];
   var sheet = Repositories.sheet_("Agreements");
   var actual = readHeaders_(sheet);
+  var legacyPrefix = actual.slice(0, legacy.length);
+  var trailingBlank = actual.slice(legacy.length).every(function (value) { return String(value || "") === ""; });
   if (headersEqual_(actual, expected)) return { status: "already_correct", headers: actual };
-  if (!headersEqual_(actual, legacy)) throw new Error("AGREEMENTS_SCHEMA_UNEXPECTED:" + actual.join(","));
+  if (legacyPrefix.length !== legacy.length || !headersEqual_(legacyPrefix, legacy) || !trailingBlank) throw new Error("AGREEMENTS_SCHEMA_UNEXPECTED:" + actual.join(","));
   sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
   sheet.setFrozenRows(1);
-  return { status: "repaired", headers: expected };
+  return { status: "repaired", previousHeaders: actual, headers: expected };
 }

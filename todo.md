@@ -174,5 +174,8 @@
 - [x] Add safe recovery for the partially completed runner without duplicating Sale or Settlement records
 - [x] Re-run syntax, Vitest, typecheck, and build verification after the Agreement fix
 - [x] Verify repository Code.gs contains repairParaWalletAgreementSchema() and the E2E runner at the latest commit
-- [ ] Verify whether the Apps Script project/deployment is still using the older Code.gs revision
-- [ ] Document exact sync, save, and redeploy steps without creating duplicate financial records
+- [x] Verify whether the Apps Script project/deployment is still using the older Code.gs revision
+- [x] Document exact sync, save, and redeploy steps without creating duplicate financial records
+- [x] Support legacy Agreements headers with four trailing blank cells in the repair function
+- [x] Verify repaired Agreement maps status=active and effectiveFrom correctly before createSale
+- [x] Re-run repository verification and update the Apps Script rerun instructions
