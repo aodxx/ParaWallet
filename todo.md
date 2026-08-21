@@ -183,3 +183,15 @@
 - [x] Build a deterministic in-memory Apps Script/Sheets-style E2E harness
 - [x] Add automated tests for Agreement, Sale, confirmation, Settlement, allocation, ledger, and idempotency transitions
 - [x] Run the complete verification suite and write a sandbox E2E report
+- [x] Define reusable ParaWallet delivery skill scope and trigger conditions
+- [x] Create the skill package with concise SKILL.md and focused reference files
+- [x] Validate the skill package with the official skill validator
+- [x] Deliver the reusable SKILL.md package to the user
+- [x] Read Agreement, Sales, Settlements, WalletEntries, SettlementAllocations, and AuditLogs for the approved garden without mutation
+- [x] Determine whether the duplicate Agreements are safe to supersede or require an editor-only repair
+- [ ] Run production health and diagnostics through the available Apps Script endpoint
+- [x] Record deployment synchronization findings and produce a safe status report
+- [x] Add a centralized Agreements schema validation guard before financial mutations
+- [x] Expose schema state in read-only diagnostics without changing production data
+- [x] Add regression tests for legacy headers, trailing blanks, and mutation blocking
+- [x] Update deployment and read-only verification documentation with the new guards

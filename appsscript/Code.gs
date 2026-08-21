@@ -109,9 +109,13 @@ function diagnosticsCheck_() {
     var book = SpreadsheetApp.openById(Config.spreadsheetId());
     result.sheetAccessible = Boolean(book && book.getId());
     result.missingSheets = SHEETS.filter(function (name) { return !book.getSheetByName(name); });
+    result.schema = Repositories.validateSchema();
+    result.schemaMismatches = result.schema.filter(function (item) { return item.status !== "ok"; });
+    result.financialSchemaReady = result.missingSheets.length === 0 && result.schemaMismatches.length === 0;
     var usersSheet = book.getSheetByName("Users");
     if (usersSheet && usersSheet.getLastRow() > 1) result.registeredUsers = usersSheet.getLastRow() - 1;
     if (result.missingSheets.length) { result.status = "warning"; result.error = "SHEETS_NOT_INITIALIZED"; }
+    else if (result.schemaMismatches.length) { result.status = "warning"; result.error = "SCHEMA_MISMATCH"; }
   } catch (error) {
     result.status = "error";
     result.error = error && error.message ? error.message : String(error);
@@ -312,6 +316,13 @@ function round_(value) { return Math.round((Number(value) + Number.EPSILON) * 10
 function readHeaders_(sheet) { return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (value) { return String(value); }); }
 function headersEqual_(actual, expected) { return actual.length === expected.length && expected.every(function (header, index) { return actual[index] === header; }); }
 function assertHeaders_(sheet, name) { var actual = readHeaders_(sheet); if (!headersEqual_(actual, HEADERS[name])) throw new Error("SCHEMA_MISMATCH:" + name + ": expected [" + HEADERS[name].join(",") + "] but found [" + actual.join(",") + "]"); }
+function assertFinancialSchemaReady_() {
+  ["Users", "Gardens", "GardenMembers", "Agreements", "Sales", "WalletEntries", "Settlements", "SettlementAllocations", "Notifications", "AuditLogs", "Requests"].forEach(function (name) {
+    var sheet = Repositories.sheet_(name);
+    if (!sheet) throw new Error("SHEET_MISSING:" + name);
+    assertHeaders_(sheet, name);
+  });
+}
 
 // =====================================================
 // 6. GOOGLE DRIVE STORAGE & OCR ADAPTERS
@@ -383,6 +394,7 @@ var Services = {
     });
   },
   createPayment: function (user, payload) {
+    assertFinancialSchemaReady_();
     return Locking.run("payment:" + payload.gardenId, function () {
       var id = Utilities.getUuid();
       Repositories.append("Payments", { id: id, gardenId: payload.gardenId, saleId: payload.saleId, fromUserId: user.id, toUserId: payload.toUserId, amount: payload.amount, method: payload.method, reference: payload.reference, status: "pending", paidAt: payload.paidAt, createdAt: new Date().toISOString() });
@@ -390,6 +402,7 @@ var Services = {
     });
   },
   confirmPayment: function (user, payload) {
+    assertFinancialSchemaReady_();
     return Locking.run("payment-confirm:" + payload.id, function () {
       Repositories.append("AuditLogs", { id: Utilities.getUuid(), actorId: user.id, entityType: "payment", entityId: payload.id, action: "confirm", requestId: payload.requestId, createdAt: new Date().toISOString() });
       return { success: true };
@@ -483,6 +496,7 @@ Services.listMembers = function (user, payload) { requireGarden_(user, payload.g
 
 Services.listAgreements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); }); };
 Services.createAgreement = function (user, payload) {
+  assertFinancialSchemaReady_();
   requireOwner_(user, payload.gardenId);
   var existing = Services.listAgreements(user, payload);
   if (!payload.effectiveFrom || isNaN(new Date(payload.effectiveFrom).getTime())) throw new Error("AGREEMENT_EFFECTIVE_FROM_REQUIRED");
@@ -516,6 +530,7 @@ function activeAgreement_(gardenId, agreementId, saleDate) {
 }
 
 Services.createSale = function (user, payload) {
+  assertFinancialSchemaReady_();
   var access = requireTapper_(user, payload.gardenId);
   var agreement = activeAgreement_(payload.gardenId, payload.agreementId, payload.saleDate);
   if (id_(agreement.tapperId) !== id_(user.id)) throw new Error("AGREEMENT_TAPPER_MISMATCH");
@@ -561,6 +576,7 @@ Services.duplicateCheck = function (user, payload) {
 };
 
 Services.confirmSale = function (user, payload) {
+  assertFinancialSchemaReady_();
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
   requireOwner_(user, sale.gardenId);
@@ -622,6 +638,7 @@ Services.wallet = function (user, payload) {
 };
 
 Services.createSettlement = function (user, payload) {
+  assertFinancialSchemaReady_();
   var access = requireGarden_(user, payload.gardenId);
   var isOwner = access.isOwner;
   if (!isOwner && user.role !== "tapper") throw new Error("SETTLEMENT_PERMISSION_DENIED");
@@ -643,6 +660,7 @@ Services.createSettlement = function (user, payload) {
 Services.listSettlements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return new Date(b.transferDate || b.createdAt).getTime() - new Date(a.transferDate || a.createdAt).getTime(); }); };
 
 Services.confirmSettlement = function (user, payload) {
+  assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
   requireOwner_(user, settlement.gardenId);
@@ -711,6 +729,7 @@ Services.resolveDispute = function (user, payload) {
 };
 
 Services.createAdjustment = function (user, payload) {
+  assertFinancialSchemaReady_();
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
   requireOwner_(user, sale.gardenId);
