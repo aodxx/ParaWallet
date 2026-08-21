@@ -133,3 +133,9 @@
 - [x] Update PRD mobile UX, navigation, responsive, accessibility, and reliability requirements
 - [x] Add mobile-specific acceptance criteria and release-scope items
 - [x] Validate PRD terminology and commit the synchronized documentation
+- [x] Audit Phase A P0 requirements against appsscript/Code.gs, src/App.tsx, api client, tests, and Sheets schema
+- [x] Fix settlement creation/confirmation so allocations and ledger effects occur only after Owner confirmation
+- [x] Make financial mutation idempotency and LockService behavior atomic for P0 mutation paths
+- [x] Enforce server-side calculation inputs and agreement/garden/tapper/date validation
+- [x] Remove or block demo financial values from production UI error states
+- [x] Add Phase A automated tests and run build/test verification

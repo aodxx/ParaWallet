@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newRequestId } from "../src/api";
+import { allocateSettlement, assertActiveTapperMember, calculateSale, validateAgreementWindow } from "../src/financial";
 
 type SplitInput = { grossSale: number; buyerDeductions?: number; sharedExpenses?: number; ownerPercentage: number; tapperPercentage: number };
 function calculate(input: SplitInput) {
@@ -25,5 +26,32 @@ describe("ParaWallet core safeguards", () => {
   });
   it("rejects invalid percentage contracts", () => {
     expect(() => calculate({ grossSale: 100, ownerPercentage: 70, tapperPercentage: 20 })).toThrow("PERCENTAGES_MUST_SUM_TO_100");
+  });
+  it("keeps server-equivalent sale calculation authoritative", () => {
+    const result = calculateSale({ weightKg: 100, unitPrice: 50, buyerDeductions: 200, sharedExpenses: 100, ownerPercentage: 60, tapperPercentage: 40 });
+    expect(result.grossSale).toBe(5000);
+    expect(result.splitBase).toBe(4700);
+    expect(result.ownerShare + result.tapperShare).toBe(result.splitBase);
+  });
+  it("rejects negative deductions and invalid sale input", () => {
+    expect(() => calculateSale({ weightKg: 0, unitPrice: 50, ownerPercentage: 60, tapperPercentage: 40 })).toThrow("SALE_INPUT_INVALID");
+    expect(() => calculateSale({ weightKg: 10, unitPrice: 50, buyerDeductions: -1, ownerPercentage: 60, tapperPercentage: 40 })).toThrow("DEDUCTION_INVALID");
+  });
+  it("accepts only sales inside the agreement effective window", () => {
+    expect(validateAgreementWindow("2026-01-01", "2026-12-31", "2026-06-30")).toBe(true);
+    expect(validateAgreementWindow("2026-01-01", "2026-12-31", "2027-01-01")).toBe(false);
+  });
+  it("requires an active tapper garden member", () => {
+    expect(assertActiveTapperMember({ role: "tapper", status: "active" })).toBe(true);
+    expect(() => assertActiveTapperMember({ role: "owner", status: "active" })).toThrow("TAPPER_NOT_ACTIVE_MEMBER");
+    expect(() => assertActiveTapperMember({ role: "tapper", status: "disabled" })).toThrow("TAPPER_NOT_ACTIVE_MEMBER");
+  });
+  it("allocates a confirmed settlement without exceeding sale entitlements", () => {
+    const allocations = allocateSettlement(800, [
+      { saleId: "sale-1", ownerShare: 500, alreadyAllocated: 100 },
+      { saleId: "sale-2", ownerShare: 600, alreadyAllocated: 0 },
+    ]);
+    expect(allocations).toEqual([{ saleId: "sale-1", amount: 400 }, { saleId: "sale-2", amount: 400 }]);
+    expect(() => allocateSettlement(1201, [{ saleId: "sale-1", ownerShare: 1200, alreadyAllocated: 0 }])).toThrow("SETTLEMENT_ALLOCATION_MISMATCH");
   });
 });

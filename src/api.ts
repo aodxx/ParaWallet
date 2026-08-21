@@ -35,9 +35,9 @@ export function newRequestId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export async function callApi<TPayload, TResult>(action: string, payload?: TPayload, options: { signal?: AbortSignal; authToken?: string } = {}): Promise<TResult> {
+export async function callApi<TPayload, TResult>(action: string, payload?: TPayload, options: { signal?: AbortSignal; authToken?: string; requestId?: string } = {}): Promise<TResult> {
   if (!apiUrl) throw new Error("VITE_APPS_SCRIPT_URL is not configured");
-  const requestId = newRequestId();
+  const requestId = options.requestId ?? newRequestId();
   const body: ApiRequest<TPayload> = { action, requestId, payload, authToken: options.authToken ?? currentAuthToken };
   const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
   const envelope = (await response.json()) as ApiResponse<TResult>;
@@ -75,7 +75,8 @@ export const api = {
   settlements: {
     list: (gardenId: string) => callApi<unknown, Settlement[]>("settlements.list", { gardenId }),
     create: (payload: Record<string, unknown>) => callApi<unknown, Settlement>("settlements.create", payload),
-    confirm: (settlementId: string) => callApi("settlements.confirm", { settlementId }),
+    confirm: (settlementId: string, requestId?: string) => callApi("settlements.confirm", { settlementId }, { requestId }),
+    reject: (payload: { settlementId: string; reason: string }, requestId?: string) => callApi("settlements.reject", payload, { requestId }),
   },
   notifications: {
     list: () => callApi<undefined, Notification[]>("notifications.list"),
