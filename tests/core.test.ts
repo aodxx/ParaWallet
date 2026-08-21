@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newRequestId } from "../src/api";
-import { allocateSettlement, assertActiveTapperMember, calculateOcrValidationScore, calculateSale, canCancelSettlement, resolveDispute, validateAgreementWindow } from "../src/financial";
+import { allocateSettlement, assertActiveTapperMember, calculateOcrValidationScore, calculateSale, canCancelSettlement, canConfirmSale, canCreateAdjustment, canDisputeSale, canResolveDispute, classifyOcrScore, isDuplicateSale, isIdempotentReplay, reconcileWallet, resolveDispute, validateAgreementPercentages, validateAgreementWindow } from "../src/financial";
 
 type SplitInput = { grossSale: number; buyerDeductions?: number; sharedExpenses?: number; ownerPercentage: number; tapperPercentage: number };
 function calculate(input: SplitInput) {
@@ -69,5 +69,42 @@ describe("ParaWallet core safeguards", () => {
     const score = calculateOcrValidationScore({ saleDate: "2026-08-21", buyerName: "Buyer", productType: "Latex", weightKg: 100, unitPrice: 50, grossSale: 5000, buyerDeductions: 0 });
     expect(score).toBe(100);
     expect(calculateOcrValidationScore({ weightKg: 100, unitPrice: 50, grossSale: 5200 })).toBe(50);
+  });
+  it.each([[100, "high"], [90, "high"], [89, "recommended"], [80, "recommended"], [79, "mandatory"], [0, "mandatory"]] as const)("classifies OCR score %s as %s", (score, expected) => {
+    expect(classifyOcrScore(score)).toBe(expected);
+  });
+  it.each([[60, 40], [100, 0], [0, 100]] as const)("accepts agreement percentages %s/%s", (owner, tapper) => {
+    expect(validateAgreementPercentages(owner, tapper)).toBe(true);
+  });
+  it.each([[60, 30, "PERCENTAGES_MUST_SUM_TO_100"], [-1, 101, "PERCENTAGE_OUT_OF_RANGE"], [101, 0, "PERCENTAGE_OUT_OF_RANGE"]] as const)("rejects invalid agreement percentages %s/%s", (owner, tapper, error) => {
+    expect(() => validateAgreementPercentages(owner, tapper)).toThrow(error);
+  });
+  it("detects duplicate sales only inside the same garden and matching business fields", () => {
+    const existing = [{ gardenId: "g1", saleDate: "2026-08-21", buyerName: "Buyer A", weightKg: 100, grossSale: 5000 }];
+    expect(isDuplicateSale({ gardenId: "g1", saleDate: "2026-08-21", buyerName: " buyer a ", weightKg: 100, grossSale: 5000 }, existing)).toBe(true);
+    expect(isDuplicateSale({ gardenId: "g2", saleDate: "2026-08-21", buyerName: "Buyer A", weightKg: 100, grossSale: 5000 }, existing)).toBe(false);
+    expect(isDuplicateSale({ gardenId: "g1", saleDate: "2026-08-22", buyerName: "Buyer A", weightKg: 100, grossSale: 5000 }, existing)).toBe(false);
+  });
+  it("reconciles wallet balances without allowing negative outstanding", () => {
+    expect(reconcileWallet(5000, 3000)).toEqual({ outstanding: 2000, balanced: false });
+    expect(reconcileWallet(5000, 5000)).toEqual({ outstanding: 0, balanced: true });
+    expect(reconcileWallet(5000, 5200)).toEqual({ outstanding: 0, balanced: true });
+  });
+  it.each([["pending_owner_review", "owner", true], ["pending_owner_review", "tapper", false], ["confirmed", "owner", false], ["disputed", "owner", false]] as const)("sale confirmation authorization %s/%s = %s", (status, role, expected) => {
+    expect(canConfirmSale(status, role)).toBe(expected);
+  });
+  it.each([["confirmed", "owner", true], ["confirmed", "tapper", true], ["pending_owner_review", "tapper", true], ["disputed", "tapper", false], ["confirmed", "viewer", false]] as const)("sale dispute authorization %s/%s = %s", (status, role, expected) => {
+    expect(canDisputeSale(status, role)).toBe(expected);
+  });
+  it.each([["open", "owner", true], ["under_review", "owner", true], ["open", "tapper", false], ["resolved", "owner", false]] as const)("dispute resolution authorization %s/%s = %s", (status, role, expected) => {
+    expect(canResolveDispute(status, role)).toBe(expected);
+  });
+  it.each([["confirmed", "owner", true], ["confirmed", "tapper", false], ["pending_owner_review", "owner", false], ["disputed", "owner", false]] as const)("adjustment authorization %s/%s = %s", (status, role, expected) => {
+    expect(canCreateAdjustment(status, role)).toBe(expected);
+  });
+  it("replays only the exact stored RequestID", () => {
+    expect(isIdempotentReplay("req-1", "req-1")).toBe(true);
+    expect(isIdempotentReplay("req-1", "req-2")).toBe(false);
+    expect(isIdempotentReplay(undefined, "req-1")).toBe(false);
   });
 });

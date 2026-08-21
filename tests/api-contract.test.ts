@@ -1,0 +1,53 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiError, callApi, onAuthFailure, setAuthToken } from "../src/api";
+
+describe("Apps Script API contract", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    setAuthToken("");
+    onAuthFailure(() => undefined);
+  });
+
+  it("returns data from a successful envelope", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "ok", requestId: "req-1", data: { connected: true } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(callApi("health.get", undefined, { requestId: "req-1" })).resolves.toEqual({ connected: true });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("preserves the caller request ID and auth token in the request body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "ok", requestId: "req-2", data: {} }) });
+    vi.stubGlobal("fetch", fetchMock);
+    setAuthToken("id-token");
+    await callApi("dashboard.get", { gardenId: "garden-1" }, { requestId: "req-2" });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    expect(body).toMatchObject({ action: "dashboard.get", requestId: "req-2", authToken: "id-token", payload: { gardenId: "garden-1" } });
+  });
+
+  it("maps structured server errors to ApiError with code and retryability", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "error", requestId: "req-3", error: { code: "SETTLEMENT_EXCEEDS_OUTSTANDING", message: "amount too high", retryable: false } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = callApi("settlements.confirm", { settlementId: "s1" }, { requestId: "req-3" });
+    await expect(request).rejects.toMatchObject({ name: "ApiError", code: "SETTLEMENT_EXCEEDS_OUTSTANDING", retryable: false, message: "amount too high" });
+  });
+
+  it("clears auth through the registered failure handler for an expired token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "error", requestId: "req-4", error: { code: "GOOGLE_TOKEN_EXPIRED", message: "expired", retryable: false } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const authFailure = vi.fn();
+    onAuthFailure(authFailure);
+    await expect(callApi("dashboard.get", undefined, { requestId: "req-4" })).rejects.toBeInstanceOf(ApiError);
+    expect(authFailure).toHaveBeenCalledOnce();
+  });
+
+  it("does not treat business validation errors as authentication failures", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "error", requestId: "req-5", error: { code: "SALE_INPUT_INVALID", message: "invalid sale", retryable: false } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const authFailure = vi.fn();
+    onAuthFailure(authFailure);
+    await expect(callApi("sales.create", {}, { requestId: "req-5" })).rejects.toBeInstanceOf(ApiError);
+    expect(authFailure).not.toHaveBeenCalled();
+  });
+});
+

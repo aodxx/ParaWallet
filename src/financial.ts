@@ -87,3 +87,42 @@ export function calculateOcrValidationScore(fields: Record<string, unknown>): nu
   if (Number(fields.buyerDeductions ?? 0) >= 0) score += 5;
   return score;
 }
+
+export function classifyOcrScore(score: number): "high" | "recommended" | "mandatory" {
+  return score >= 90 ? "high" : score >= 80 ? "recommended" : "mandatory";
+}
+
+export function validateAgreementPercentages(ownerPercentage: number, tapperPercentage: number): boolean {
+  if (ownerPercentage < 0 || tapperPercentage < 0 || ownerPercentage > 100 || tapperPercentage > 100) throw new Error("PERCENTAGE_OUT_OF_RANGE");
+  if (Math.round((ownerPercentage + tapperPercentage) * 100) / 100 !== 100) throw new Error("PERCENTAGES_MUST_SUM_TO_100");
+  return true;
+}
+
+export function isDuplicateSale(candidate: { gardenId: string; saleDate: string; buyerName?: string; weightKg?: number; grossSale?: number }, existing: Array<{ gardenId: string; saleDate: string; buyerName?: string; weightKg?: number; grossSale?: number }>): boolean {
+  return existing.some((row) => row.gardenId === candidate.gardenId && row.saleDate === candidate.saleDate && (row.buyerName || "").trim().toLowerCase() === (candidate.buyerName || "").trim().toLowerCase() && Math.abs(Number(row.weightKg || 0) - Number(candidate.weightKg || 0)) <= 0.01 && Math.abs(Number(row.grossSale || 0) - Number(candidate.grossSale || 0)) <= 0.01);
+}
+
+export function reconcileWallet(entitlement: number, received: number): { outstanding: number; balanced: boolean } {
+  const outstanding = Math.max(0, Math.round((entitlement - received + Number.EPSILON) * 100) / 100);
+  return { outstanding, balanced: outstanding === 0 };
+}
+
+export function canConfirmSale(status: string, role: string): boolean {
+  return role === "owner" && status === "pending_owner_review";
+}
+
+export function canDisputeSale(status: string, role: string): boolean {
+  return (role === "owner" || role === "tapper") && ["pending_owner_review", "confirmed"].includes(status);
+}
+
+export function canResolveDispute(status: string, role: string): boolean {
+  return role === "owner" && ["open", "under_review"].includes(status);
+}
+
+export function canCreateAdjustment(saleStatus: string, role: string): boolean {
+  return role === "owner" && saleStatus === "confirmed";
+}
+
+export function isIdempotentReplay(storedRequestId: string | undefined, requestId: string): boolean {
+  return Boolean(storedRequestId && requestId && storedRequestId === requestId);
+}

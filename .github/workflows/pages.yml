@@ -23,7 +23,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - run: pnpm verify
         env:
           VITE_APPS_SCRIPT_URL: ${{ vars.VITE_APPS_SCRIPT_URL }}
           # Client ID is public configuration; the repository variable can override it when permissions allow.

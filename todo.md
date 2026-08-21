@@ -144,3 +144,8 @@
 - [x] Connect Phase B workflows to the PWA and mobile UI with explicit loading/error/empty states
 - [x] Add Phase B regression tests and run syntax, typecheck, build, and production verification
 - [x] Document Phase B deployment steps and remaining risks
+- [x] Read and reconcile Phase C requirements with the post-Phase-B test and CI baseline
+- [x] Define a 30–50 test matrix covering business rules, authorization, idempotency, OCR, disputes, settlements, adjustments, and reconciliation
+- [x] Add deterministic test fixtures and integration/contract harnesses without writing production test data
+- [x] Add CI gates for tests, typecheck, Apps Script syntax check, build, and diff validation
+- [x] Run the complete Phase C verification suite and document remaining untested paths
