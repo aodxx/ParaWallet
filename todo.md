@@ -179,3 +179,7 @@
 - [x] Support legacy Agreements headers with four trailing blank cells in the repair function
 - [x] Verify repaired Agreement maps status=active and effectiveFrom correctly before createSale
 - [x] Re-run repository verification and update the Apps Script rerun instructions
+- [x] Define an explicit non-production E2E fixture and expected financial outputs
+- [x] Build a deterministic in-memory Apps Script/Sheets-style E2E harness
+- [x] Add automated tests for Agreement, Sale, confirmation, Settlement, allocation, ledger, and idempotency transitions
+- [x] Run the complete verification suite and write a sandbox E2E report
