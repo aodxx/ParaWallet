@@ -130,6 +130,7 @@ export default function App() {
         {screen === "notifications" && <NotificationsScreen notifications={notifications} onRead={async (id) => { await api.notifications.read(id); setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item)); }} />}
       </main>
     </div>
+    <DeveloperCredit />
     <nav className="mobile-bottom-nav" aria-label="เมนูหลักบนมือถือ"><button className={screen === "overview" ? "active" : ""} onClick={() => openScreen("overview")}><Leaf size={19} /><span>ภาพรวม</span></button><button className={screen === "sales" ? "active" : ""} onClick={() => openScreen("sales")}><FileText size={19} /><span>รายการ</span>{data.pendingReviews > 0 && <em>{data.pendingReviews}</em>}</button><button className={screen === "settlements" ? "active" : ""} onClick={() => openScreen("settlements")}><WalletCards size={19} /><span>กระเป๋า</span></button><button className={screen === "notifications" ? "active" : ""} onClick={() => openScreen("notifications")}><Bell size={19} /><span>แจ้งเตือน</span></button><button className={screen === "gardens" || screen === "agreements" || screen === "reports" ? "active" : ""} onClick={() => openScreen("gardens")}><Menu size={19} /><span>เพิ่มเติม</span></button></nav>
     {showGardenForm && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); void refresh("gardens"); }} />}
     {showSaleForm && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); void refresh("sales"); }} />}
@@ -140,6 +141,10 @@ export default function App() {
 }
 
 function screenTitle(screen: Screen) { return ({ overview: "ภาพรวมการแบ่งรายได้", sales: "รายการขายยาง", gardens: "สวนและแปลง", agreements: "ข้อตกลงแบ่งรายได้", settlements: "การส่งเงิน", reports: "รายงาน", notifications: "การแจ้งเตือน" } as Record<Screen, string>)[screen]; }
+
+function DeveloperCredit() {
+  return <footer className="developer-credit" aria-label="เครดิตผู้พัฒนา"><span className="developer-credit__label">Developed by <strong>aod</strong></span><a className="developer-credit__link" href="https://www.facebook.com/share/1AWvhjdr44/" target="_blank" rel="noreferrer" aria-label="เปิด Facebook ของ aod"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.6 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a21 21 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.5v3h2.7v8h3.4Z" /></svg><span>Facebook</span></a></footer>;
+}
 
 function AuthScreen({ clientId, message, onCredential, onError }: { clientId: string; message: string; onCredential: (token: string) => void; onError: (message: string) => void }) {
   return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE ACCESS</p><h1>เข้าสู่ระบบ ParaWallet</h1><p>ใช้บัญชี Google เพื่อยืนยันตัวตน แล้วระบบจะโหลดข้อมูลเฉพาะสวนและสิทธิ์ของคุณจาก Google Sheets</p><GoogleSignIn clientId={clientId} onCredential={onCredential} onError={onError} />{message && <div className="notice">{message}</div>}<small>ระบบจะไม่เรียกใช้ Session.getEffectiveUser และจะไม่เก็บรหัสผ่าน Google</small></section></main>;
