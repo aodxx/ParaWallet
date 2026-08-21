@@ -752,3 +752,120 @@ Services.extractReceipt = function (user, payload) {
   writeAudit_(user, "receipt_ocr_extracted", "receipt", receiptId, null, { provider: result.provider, confidence: result.confidence }, payload.requestId);
   return { receiptId: receiptId, file: file, ocr: result, status: result.needsReview ? "ocr_review" : "ready" };
 };
+
+
+// =====================================================
+// 10. CONTROLLED ONE-TIME E2E TEST RUNNER
+// =====================================================
+// Run manually from the Apps Script editor only. This function is intentionally
+// not exposed through doPost and is restricted to the approved test garden and
+// registered Owner/Tapper IDs. It is resumable after a partial failure and
+// permanently blocks itself after a successful completion.
+function runAuthorizedE2ETestOnce() {
+  return Locking.run("e2e:pahpayom:once", function () {
+    var props = PropertiesService.getScriptProperties();
+    var stateKey = "PARAWALLET_E2E_PAHPAYOM_STATUS";
+    if (props.getProperty(stateKey) === "completed") throw new Error("E2E_ALREADY_COMPLETED");
+
+    var gardenId = "garden-pahpayom-001";
+    var ownerId = "user-owner-001";
+    var tapperId = "user-tapper-001";
+    var runTag = "E2E-PAHPAYOM-001";
+    var saleRequestId = runTag + "-SALE";
+    var settlementRequestId = runTag + "-SETTLEMENT";
+    var owner = findById_("Users", ownerId);
+    var tapper = findById_("Users", tapperId);
+    var garden = findById_("Gardens", gardenId);
+    if (!owner || owner.status !== "active" || owner.role !== "owner") throw new Error("E2E_OWNER_FIXTURE_INVALID");
+    if (!tapper || tapper.status !== "active" || tapper.role !== "tapper") throw new Error("E2E_TAPPER_FIXTURE_INVALID");
+    if (!garden || id_(garden.ownerId) !== ownerId || garden.status !== "active") throw new Error("E2E_GARDEN_FIXTURE_INVALID");
+    var membership = rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === gardenId && id_(row.userId) === tapperId && row.role === "tapper" && row.status === "active"; })[0];
+    if (!membership) throw new Error("E2E_TAPPER_MEMBERSHIP_INVALID");
+
+    var agreement = rows_("Agreements").filter(function (row) { return id_(row.gardenId) === gardenId && id_(row.tapperId) === tapperId && row.status === "active"; }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); })[0];
+    if (!agreement) {
+      agreement = Services.createAgreement(owner, {
+        gardenId: gardenId,
+        tapperId: tapperId,
+        ownerPercentage: 60,
+        tapperPercentage: 40,
+        effectiveFrom: "2026-08-21T00:00:00+12:00",
+        expenseRules: { testFixture: true, label: runTag },
+        requestId: runTag + "-AGREEMENT"
+      });
+    }
+    if (numeric_(agreement.ownerPercentage) !== 60 || numeric_(agreement.tapperPercentage) !== 40) throw new Error("E2E_AGREEMENT_SPLIT_INVALID");
+
+    var sale = rows_("Sales").filter(function (row) { return id_(row.gardenId) === gardenId && String(row.ticketNumber || "") === runTag; })[0];
+    if (!sale) {
+      sale = Services.createSale(tapper, {
+        gardenId: gardenId,
+        agreementId: agreement.id,
+        saleDate: "2026-08-21",
+        ticketNumber: runTag,
+        buyerName: "ผู้ซื้อทดสอบ E2E",
+        productType: "ยางก้อนถ้วย (ทดสอบ)",
+        grossWeight: 100,
+        tareWeight: 0,
+        netWeight: 100,
+        weightKg: 100,
+        unitPrice: 60,
+        buyerDeductions: 100,
+        sharedExpenses: 50,
+        manualEntry: true,
+        requestId: saleRequestId
+      });
+      sale = findById_("Sales", sale.id);
+    }
+    if (!sale) throw new Error("E2E_SALE_NOT_CREATED");
+    if (sale.status === "pending_owner_review" || sale.status === "ocr_review") {
+      sale = Services.confirmSale(owner, { saleId: sale.id, requestId: saleRequestId + "-CONFIRM" });
+    }
+    if (sale.status !== "confirmed") throw new Error("E2E_SALE_NOT_CONFIRMED");
+    if (round_(numeric_(sale.grossSale)) !== 6000 || round_(numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses)) !== 150 || round_(numeric_(sale.splitBase)) !== 5850 || round_(numeric_(sale.ownerShare)) !== 3510 || round_(numeric_(sale.tapperShare)) !== 2340) throw new Error("E2E_SALE_CALCULATION_INVALID");
+
+    var settlement = rows_("Settlements").filter(function (row) { return id_(row.gardenId) === gardenId && String(row.referenceNo || "") === runTag; })[0];
+    if (!settlement) {
+      settlement = Services.createSettlement(tapper, {
+        gardenId: gardenId,
+        tapperId: tapperId,
+        method: "cash",
+        amount: 2000,
+        transferDate: "2026-08-21",
+        referenceNo: runTag,
+        note: "รายการทดสอบ E2E: ส่งเงินบางส่วน",
+        requestId: settlementRequestId
+      });
+    }
+    if (!settlement) throw new Error("E2E_SETTLEMENT_NOT_CREATED");
+    if (settlement.status === "pending_owner_confirmation") settlement = Services.confirmSettlement(owner, { settlementId: settlement.id, requestId: settlementRequestId + "-CONFIRM" });
+    if (settlement.status !== "confirmed") throw new Error("E2E_SETTLEMENT_NOT_CONFIRMED");
+
+    var saleRows = rows_("Sales").filter(function (row) { return id_(row.id) === id_(sale.id); });
+    var allocationRows = rows_("SettlementAllocations").filter(function (row) { return id_(row.settlementId) === id_(settlement.id) && id_(row.saleId) === id_(sale.id); });
+    var allocationTotal = round_(allocationRows.reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0));
+    var saleWalletRows = rows_("WalletEntries").filter(function (row) { return id_(row.saleId) === id_(sale.id); });
+    var settlementWalletRows = rows_("WalletEntries").filter(function (row) { return id_(row.settlementId) === id_(settlement.id); });
+    var auditRows = rows_("AuditLogs").filter(function (row) { return id_(row.entityId) === id_(sale.id) || id_(row.entityId) === id_(settlement.id) || id_(row.entityId) === id_(agreement.id); });
+    var hasSaleCreated = auditRows.some(function (row) { return row.action === "sale_created"; });
+    var hasSaleConfirmed = auditRows.some(function (row) { return row.action === "sale_confirmed"; });
+    var hasSettlementCreated = auditRows.some(function (row) { return row.action === "settlement_created"; });
+    var hasSettlementConfirmed = auditRows.some(function (row) { return row.action === "settlement_confirmed"; });
+    if (saleRows.length !== 1 || allocationTotal !== 2000 || saleWalletRows.length !== 2 || settlementWalletRows.length !== 1 || !hasSaleCreated || !hasSaleConfirmed || !hasSettlementCreated || !hasSettlementConfirmed) throw new Error("E2E_EVIDENCE_ASSERTION_FAILED");
+
+    var result = { status: "completed", testTag: runTag, gardenId: gardenId, agreementId: agreement.id, saleId: sale.id, settlementId: settlement.id, expected: { grossSale: 6000, deductions: 150, splitBase: 5850, ownerShare: 3510, tapperShare: 2340, settlementAmount: 2000 }, evidence: { saleStatus: sale.status, settlementStatus: settlement.status, allocationTotal: allocationTotal, saleWalletEntries: saleWalletRows.length, settlementWalletEntries: settlementWalletRows.length, auditEvents: auditRows.length }, completedAt: nowIso_() };
+    props.setProperty(stateKey, "completed");
+    props.setProperty("PARAWALLET_E2E_PAHPAYOM_RESULT", JSON.stringify(result));
+    return result;
+  });
+}
+
+function previewAuthorizedE2ETest() {
+  var gardenId = "garden-pahpayom-001";
+  var runTag = "E2E-PAHPAYOM-001";
+  return { garden: findById_("Gardens", gardenId), agreement: rows_("Agreements").filter(function (row) { return id_(row.gardenId) === gardenId && row.status === "active"; }), existingSale: rows_("Sales").filter(function (row) { return id_(row.gardenId) === gardenId && String(row.ticketNumber || "") === runTag; }), existingSettlement: rows_("Settlements").filter(function (row) { return id_(row.gardenId) === gardenId && String(row.referenceNo || "") === runTag; }), expected: { grossSale: 6000, deductions: 150, splitBase: 5850, ownerShare: 3510, tapperShare: 2340, settlementAmount: 2000 } };
+}
+
+function getAuthorizedE2ETestResult() {
+  return PropertiesService.getScriptProperties().getProperty("PARAWALLET_E2E_PAHPAYOM_RESULT") || "NOT_COMPLETED";
+}

@@ -149,3 +149,23 @@
 - [x] Add deterministic test fixtures and integration/contract harnesses without writing production test data
 - [x] Add CI gates for tests, typecheck, Apps Script syntax check, build, and diff validation
 - [x] Run the complete Phase C verification suite and document remaining untested paths
+- [ ] Read and reconcile Phase D scope with the current Apps Script deployment and production Sheets state
+- [ ] Run read-only health, diagnostics, schema, OAuth, membership, and Drive-access checks
+- [ ] Add integration/contract harness coverage for real response envelopes without storing credentials
+- [ ] Obtain explicit approval before creating any real mutation test records or require a dedicated test garden
+- [ ] Run authorized E2E mutations with evidence and cleanup/rollback verification
+- [ ] Produce a Phase D evidence report and production sign-off checklist
+- [x] Create example Garden ป่าพะยอม with explicit example metadata in the real Spreadsheet
+- [x] Create active GardenMembers rows for the Owner and สมหมาย Tapper
+- [x] Verify the created Garden and memberships read back correctly
+- [ ] Ask separately before creating example sales, settlements, disputes, or adjustments
+- [ ] Define and record the example E2E transaction parameters and expected split
+- [ ] Create the example Sale through the Apps Script API path
+- [ ] Confirm the Sale as Owner through the Apps Script API path
+- [ ] Create the example Settlement and confirm it as Owner
+- [ ] Verify WalletEntries, SettlementAllocations, Notifications, and AuditLogs in the real Spreadsheet
+- [ ] Produce the Phase D E2E evidence report and record any defects
+- [x] Design a one-time Apps Script E2E runner limited to garden-pahpayom-001 and clearly labeled test data
+- [x] Add one-time runner and verification helpers inside the single appsscript/Code.gs file
+- [x] Validate runner syntax and add a dry-run guard before any real mutation
+- [x] Document the minimal Apps Script Editor steps and post-run evidence checks
