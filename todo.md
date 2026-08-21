@@ -169,3 +169,10 @@
 - [x] Add one-time runner and verification helpers inside the single appsscript/Code.gs file
 - [x] Validate runner syntax and add a dry-run guard before any real mutation
 - [x] Document the minimal Apps Script Editor steps and post-run evidence checks
+- [x] Investigate the real Agreement row causing AGREEMENT_NOT_ACTIVE for saleDate 2026-08-21
+- [x] Fix the one-time E2E runner to require an active, date-valid Agreement before createSale
+- [x] Add safe recovery for the partially completed runner without duplicating Sale or Settlement records
+- [x] Re-run syntax, Vitest, typecheck, and build verification after the Agreement fix
+- [x] Verify repository Code.gs contains repairParaWalletAgreementSchema() and the E2E runner at the latest commit
+- [ ] Verify whether the Apps Script project/deployment is still using the older Code.gs revision
+- [ ] Document exact sync, save, and redeploy steps without creating duplicate financial records

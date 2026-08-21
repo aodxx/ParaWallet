@@ -869,3 +869,19 @@ function previewAuthorizedE2ETest() {
 function getAuthorizedE2ETestResult() {
   return PropertiesService.getScriptProperties().getProperty("PARAWALLET_E2E_PAHPAYOM_RESULT") || "NOT_COMPLETED";
 }
+
+
+// Repairs only the known legacy Agreements header shape created before the
+// current 16-column Data Model. This is editor-only and refuses unexpected
+// schemas so no unrelated table is modified.
+function repairParaWalletAgreementSchema() {
+  var expected = HEADERS.Agreements;
+  var legacy = ["id", "gardenId", "ownerId", "tapperId", "version", "ownerPercentage", "tapperPercentage", "effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"];
+  var sheet = Repositories.sheet_("Agreements");
+  var actual = readHeaders_(sheet);
+  if (headersEqual_(actual, expected)) return { status: "already_correct", headers: actual };
+  if (!headersEqual_(actual, legacy)) throw new Error("AGREEMENTS_SCHEMA_UNEXPECTED:" + actual.join(","));
+  sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+  sheet.setFrozenRows(1);
+  return { status: "repaired", headers: expected };
+}

@@ -21,9 +21,11 @@
 1. เปิด Apps Script project เดิมที่อยู่เบื้องหลัง Web App URL ของ ParaWallet
 2. สำรอง `Code.gs` เดิมไว้ก่อน แล้วแทนที่ด้วย `appsscript/Code.gs` ฉบับล่าสุดจาก repository โดยคงสถาปัตยกรรม single-file ไว้
 3. กด Save และรัน `previewAuthorizedE2ETest()` ก่อน ฟังก์ชันนี้เป็น read-only และควรแสดงสวนป่าพะยอมกับรายการที่มีอยู่ก่อนรัน
-4. หาก preview ถูกต้อง ให้รัน `runAuthorizedE2ETestOnce()` เพียงครั้งเดียว แล้วอนุญาตสิทธิ์ Apps Script หากระบบร้องขอ
-5. รัน `getAuthorizedE2ETestResult()` และเปิด Execution log เพื่ออ่านผลสรุป หากสำเร็จจะมีสถานะ `completed` และผลลัพธ์ถูกเก็บใน Script Properties
-6. หลังบันทึก Code.gs แล้ว ให้สร้าง Web App version ใหม่ตามขั้นตอน deploy เดิมของโครงการ เพื่อให้ deployment กับ repository ตรงกัน แม้การรัน E2E จะเกิดจาก Editor โดยตรง
+4. จากผลการทดสอบครั้งแรก หากแท็บ `Agreements` แสดงหัวตาราง legacy 12 คอลัมน์ ให้รัน `repairParaWalletAgreementSchema()` หนึ่งครั้ง ฟังก์ชันนี้ซ่อมเฉพาะกรณีที่หัวตารางตรงกับ legacy schema ที่รู้จักเท่านั้น
+5. รัน `previewAuthorizedE2ETest()` อีกครั้งเพื่อตรวจว่า Agreement แสดง `status=active`, `effectiveFrom` และเปอร์เซ็นต์ 60/40 อยู่ในคอลัมน์ที่ถูกต้อง
+6. หาก preview ถูกต้อง ให้รัน `runAuthorizedE2ETestOnce()` เพียงครั้งเดียว แล้วอนุญาตสิทธิ์ Apps Script หากระบบร้องขอ
+7. รัน `getAuthorizedE2ETestResult()` และเปิด Execution log เพื่ออ่านผลสรุป หากสำเร็จจะมีสถานะ `completed` และผลลัพธ์ถูกเก็บใน Script Properties
+8. หลังบันทึก Code.gs แล้ว ให้สร้าง Web App version ใหม่ตามขั้นตอน deploy เดิมของโครงการ เพื่อให้ deployment กับ repository ตรงกัน แม้การรัน E2E จะเกิดจาก Editor โดยตรง
 
 ## การป้องกันความเสียหาย
 
