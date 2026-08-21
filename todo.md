@@ -205,3 +205,7 @@
 - [x] Add an elegant Developed by aod credit to the PWA layout
 - [x] Add an accessible Facebook icon link to the provided developer profile URL
 - [x] Verify mobile/desktop rendering and production build for the credit UI
+- [x] Gather the final setup and operating steps from the current ParaWallet implementation
+- [x] Write the complete Thai PWA real-use manual for Owner and Tapper workflows
+- [x] Add production go-live checklist, data safety rules, and troubleshooting guidance
+- [x] Review and deliver the final usage guide attachment
