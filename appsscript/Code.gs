@@ -48,7 +48,10 @@ function doPost(e) {
     });
     return jsonResponse_(response);
   } catch (error) {
-    return jsonResponse_(errorResponse_("API_ERROR", error && error.message ? error.message : String(error), request && request.requestId ? request.requestId : "unknown"));
+    var rawMessage = error && error.message ? error.message : String(error);
+    var codeMatch = rawMessage.match(/^([A-Z][A-Z0-9_]+)(?=:|$)/);
+    var code = codeMatch ? codeMatch[1] : "API_ERROR";
+    return jsonResponse_(errorResponse_(code, rawMessage, request && request.requestId ? request.requestId : "unknown"));
   }
 }
 
@@ -84,6 +87,9 @@ function routeAction_(request) {
     case "settlements.create": return Services.createSettlement(user, request.payload);
     case "settlements.confirm": return Services.confirmSettlement(user, request.payload);
     case "settlements.reject": return Services.rejectSettlement(user, request.payload);
+    case "settlements.cancel": return Services.cancelSettlement(user, request.payload);
+    case "disputes.resolve": return Services.resolveDispute(user, request.payload);
+    case "adjustments.create": return Services.createAdjustment(user, request.payload);
     case "payments.create": return Services.createPayment(user, request.payload);
     case "payments.confirm": return Services.confirmPayment(user, request.payload);
     case "notifications.list": return Services.listNotifications(user);
@@ -113,7 +119,7 @@ function diagnosticsCheck_() {
   return result;
 }
 function okResponse_(requestId, data) { return { status: "ok", requestId: requestId, data: data }; }
-function errorResponse_(code, message, requestId) { return { status: "error", requestId: requestId, error: { code: code, message: message } }; }
+function errorResponse_(code, message, requestId) { var retryable = ["TRANSACTION_BUSY", "API_ERROR", "AUTH_REQUIRED"].indexOf(code) >= 0; return { status: "error", requestId: requestId, error: { code: code, message: message, retryable: retryable } }; }
 function jsonResponse_(body) { return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON); }
 
 // =====================================================
@@ -328,17 +334,34 @@ var OCR = {
     var prompt = "Extract rubber sale receipt fields as JSON: saleDate, buyerName, productType, weightKg, unitPrice, grossSale, buyerDeductions. Return only JSON.";
     if (Config.geminiKey()) return this.gemini_(fileBase64, mimeType, prompt);
     if (Config.visionKey()) return this.vision_(fileBase64, mimeType);
-    return { provider: "none", confidence: 0, needsReview: true, fields: {} };
+    return { provider: "none", confidence: 0, score: 0, needsReview: true, reviewLevel: "mandatory", fields: {} };
+  },
+  score_: function (fields) {
+    var score = 0;
+    if (fields.saleDate) score += 10;
+    if (fields.buyerName) score += 10;
+    if (fields.productType) score += 10;
+    if (numeric_(fields.weightKg) > 0) score += 15;
+    if (numeric_(fields.unitPrice) > 0) score += 15;
+    if (numeric_(fields.grossSale) > 0) score += 15;
+    if (numeric_(fields.weightKg) > 0 && numeric_(fields.unitPrice) > 0 && numeric_(fields.grossSale) > 0 && Math.abs(numeric_(fields.weightKg) * numeric_(fields.unitPrice) - numeric_(fields.grossSale)) <= 0.02) score += 20;
+    if (numeric_(fields.buyerDeductions) >= 0) score += 5;
+    return score;
+  },
+  scored_: function (provider, fields) {
+    var score = this.score_(fields || {});
+    return { provider: provider, confidence: score / 100, score: score, needsReview: score < 90, reviewLevel: score >= 90 ? "high" : (score >= 80 ? "recommended" : "mandatory"), fields: fields || {} };
   },
   gemini_: function (base64, mimeType, prompt) {
     var response = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + encodeURIComponent(Config.geminiKey()), { method: "post", contentType: "application/json", payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }] }), muteHttpExceptions: true });
     var body = JSON.parse(response.getContentText());
     var text = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text || "{}";
-    return { provider: "gemini", confidence: 0.75, needsReview: true, fields: JSON.parse(text.replace(/```json|```/g, "").trim()) };
+    var fields = JSON.parse(text.replace(/```json|```/g, "").trim());
+    return this.scored_("gemini", fields);
   },
   vision_: function (base64, mimeType) {
     var response = UrlFetchApp.fetch("https://vision.googleapis.com/v1/images:annotate?key=" + encodeURIComponent(Config.visionKey()), { method: "post", contentType: "application/json", payload: JSON.stringify({ requests: [{ image: { content: base64 }, features: [{ type: "DOCUMENT_TEXT_DETECTION" }] }] }), muteHttpExceptions: true });
-    return { provider: "vision", confidence: 0.55, needsReview: true, fields: { rawText: JSON.parse(response.getContentText()) } };
+    return this.scored_("vision", { rawText: JSON.parse(response.getContentText()) });
   }
 };
 
@@ -564,12 +587,20 @@ Services.disputeSale = function (user, payload) {
   return { disputeId: disputeId, saleId: sale.id, status: "disputed" };
 };
 
+function ownerAdjustmentForSale_(saleId) {
+  return round_(rows_("Adjustments").filter(function (row) { return id_(row.saleId) === id_(saleId) && row.status === "confirmed"; }).reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0));
+}
+
 function settlementOutstanding_(gardenId, ownerId) {
   var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && row.status === "confirmed"; });
   var total = sales.reduce(function (sum, sale) { return sum + numeric_(sale.ownerShare); }, 0);
+  var saleIds = sales.reduce(function (map, sale) { map[id_(sale.id)] = true; return map; }, {});
+  var adjustments = rows_("Adjustments").filter(function (row) { return row.status === "confirmed" && saleIds[id_(row.saleId)]; });
+  var ownerAdjustment = adjustments.reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0);
   var settlements = rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && id_(row.ownerId) === id_(ownerId) && row.status === "confirmed"; });
   var paid = settlements.reduce(function (sum, item) { return sum + numeric_(item.amount); }, 0);
-  return { entitlement: round_(total), received: round_(paid), outstanding: round_(Math.max(0, total - paid)) };
+  var entitlement = round_(total + ownerAdjustment);
+  return { entitlement: entitlement, received: round_(paid), outstanding: round_(Math.max(0, entitlement - paid)) };
 }
 
 Services.wallet = function (user, payload) {
@@ -582,8 +613,10 @@ Services.wallet = function (user, payload) {
   var pending = sales.filter(function (row) { return row.status === "pending_owner_review" || row.status === "ocr_review"; });
   var disputed = sales.filter(function (row) { return row.status === "disputed"; });
   var tapperId = access.member && access.member.role === "tapper" ? user.id : (payload.tapperId || "");
-  var ownerEntitlement = confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0);
-  var tapperIncome = confirmed.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0);
+  var confirmedIds = confirmed.reduce(function (map, row) { map[id_(row.id)] = true; return map; }, {});
+  var adjustments = rows_("Adjustments").filter(function (row) { return row.status === "confirmed" && confirmedIds[id_(row.saleId)]; });
+  var ownerEntitlement = confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) + adjustments.reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0);
+  var tapperIncome = confirmed.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0) + adjustments.filter(function (row) { var sale = findById_("Sales", row.saleId); return sale && (!tapperId || id_(sale.tapperId) === id_(tapperId)); }).reduce(function (sum, row) { return sum + (row.adjustmentType === "tapper_credit" ? numeric_(row.amount) : row.adjustmentType === "tapper_debit" ? -numeric_(row.amount) : 0); }, 0);
   var settlement = settlementOutstanding_(garden.id, ownerId);
   return { gardenId: garden.id, role: user.role, agreementCount: agreementRows.length, owner: { totalEntitlement: round_(ownerEntitlement), totalReceived: settlement.received, outstanding: settlement.outstanding, pending: pending.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0), disputed: disputed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) }, tapper: { totalIncome: round_(tapperIncome), ownerMoneyHeld: settlement.outstanding, ownerMoneyTransferred: settlement.received, pendingReviews: pending.length } };
 };
@@ -596,6 +629,7 @@ Services.createSettlement = function (user, payload) {
   if (!isOwner && id_(tapperId) !== id_(user.id)) throw new Error("SETTLEMENT_TAPPER_MISMATCH");
   var tapperMember = rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && id_(row.userId) === id_(tapperId) && row.role === "tapper" && row.status === "active"; })[0];
   if (!tapperMember) throw new Error("TAPPER_NOT_ACTIVE_MEMBER");
+  if (isOwner) throw new Error("TAPPER_SETTLEMENT_REQUIRED");
   if (numeric_(payload.amount) <= 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
   var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId).outstanding;
   if (numeric_(payload.amount) > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
@@ -622,7 +656,7 @@ Services.confirmSettlement = function (user, payload) {
     rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(settlement.gardenId) && row.status === "confirmed"; }).sort(function (a, b) { return new Date(a.saleDate || a.createdAt).getTime() - new Date(b.saleDate || b.createdAt).getTime(); }).forEach(function (sale) {
       if (remaining <= 0) return;
       var already = rows_("SettlementAllocations").filter(function (row) { return id_(row.saleId) === id_(sale.id) && row.settlementId !== settlement.id && row.status !== "rejected" && row.status !== "cancelled"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0);
-      var allocated = Math.min(remaining, Math.max(0, numeric_(sale.ownerShare) - already));
+      var allocated = Math.min(remaining, Math.max(0, numeric_(sale.ownerShare) + ownerAdjustmentForSale_(sale.id) - already));
       if (allocated > 0) { allocations.push({ saleId: sale.id, amount: round_(allocated) }); remaining = round_(remaining - allocated); }
     });
     if (remaining !== 0) throw new Error("SETTLEMENT_ALLOCATION_MISMATCH");
@@ -638,12 +672,61 @@ Services.rejectSettlement = function (user, payload) {
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
   requireOwner_(user, settlement.gardenId);
-    if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_REJECTABLE");
-    if (!payload.reason) throw new Error("SETTLEMENT_REJECTION_REASON_REQUIRED");
-    updateRowById_("Settlements", settlement.id, { status: "rejected", note: (settlement.note || "") + "\nเหตุผล: " + payload.reason });
-    writeAudit_(user, "settlement_rejected", "settlement", settlement.id, settlement, { status: "rejected", reason: payload.reason }, payload.requestId);
-    notifyUser_(settlement.tapperId, "settlement_rejected", "เจ้าของปฏิเสธรายการส่งเงิน", payload.reason);
+  if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_REJECTABLE");
+  if (!payload.reason) throw new Error("SETTLEMENT_REJECTION_REASON_REQUIRED");
+  updateRowById_("Settlements", settlement.id, { status: "rejected", note: (settlement.note || "") + "\nเหตุผล: " + payload.reason });
+  writeAudit_(user, "settlement_rejected", "settlement", settlement.id, settlement, { status: "rejected", reason: payload.reason }, payload.requestId);
+  notifyUser_(settlement.tapperId, "settlement_rejected", "เจ้าของปฏิเสธรายการส่งเงิน", payload.reason);
   return findById_("Settlements", settlement.id);
+};
+
+Services.cancelSettlement = function (user, payload) {
+  var settlement = findById_("Settlements", payload.settlementId);
+  if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireGarden_(user, settlement.gardenId);
+  if (id_(settlement.tapperId) !== id_(user.id) || user.role !== "tapper") throw new Error("TAPPER_PERMISSION_REQUIRED");
+  if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_CANCELLABLE");
+  updateRowById_("Settlements", settlement.id, { status: "cancelled", note: (settlement.note || "") + "\nยกเลิกโดย: " + user.id });
+  writeAudit_(user, "settlement_cancelled", "settlement", settlement.id, settlement, { status: "cancelled" }, payload.requestId);
+  notifyUser_(settlement.ownerId, "settlement_cancelled", "คนกรีดยกเลิกรายการส่งเงิน", "รายการ " + settlement.id);
+  return findById_("Settlements", settlement.id);
+};
+
+Services.resolveDispute = function (user, payload) {
+  var dispute = payload.disputeId ? findById_("Disputes", payload.disputeId) : null;
+  if (!dispute && payload.saleId) dispute = rows_("Disputes").filter(function (row) { return id_(row.saleId) === id_(payload.saleId) && ["open", "under_review"].indexOf(row.status) >= 0; }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); })[0];
+  if (!dispute) throw new Error("DISPUTE_NOT_FOUND");
+  var sale = findById_("Sales", dispute.saleId);
+  if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireOwner_(user, sale.gardenId);
+  if (["open", "under_review"].indexOf(dispute.status) < 0) throw new Error("DISPUTE_NOT_RESOLVABLE");
+  var decision = String(payload.decision || "").toLowerCase();
+  if (["resolved", "rejected"].indexOf(decision) < 0) throw new Error("DISPUTE_DECISION_INVALID");
+  var resolution = { decision: decision, note: payload.resolution || "", resolvedBy: user.id, resolvedAt: nowIso_() };
+  updateRowById_("Disputes", dispute.id, { status: decision, note: JSON.stringify(resolution), resolvedAt: resolution.resolvedAt });
+  if (decision === "rejected" && sale.status === "disputed") updateRowById_("Sales", sale.id, { status: "confirmed", updatedAt: nowIso_() });
+  writeAudit_(user, "dispute_resolved", "dispute", dispute.id, dispute, resolution, payload.requestId);
+  notifyUser_(id_(user.id) === id_(sale.tapperId) ? findById_("Agreements", sale.agreementId).ownerId : sale.tapperId, "dispute_resolved", "มีการสรุปข้อพิพาท", resolution.note || decision);
+  return { disputeId: dispute.id, saleId: sale.id, status: decision, resolution: resolution };
+};
+
+Services.createAdjustment = function (user, payload) {
+  var sale = findById_("Sales", payload.saleId);
+  if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireOwner_(user, sale.gardenId);
+  if (sale.status !== "confirmed") throw new Error("SALE_NOT_ADJUSTABLE");
+  var amount = round_(numeric_(payload.amount));
+  if (amount <= 0) throw new Error("ADJUSTMENT_AMOUNT_INVALID");
+  var types = ["owner_credit", "owner_debit", "tapper_credit", "tapper_debit"];
+  if (types.indexOf(payload.adjustmentType) < 0) throw new Error("ADJUSTMENT_TYPE_INVALID");
+  if (!payload.reason) throw new Error("ADJUSTMENT_REASON_REQUIRED");
+  var adjustmentId = Utilities.getUuid();
+  Repositories.append("Adjustments", { id: adjustmentId, saleId: sale.id, userId: user.id, adjustmentType: payload.adjustmentType, amount: amount, reason: payload.reason, status: "confirmed", createdAt: nowIso_() });
+  var walletOwnerUserId = ["owner_credit", "owner_debit"].indexOf(payload.adjustmentType) >= 0 ? findById_("Agreements", sale.agreementId).ownerId : sale.tapperId;
+  var direction = ["owner_credit", "tapper_credit"].indexOf(payload.adjustmentType) >= 0 ? "credit" : "debit";
+  Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: walletOwnerUserId, saleId: sale.id, settlementId: "", entryType: "adjustment_" + direction, direction: direction, amount: amount, status: "confirmed", createdAt: nowIso_() });
+  writeAudit_(user, "adjustment_created", "adjustment", adjustmentId, null, { saleId: sale.id, type: payload.adjustmentType, amount: amount, reason: payload.reason }, payload.requestId);
+  return findById_("Adjustments", adjustmentId);
 };
 
 Services.listNotifications = function (user) { return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); }); };

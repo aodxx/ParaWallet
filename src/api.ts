@@ -12,8 +12,19 @@ export type ApiResponse<T> = {
   status: RequestStatus;
   requestId: string;
   data?: T;
-  error?: { code: string; message: string; details?: unknown };
+  error?: { code: string; message: string; details?: unknown; retryable?: boolean };
 };
+
+export class ApiError extends Error {
+  code: string;
+  retryable: boolean;
+  constructor(code: string, message: string, retryable = false) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.retryable = retryable;
+  }
+}
 
 export type Garden = { id: string; ownerId?: string; name: string; locationText?: string; province?: string; district?: string; areaRai: number; treeCount: number; status: "active" | "archived" };
 export type Plot = { id: string; gardenId: string; name: string; notes?: string; status: string };
@@ -28,7 +39,9 @@ export type ReportData = { summary: { from: string; to: string; salesCount: numb
 
 const apiUrl = (import.meta.env.VITE_APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwiW2tuD_RQUgygjZz-jIEfCLe03s6kdXXyz2Z2ZG8mUDwjvfA_luGrl4SpZ253UeH3/exec").replace(/\/$/, "");
 let currentAuthToken = "";
+let authFailureHandler: (() => void) | undefined;
 export function setAuthToken(token: string) { currentAuthToken = token; }
+export function onAuthFailure(handler: () => void) { authFailureHandler = handler; }
 export function getAuthToken() { return currentAuthToken; }
 
 export function newRequestId() {
@@ -41,7 +54,11 @@ export async function callApi<TPayload, TResult>(action: string, payload?: TPayl
   const body: ApiRequest<TPayload> = { action, requestId, payload, authToken: options.authToken ?? currentAuthToken };
   const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
   const envelope = (await response.json()) as ApiResponse<TResult>;
-  if (envelope.status !== "ok") throw new Error(envelope.error?.message || "Apps Script request failed");
+  if (envelope.status !== "ok") {
+    const code = envelope.error?.code || "API_ERROR";
+    if (["AUTH_REQUIRED", "INVALID_GOOGLE_ID_TOKEN", "GOOGLE_TOKEN_EXPIRED", "USER_NOT_REGISTERED"].includes(code)) authFailureHandler?.();
+    throw new ApiError(code, envelope.error?.message || "Apps Script request failed", envelope.error?.retryable === true);
+  }
   return envelope.data as TResult;
 }
 
@@ -77,10 +94,13 @@ export const api = {
     create: (payload: Record<string, unknown>) => callApi<unknown, Settlement>("settlements.create", payload),
     confirm: (settlementId: string, requestId?: string) => callApi("settlements.confirm", { settlementId }, { requestId }),
     reject: (payload: { settlementId: string; reason: string }, requestId?: string) => callApi("settlements.reject", payload, { requestId }),
+    cancel: (settlementId: string, requestId?: string) => callApi("settlements.cancel", { settlementId }, { requestId }),
   },
   notifications: {
     list: () => callApi<undefined, Notification[]>("notifications.list"),
     read: (notificationId: string) => callApi("notifications.read", { notificationId }),
   },
   reports: { summary: (payload: { gardenId: string; from?: string; to?: string }) => callApi<unknown, ReportData>("reports.summary", payload) },
+  disputes: { resolve: (payload: { disputeId?: string; saleId?: string; decision: "resolved" | "rejected"; resolution?: string }, requestId?: string) => callApi("disputes.resolve", payload, { requestId }) },
+  adjustments: { create: (payload: { saleId: string; adjustmentType: string; amount: number; reason: string }, requestId?: string) => callApi("adjustments.create", payload, { requestId }) },
 };

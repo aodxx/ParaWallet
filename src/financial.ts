@@ -64,3 +64,26 @@ export function assertActiveTapperMember(member: { role: string; status: string 
   if (!member || member.role !== "tapper" || member.status !== "active") throw new Error("TAPPER_NOT_ACTIVE_MEMBER");
   return true;
 }
+
+export function canCancelSettlement(status: string, role: string): boolean {
+  return role === "tapper" && status === "pending_owner_confirmation";
+}
+
+export function resolveDispute(status: string, decision: string): "resolved" | "rejected" {
+  if (!["open", "under_review"].includes(status)) throw new Error("DISPUTE_NOT_RESOLVABLE");
+  if (!["resolved", "rejected"].includes(decision)) throw new Error("DISPUTE_DECISION_INVALID");
+  return decision as "resolved" | "rejected";
+}
+
+export function calculateOcrValidationScore(fields: Record<string, unknown>): number {
+  let score = 0;
+  if (fields.saleDate) score += 10;
+  if (fields.buyerName) score += 10;
+  if (fields.productType) score += 10;
+  if (Number(fields.weightKg) > 0) score += 15;
+  if (Number(fields.unitPrice) > 0) score += 15;
+  if (Number(fields.grossSale) > 0) score += 15;
+  if (Number(fields.weightKg) > 0 && Number(fields.unitPrice) > 0 && Number(fields.grossSale) > 0 && Math.abs(Number(fields.weightKg) * Number(fields.unitPrice) - Number(fields.grossSale)) <= 0.02) score += 20;
+  if (Number(fields.buyerDeductions ?? 0) >= 0) score += 5;
+  return score;
+}

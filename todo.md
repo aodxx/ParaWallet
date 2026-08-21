@@ -139,3 +139,8 @@
 - [x] Enforce server-side calculation inputs and agreement/garden/tapper/date validation
 - [x] Remove or block demo financial values from production UI error states
 - [x] Add Phase A automated tests and run build/test verification
+- [x] Read and reconcile the authoritative Phase B requirements with the post-Phase-A repository baseline
+- [x] Implement the Phase B backend/API workflow without weakening Phase A financial invariants
+- [x] Connect Phase B workflows to the PWA and mobile UI with explicit loading/error/empty states
+- [x] Add Phase B regression tests and run syntax, typecheck, build, and production verification
+- [x] Document Phase B deployment steps and remaining risks

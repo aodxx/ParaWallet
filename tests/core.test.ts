@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newRequestId } from "../src/api";
-import { allocateSettlement, assertActiveTapperMember, calculateSale, validateAgreementWindow } from "../src/financial";
+import { allocateSettlement, assertActiveTapperMember, calculateOcrValidationScore, calculateSale, canCancelSettlement, resolveDispute, validateAgreementWindow } from "../src/financial";
 
 type SplitInput = { grossSale: number; buyerDeductions?: number; sharedExpenses?: number; ownerPercentage: number; tapperPercentage: number };
 function calculate(input: SplitInput) {
@@ -53,5 +53,21 @@ describe("ParaWallet core safeguards", () => {
     ]);
     expect(allocations).toEqual([{ saleId: "sale-1", amount: 400 }, { saleId: "sale-2", amount: 400 }]);
     expect(() => allocateSettlement(1201, [{ saleId: "sale-1", ownerShare: 1200, alreadyAllocated: 0 }])).toThrow("SETTLEMENT_ALLOCATION_MISMATCH");
+  });
+  it("allows only a tapper to cancel a pending settlement", () => {
+    expect(canCancelSettlement("pending_owner_confirmation", "tapper")).toBe(true);
+    expect(canCancelSettlement("confirmed", "tapper")).toBe(false);
+    expect(canCancelSettlement("pending_owner_confirmation", "owner")).toBe(false);
+  });
+  it("resolves disputes only from open or under-review states", () => {
+    expect(resolveDispute("open", "resolved")).toBe("resolved");
+    expect(resolveDispute("under_review", "rejected")).toBe("rejected");
+    expect(() => resolveDispute("confirmed", "resolved")).toThrow("DISPUTE_NOT_RESOLVABLE");
+    expect(() => resolveDispute("open", "cancelled")).toThrow("DISPUTE_DECISION_INVALID");
+  });
+  it("scores OCR from field completeness and arithmetic validation instead of provider constants", () => {
+    const score = calculateOcrValidationScore({ saleDate: "2026-08-21", buyerName: "Buyer", productType: "Latex", weightKg: 100, unitPrice: 50, grossSale: 5000, buyerDeductions: 0 });
+    expect(score).toBe(100);
+    expect(calculateOcrValidationScore({ weightKg: 100, unitPrice: 50, grossSale: 5200 })).toBe(50);
   });
 });
