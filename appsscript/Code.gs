@@ -581,7 +581,8 @@ Services.confirmSale = function (user, payload) {
   if (!sale) throw new Error("SALE_NOT_FOUND");
   requireOwner_(user, sale.gardenId);
   if (sale.status !== "pending_owner_review" && sale.status !== "ocr_review") throw new Error("SALE_NOT_REVIEWABLE");
-  if (numeric_(sale.grossSale) < numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses) + numeric_(sale.ownerShare) + numeric_(sale.tapperShare)) throw new Error("LEDGER_IMBALANCE");
+  var ledgerExpected = round_(numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses) + numeric_(sale.ownerShare) + numeric_(sale.tapperShare));
+  if (round_(numeric_(sale.grossSale)) !== ledgerExpected) throw new Error("LEDGER_IMBALANCE");
   updateRowById_("Sales", sale.id, { status: "confirmed", updatedAt: nowIso_() });
   rows_("WalletEntries").filter(function (row) { return id_(row.saleId) === id_(sale.id); }).forEach(function (entry) { updateRowById_("WalletEntries", entry.id, { status: "confirmed" }); });
   writeAudit_(user, "sale_confirmed", "sale", sale.id, sale, { status: "confirmed" }, payload.requestId);
@@ -590,6 +591,7 @@ Services.confirmSale = function (user, payload) {
 };
 
 Services.disputeSale = function (user, payload) {
+  assertFinancialSchemaReady_();
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
   requireGarden_(user, sale.gardenId);
@@ -687,6 +689,7 @@ Services.confirmSettlement = function (user, payload) {
 };
 
 Services.rejectSettlement = function (user, payload) {
+  assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
   requireOwner_(user, settlement.gardenId);
@@ -699,6 +702,7 @@ Services.rejectSettlement = function (user, payload) {
 };
 
 Services.cancelSettlement = function (user, payload) {
+  assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
   requireGarden_(user, settlement.gardenId);
@@ -711,6 +715,7 @@ Services.cancelSettlement = function (user, payload) {
 };
 
 Services.resolveDispute = function (user, payload) {
+  assertFinancialSchemaReady_();
   var dispute = payload.disputeId ? findById_("Disputes", payload.disputeId) : null;
   if (!dispute && payload.saleId) dispute = rows_("Disputes").filter(function (row) { return id_(row.saleId) === id_(payload.saleId) && ["open", "under_review"].indexOf(row.status) >= 0; }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); })[0];
   if (!dispute) throw new Error("DISPUTE_NOT_FOUND");

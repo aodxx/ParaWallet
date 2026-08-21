@@ -195,3 +195,10 @@
 - [x] Expose schema state in read-only diagnostics without changing production data
 - [x] Add regression tests for legacy headers, trailing blanks, and mutation blocking
 - [x] Update deployment and read-only verification documentation with the new guards
+- [x] Add schema diagnostics and financial mutation-guard guidance to the reusable skill
+- [x] Add production read-only audit and deployment-sync guidance to the reusable skill
+- [x] Validate the updated skill package and deliver the refreshed attachment
+- [x] Audit all remaining production-readiness TODOs and classify what can be completed without external account actions
+- [x] Complete all repository-side production hardening, documentation, tests, and build checks
+- [x] Run final read-only production verification without creating additional financial records
+- [x] Prepare the final handoff package with exact deployment state, tested capabilities, and unavoidable external blockers

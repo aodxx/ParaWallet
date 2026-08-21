@@ -44,8 +44,13 @@ describe("Apps Script schema safety contract", () => {
   });
 
   it("guards all critical financial mutations before row writes", () => {
-    expect(code.match(/assertFinancialSchemaReady_\(\);/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(code.match(/assertFinancialSchemaReady_\(\);/g)?.length).toBeGreaterThanOrEqual(10);
     expect(code).toContain("E2E_AGREEMENTS_SCHEMA_REPAIR_REQUIRED");
     expect(code).toContain("function repairParaWalletAgreementSchema()");
+  });
+
+  it("requires exact rounded ledger equality before Sale confirmation", () => {
+    expect(code).toContain("var ledgerExpected = round_(numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses) + numeric_(sale.ownerShare) + numeric_(sale.tapperShare));");
+    expect(code).toContain("if (round_(numeric_(sale.grossSale)) !== ledgerExpected) throw new Error(\"LEDGER_IMBALANCE\")");
   });
 });
