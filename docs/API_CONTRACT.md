@@ -66,9 +66,13 @@ These are editor-only functions and are not exposed as unauthenticated Web App a
 ```javascript
 setupParaWalletSheets();
 validateParaWalletSheets();
+previewParaWalletProductionSchemaRepair();
+repairParaWalletProductionSchema();
 ```
 
 `setupParaWalletSheets()` creates missing tabs and writes the exact Data Model headers. If an existing tab has a different header order, it fails with `SCHEMA_MISMATCH:<tab>` rather than overwriting data.
+
+`previewParaWalletProductionSchemaRepair()` is read-only. `repairParaWalletProductionSchema()` accepts only the explicitly known legacy headers for Agreements, Gardens, Buyers, Sales, and Settlements, copies every changed sheet to a timestamped backup, semantically maps the existing rows, and refuses any unexpected schema.
 
 ## Security and transaction boundary
 

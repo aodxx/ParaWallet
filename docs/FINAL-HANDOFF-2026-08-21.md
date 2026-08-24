@@ -48,3 +48,7 @@ The codebase is **repository-verified and sandbox-E2E verified**, but it is **no
 Release `2026.08.24-phase-d1` closes two repository-side Phase D gaps. `health.get` and `diagnostics.get` now expose a non-secret backend release and schema fingerprint, so the deployed Web App can be compared with the repository without relying on inference. The Agreements repair is now a backup-first data migration: it copies the original sheet, maps legacy effective dates, expense rules, status, and timestamps into their correct 16-column positions, flushes writes before releasing the script lock, and rejects any unknown header shape.
 
 The production gate remains unchanged: deploy this release, confirm the health fingerprint, run the migration once from the Apps Script editor, confirm `financialSchemaReady=true`, and only then execute a controlled authenticated E2E transaction.
+
+## Addendum — Phase D2 production-schema preflight
+
+The live D1 health fingerprint was confirmed, but the authorized E2E preflight stopped before mutation after detecting four additional legacy headers: Gardens, Buyers, Sales, and Settlements. Release `2026.08.24-phase-d2` adds a read-only migration preview, a backup-first semantic migration for every known production legacy shape, and a full critical-schema assertion at the start of the E2E runner. Deploy D2, run `repairParaWalletProductionSchema()` once, and require `financialSchemaReady=true` before rerunning the controlled E2E.

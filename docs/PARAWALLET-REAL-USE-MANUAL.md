@@ -35,8 +35,8 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 | Owner ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | Tapper ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | GardenMembers | ใช่ | Owner และ Tapper ผูกกับ garden เดียวกันและ active |
-| Agreements schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-agreements-v2` |
-| Web App deployment | ใช่ | health ต้องรายงาน `release=2026.08.24-phase-d1` |
+| Production schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-production-v3` |
+| Web App deployment | ใช่ | health ต้องรายงาน `release=2026.08.24-phase-d2` |
 
 ## 3. การเตรียม Apps Script และ Google Sheets
 
@@ -44,9 +44,9 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 
 เมื่อเริ่มระบบใหม่ ให้รัน bootstrap ที่มีอยู่ใน `Code.gs` เพื่อสร้างแท็บตาม Data Model จากนั้นตรวจชื่อแท็บและหัวคอลัมน์ทุกแท็บ ห้ามสรุปว่า bootstrap สำเร็จเพียงเพราะมีชื่อแท็บ เพราะ Google Sheets ที่มี header เก่าอยู่แล้วอาจไม่ถูกปรับอัตโนมัติ
 
-สำหรับแท็บ `Agreements` ต้องตรวจเป็นพิเศษ หากพบหัวคอลัมน์แบบ legacy 12 ช่องหรือมีช่องว่างท้ายแถว ระบบรุ่นล่าสุดจะรายงาน mismatch และบล็อก mutation ทางการเงินไว้ก่อน การแก้ schema ต้องทำผ่านฟังก์ชันซ่อมที่มี guard หรือ migration ใน Apps Script เท่านั้น ไม่ควรแก้ตำแหน่งคอลัมน์ด้วยมือใน Google Sheets
+ต้องตรวจ `Agreements`, `Gardens`, `Buyers`, `Sales` และ `Settlements` เป็นพิเศษ ระบบรุ่นล่าสุดจะรายงาน mismatch และบล็อก mutation ทางการเงินไว้ก่อน การแก้ schema ต้องทำผ่าน migration ใน Apps Script เท่านั้น ไม่ควรแก้ตำแหน่งคอลัมน์ด้วยมือใน Google Sheets
 
-รุ่น `2026.08.24-phase-d1` เปลี่ยน `repairParaWalletAgreementSchema()` ให้เป็น migration ที่สำรองชีตเดิมเป็น `Agreements_Backup_*` ก่อนย้ายค่าทุกแถวไปยัง schema 16 คอลัมน์ ห้ามลบชีตสำรองจนกว่าจะผ่าน Production E2E และตรวจยอดย้อนหลังครบถ้วน
+รุ่น `2026.08.24-phase-d2` เพิ่ม `previewParaWalletProductionSchemaRepair()` แบบ read-only และ `repairParaWalletProductionSchema()` ซึ่งสำรองทุกชีต legacy เป็น `*_Backup_*` ก่อนย้ายค่าตามความหมาย รองรับเฉพาะ header รุ่นเก่าที่ระบบรู้จักและปฏิเสธรูปแบบอื่น ห้ามลบชีตสำรองจนกว่าจะผ่าน Production E2E และตรวจยอดย้อนหลังครบถ้วน
 
 ## 4. การตั้งค่าโฟลเดอร์หลักฐานใน Google Drive
 
@@ -154,7 +154,7 @@ Owner ใช้ Dashboard เพื่อตรวจยอดส่วนแบ
 | ตรวจสอบ | ผ่านเมื่อ |
 |---|---|
 | Deployment | Web App ใช้ `Code.gs` revision ล่าสุดจาก repository |
-| Health | endpoint ตอบ `status=ok`, `release=2026.08.24-phase-d1` และ `schemaVersion=2026-08-agreements-v2` |
+| Health | endpoint ตอบ `status=ok`, `release=2026.08.24-phase-d2` และ `schemaVersion=2026-08-production-v3` |
 | Diagnostics | `financialSchemaReady=true` และไม่มี schema mismatch |
 | OAuth | Owner และ Tapper login ด้วยบัญชีที่ลงทะเบียนได้ |
 | Authorization | Owner เห็นเฉพาะสวนของตน และ Tapper เห็นเฉพาะสวนที่ผูก |

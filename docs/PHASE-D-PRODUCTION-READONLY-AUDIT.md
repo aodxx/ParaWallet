@@ -1,5 +1,18 @@
 # ParaWallet Phase D — Production Read-only Audit
 
+## Controlled E2E preflight — 24 สิงหาคม 2026
+
+ผู้ดูแลยืนยัน live health fingerprint ของ `2026.08.24-phase-d1` และอนุมัติธุรกรรมทดสอบแล้ว แต่ preflight ก่อนเรียก runner พบ production schema mismatch เพิ่มอีก 4 ตาราง จึงหยุดก่อนสร้างข้อมูล:
+
+| Sheet | Live header | Canonical header | สถานะ |
+|---|---:|---:|---|
+| Gardens | 10 คอลัมน์ | 11 คอลัมน์ | ขาด `locationText` และต้องเลื่อนค่าเดิมตามความหมาย |
+| Buyers | 6 คอลัมน์ | 7 คอลัมน์ | ขาด `createdAt` |
+| Sales | 19 คอลัมน์ | 32 คอลัมน์ | legacy schema; ต้อง semantic migration แม้ขณะนี้ไม่มี data row |
+| Settlements | 13 คอลัมน์ | 14 คอลัมน์ | ขาด `createdAt` |
+
+`Sales`, `Settlements`, `SettlementAllocations` และ `WalletEntries` ยังไม่มี data row ดังนั้นการหยุด preflight ครั้งนี้เกิดก่อนธุรกรรมและไม่มีผลต่อยอดเงินจริง แก้ไข repository เป็น release `2026.08.24-phase-d2` โดยเพิ่ม `previewParaWalletProductionSchemaRepair()` และ backup-first `repairParaWalletProductionSchema()` พร้อมบังคับ runner ให้ตรวจ critical schema ทั้งชุดก่อนเขียนข้อมูล
+
 ## Post-deployment verification — 24 สิงหาคม 2026
 
 ตรวจสอบหลังผู้ดูแล deploy backend และเรียก migration แล้ว โดยการตรวจครั้งนี้เป็น read-only และไม่สร้าง Sale, Settlement หรือรายการกระเป๋าเงินใด ๆ
@@ -11,7 +24,7 @@
 | Semantic row mapping | ค่า id, garden, คู่สัญญา, version และสัดส่วน 60/40 ตรงกับ backup; ฟิลด์ legacy ท้ายแถวถูกย้ายไปตำแหน่ง canonical โดยไม่เลื่อนความหมาย | ผ่าน |
 | Production financial safety | `Sales`, `Settlements`, `SettlementAllocations` และ `WalletEntries` ยังมีเฉพาะ header | ผ่าน |
 | Garden membership | สวน `garden-pahpayom-001` มี Owner และ Tapper membership สถานะ active | ผ่าน |
-| Backend fingerprint | ยังอ่าน live health response หลัง deploy ไม่ได้จากสภาพแวดล้อมตรวจสอบ จึงยังไม่ยืนยัน `release=2026.08.24-phase-d1`, `schemaVersion=2026-08-agreements-v2` และ `financialSchemaReady=true` | รอยืนยัน |
+| Backend fingerprint | ผู้ดูแลส่ง live health response ซึ่งยืนยัน `release=2026.08.24-phase-d1` และ `schemaVersion=2026-08-agreements-v2`; health GET ไม่ได้รายงาน `financialSchemaReady` | ผ่านเฉพาะ release; schema gate ยังไม่ผ่าน |
 
 ดังนั้น migration และ data-safety gate ผ่านแล้ว แต่ยังไม่ควรเริ่ม controlled production E2E จนกว่า live health/diagnostics fingerprint จะตรงกับ release ที่คาดไว้ และต้องได้รับอนุมัติแยกต่างหากก่อนสร้างธุรกรรมจริง
 

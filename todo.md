@@ -213,5 +213,8 @@
 - [x] Replace the header-only Agreements repair with a backup-first semantic data migration
 - [x] Add regression coverage for legacy Agreement value mapping and lock flush ordering
 - [x] Run the backup-first Agreements migration once and verify the canonical 16-column schema against the production backup
-- [ ] Verify the deployed backend reports `release=2026.08.24-phase-d1`, `schemaVersion=2026-08-agreements-v2`, and `financialSchemaReady=true`
+- [x] Verify the deployed backend reports `release=2026.08.24-phase-d1` and `schemaVersion=2026-08-agreements-v2`
+- [x] Run a read-only controlled E2E preflight and identify the remaining Gardens, Buyers, Sales, and Settlements legacy schemas before mutation
+- [x] Add a backup-first production schema migration and block the E2E runner until every critical header is canonical
+- [ ] Deploy backend release `2026.08.24-phase-d2`, run `repairParaWalletProductionSchema()` once, and verify diagnostics reports `financialSchemaReady=true`
 - [ ] Run one controlled authenticated production E2E only after the release and schema fingerprints match

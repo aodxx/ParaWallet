@@ -41,7 +41,8 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d1";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d2";');
+    expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
   });
@@ -58,15 +59,47 @@ describe("Apps Script schema safety contract", () => {
     ]);
   });
 
-  it("backs up Agreements and flushes writes before releasing the script lock", () => {
+  it("semantically migrates the observed legacy Garden row", () => {
+    const source = code.match(/function mapLegacyGardenRow_\(row\) \{[\s\S]*?\n\}/)?.[0];
+    expect(source).toBeTruthy();
+    const mapper = new Function(`${source}; return mapLegacyGardenRow_;`)() as (row: unknown[]) => unknown[];
+    expect(mapper(["g1", "o1", "สวน", "พัทลุง", "ป่าพะยอม", 10, 1000, "active", "created", "updated"])).toEqual([
+      "g1", "o1", "สวน", "", "พัทลุง", "ป่าพะยอม", 10, 1000, "active", "created", "updated",
+    ]);
+  });
+
+  it("semantically expands the observed legacy Sale row to 32 columns", () => {
+    const source = code.match(/function mapLegacySaleRow_\(row\) \{[\s\S]*?\n\}/)?.[0];
+    expect(source).toBeTruthy();
+    const mapper = new Function(`${source}; return mapLegacySaleRow_;`)() as (row: unknown[]) => unknown[];
+    const migrated = mapper(["s1", "g1", "a1", "t1", "2026-08-21", "buyer", "rubber", 100, 60, 6000, 100, 50, 5850, 3510, 2340, "confirmed", "file1", 0.95, "created"]);
+    expect(migrated).toHaveLength(32);
+    expect(migrated[3]).toBe("a1");
+    expect(migrated[7]).toBe("2026-08-21");
+    expect(migrated[12]).toBe(100);
+    expect(migrated[14]).toBe(100);
+    expect(migrated[16]).toBe(100);
+    expect(migrated[19]).toBe(6000);
+    expect(migrated[25]).toBe(5850);
+    expect(migrated[26]).toBe("confirmed");
+    expect(migrated[30]).toBe("created");
+  });
+
+  it("backs up every changed legacy sheet and flushes writes before releasing the script lock", () => {
     expect(code).toContain("sheet.copyTo(book).setName(backupName)");
-    expect(code).toContain("var migratedRows = legacyRows.map(mapLegacyAgreementRow_);");
+    expect(code).toContain("var migratedRows = legacyRows.map(plan.mapper);");
+    expect(code).toContain("function repairParaWalletProductionSchema()");
+    expect(code).toContain('name: "Gardens"');
+    expect(code).toContain('name: "Buyers"');
+    expect(code).toContain('name: "Sales"');
+    expect(code).toContain('name: "Settlements"');
     expect(code).toContain("try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }");
   });
 
   it("guards all critical financial mutations before row writes", () => {
     expect(code.match(/assertFinancialSchemaReady_\(\);/g)?.length).toBeGreaterThanOrEqual(10);
-    expect(code).toContain("E2E_AGREEMENTS_SCHEMA_REPAIR_REQUIRED");
+    expect(code).toContain("E2E_PRODUCTION_SCHEMA_REPAIR_REQUIRED");
+    expect(code).toContain("assertFinancialSchemaReady_();");
     expect(code).toContain("function repairParaWalletAgreementSchema()");
   });
 

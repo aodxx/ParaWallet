@@ -27,12 +27,13 @@ No existing ParaWallet or rubber-project design was found in the connected Canva
 
 ## Production acceptance gate
 
-1. Deploy `appsscript/Code.gs` release `2026.08.24-phase-d1` as a new Web App version.
+1. Deploy `appsscript/Code.gs` release `2026.08.24-phase-d2` as a new Web App version.
 2. Open the health endpoint and confirm both `release` and `schemaVersion` match the repository.
-3. Run `repairParaWalletAgreementSchema()` once; keep the generated `Agreements_Backup_*` sheet.
-4. Run diagnostics and require `financialSchemaReady=true` with no schema mismatches.
-5. Only then run one authenticated Owner/Tapper Sale → confirmation → Settlement → confirmation journey.
-6. Reconcile `Sales`, `WalletEntries`, `SettlementAllocations`, `Notifications`, and `AuditLogs` before accepting real use.
+3. Run `previewParaWalletProductionSchemaRepair()` and require only `correct` or `known_legacy` results.
+4. Run `repairParaWalletProductionSchema()` once; keep every generated `*_Backup_*` sheet.
+5. Run diagnostics and require `financialSchemaReady=true` with no schema mismatches.
+6. Only then run one authenticated Owner/Tapper Sale → confirmation → Settlement → confirmation journey.
+7. Reconcile `Sales`, `WalletEntries`, `SettlementAllocations`, `Notifications`, and `AuditLogs` before accepting real use.
 
 ## Claim-to-source ledger
 

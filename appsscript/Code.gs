@@ -14,8 +14,8 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d1";
-var PARAWALLET_SCHEMA_VERSION = "2026-08-agreements-v2";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d2";
+var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
 // 0. ADMIN SETUP ENTRYPOINTS
@@ -802,9 +802,11 @@ function runAuthorizedE2ETestOnce() {
 
     var gardenId = "garden-pahpayom-001";
     var ownerId = "user-owner-001";
-    var agreementHeader = readHeaders_(Repositories.sheet_("Agreements"));
-    var expectedAgreementHeader = HEADERS.Agreements;
-    if (!headersEqual_(agreementHeader, expectedAgreementHeader)) throw new Error("E2E_AGREEMENTS_SCHEMA_REPAIR_REQUIRED");
+    try {
+      assertFinancialSchemaReady_();
+    } catch (schemaError) {
+      throw new Error("E2E_PRODUCTION_SCHEMA_REPAIR_REQUIRED:" + (schemaError && schemaError.message ? schemaError.message : String(schemaError)));
+    }
     var tapperId = "user-tapper-001";
     var runTag = "E2E-PAHPAYOM-001";
     var saleRequestId = runTag + "-SALE";
@@ -915,38 +917,114 @@ function mapLegacyAgreementRow_(row) {
   ];
 }
 
+function mapLegacyGardenRow_(row) {
+  return [row[0], row[1], row[2], "", row[3], row[4], row[5], row[6], row[7], row[8], row[9]];
+}
+
+function mapLegacyBuyerRow_(row) {
+  return [row[0], row[1], row[2], row[3], row[4], row[5], ""];
+}
+
+function mapLegacySaleRow_(row) {
+  return [
+    row[0], row[1], "", row[2], row[3], "", "", row[4], "", "",
+    row[5], row[6], row[7], 0, row[7], "", row[7], row[8], row[8], row[9],
+    row[10], row[11], row[12], row[13], row[14], row[12], row[15], true,
+    row[16], row[17], row[18], ""
+  ];
+}
+
+function mapLegacySettlementRow_(row) {
+  return [row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], ""];
+}
+
+function productionSchemaMigrationPlans_() {
+  return [
+    { name: "Agreements", legacy: ["id", "gardenId", "ownerId", "tapperId", "version", "ownerPercentage", "tapperPercentage", "effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"], mapper: mapLegacyAgreementRow_ },
+    { name: "Gardens", legacy: ["id", "ownerId", "name", "province", "district", "areaRai", "treeCount", "status", "createdAt", "updatedAt"], mapper: mapLegacyGardenRow_ },
+    { name: "Buyers", legacy: ["id", "name", "branch", "contact", "notes", "status"], mapper: mapLegacyBuyerRow_ },
+    { name: "Sales", legacy: ["id", "gardenId", "agreementId", "tapperId", "saleDate", "buyerName", "productType", "weightKg", "unitPrice", "grossSale", "buyerDeductions", "sharedExpenses", "splitBase", "ownerShare", "tapperShare", "status", "receiptFileId", "ocrConfidence", "createdAt"], mapper: mapLegacySaleRow_ },
+    { name: "Settlements", legacy: ["id", "gardenId", "tapperId", "ownerId", "method", "amount", "transferDate", "bank", "referenceNo", "slipFileId", "location", "note", "status"], mapper: mapLegacySettlementRow_ }
+  ];
+}
+
+function classifyKnownSchema_(actual, expected, legacy) {
+  if (headersEqual_(actual, expected)) return "correct";
+  var legacyPrefix = actual.slice(0, legacy.length);
+  var trailingBlank = actual.slice(legacy.length).every(function (value) { return String(value || "") === ""; });
+  return legacyPrefix.length === legacy.length && headersEqual_(legacyPrefix, legacy) && trailingBlank ? "known_legacy" : "unexpected";
+}
+
+function ensureSheetColumnCapacity_(sheet, columnCount) {
+  var current = sheet.getMaxColumns();
+  if (current < columnCount) sheet.insertColumnsAfter(current, columnCount - current);
+}
+
+function migrateKnownLegacySheet_(book, plan, suffix) {
+  var sheet = book.getSheetByName(plan.name);
+  if (!sheet) throw new Error("SHEET_MISSING:" + plan.name);
+  var expected = HEADERS[plan.name];
+  var actual = readHeaders_(sheet);
+  var classification = classifyKnownSchema_(actual, expected, plan.legacy);
+  if (classification === "correct") return { name: plan.name, status: "already_correct", headers: actual };
+  if (classification !== "known_legacy") throw new Error("SCHEMA_MIGRATION_UNEXPECTED:" + plan.name + ":" + actual.join(","));
+
+  var backupName = plan.name + "_Backup_" + suffix;
+  if (book.getSheetByName(backupName)) backupName += "_" + Utilities.getUuid().slice(0, 6);
+  var backup = sheet.copyTo(book).setName(backupName);
+  backup.setFrozenRows(1);
+
+  var lastRow = sheet.getLastRow();
+  var sourceWidth = Math.max(actual.length, plan.legacy.length);
+  var legacyRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, sourceWidth).getValues() : [];
+  var migratedRows = legacyRows.map(plan.mapper);
+  ensureSheetColumnCapacity_(sheet, expected.length);
+  var clearWidth = Math.max(sheet.getLastColumn(), expected.length);
+  sheet.getRange(1, 1, Math.max(lastRow, 1), clearWidth).clearContent();
+  sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+  if (migratedRows.length) sheet.getRange(2, 1, migratedRows.length, expected.length).setValues(migratedRows);
+  sheet.setFrozenRows(1);
+  SpreadsheetApp.flush();
+  assertHeaders_(sheet, plan.name);
+  return { name: plan.name, status: "migrated", backupSheet: backupName, migratedRows: migratedRows.length, previousHeaders: actual, headers: expected };
+}
+
+// Read-only preview. Run this before repairParaWalletProductionSchema().
+function previewParaWalletProductionSchemaRepair() {
+  var book = SpreadsheetApp.openById(Config.spreadsheetId());
+  return productionSchemaMigrationPlans_().map(function (plan) {
+    var sheet = book.getSheetByName(plan.name);
+    if (!sheet) return { name: plan.name, status: "missing" };
+    var actual = readHeaders_(sheet);
+    return { name: plan.name, status: classifyKnownSchema_(actual, HEADERS[plan.name], plan.legacy), actual: actual, expected: HEADERS[plan.name], dataRows: Math.max(sheet.getLastRow() - 1, 0) };
+  });
+}
+
+// Repairs every known production legacy schema in one Script Lock. Each changed
+// sheet is copied to a timestamped backup before values are semantically mapped.
+function repairParaWalletProductionSchema() {
+  return Locking.run("admin:repair-production-schema", function () {
+    var book = SpreadsheetApp.openById(Config.spreadsheetId());
+    var suffix = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Etc/UTC", "yyyyMMdd_HHmmss");
+    var results = productionSchemaMigrationPlans_().map(function (plan) { return migrateKnownLegacySheet_(book, plan, suffix); });
+    SpreadsheetApp.flush();
+    var schema = Repositories.validateSchema();
+    var mismatches = schema.filter(function (item) { return item.status !== "ok"; });
+    return { status: mismatches.length ? "incomplete" : "ready", release: PARAWALLET_RELEASE, schemaVersion: PARAWALLET_SCHEMA_VERSION, financialSchemaReady: mismatches.length === 0, results: results, mismatches: mismatches };
+  });
+}
+
 // Migrates only the known legacy Agreements schema created before the current
 // 16-column Data Model. It makes a full backup copy first, preserves the
 // meaning of effective dates/status/createdAt, and refuses unexpected schemas.
 function repairParaWalletAgreementSchema() {
   return Locking.run("admin:repair-agreements-schema", function () {
-    var expected = HEADERS.Agreements;
-    var legacy = ["id", "gardenId", "ownerId", "tapperId", "version", "ownerPercentage", "tapperPercentage", "effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"];
-    var sheet = Repositories.sheet_("Agreements");
-    var actual = readHeaders_(sheet);
-    var legacyPrefix = actual.slice(0, legacy.length);
-    var trailingBlank = actual.slice(legacy.length).every(function (value) { return String(value || "") === ""; });
-    if (headersEqual_(actual, expected)) return { status: "already_correct", headers: actual, schemaVersion: PARAWALLET_SCHEMA_VERSION };
-    if (legacyPrefix.length !== legacy.length || !headersEqual_(legacyPrefix, legacy) || !trailingBlank) throw new Error("AGREEMENTS_SCHEMA_UNEXPECTED:" + actual.join(","));
-
     var book = SpreadsheetApp.openById(Config.spreadsheetId());
     var suffix = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Etc/UTC", "yyyyMMdd_HHmmss");
-    var backupName = "Agreements_Backup_" + suffix;
-    if (book.getSheetByName(backupName)) backupName += "_" + Utilities.getUuid().slice(0, 6);
-    var backup = sheet.copyTo(book).setName(backupName);
-    backup.setFrozenRows(1);
-
-    var lastRow = sheet.getLastRow();
-    var sourceWidth = Math.max(actual.length, legacy.length);
-    var legacyRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, sourceWidth).getValues() : [];
-    var migratedRows = legacyRows.map(mapLegacyAgreementRow_);
-    var clearWidth = Math.max(sheet.getLastColumn(), expected.length);
-    sheet.getRange(1, 1, Math.max(lastRow, 1), clearWidth).clearContent();
-    sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
-    if (migratedRows.length) sheet.getRange(2, 1, migratedRows.length, expected.length).setValues(migratedRows);
-    sheet.setFrozenRows(1);
+    var plan = productionSchemaMigrationPlans_().filter(function (item) { return item.name === "Agreements"; })[0];
+    var result = migrateKnownLegacySheet_(book, plan, suffix);
     SpreadsheetApp.flush();
-    assertHeaders_(sheet, "Agreements");
-    return { status: "migrated", backupSheet: backupName, migratedRows: migratedRows.length, previousHeaders: actual, headers: expected, schemaVersion: PARAWALLET_SCHEMA_VERSION };
+    result.schemaVersion = PARAWALLET_SCHEMA_VERSION;
+    return result;
   });
 }
