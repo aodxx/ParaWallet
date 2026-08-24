@@ -10,13 +10,13 @@ This prototype validates visual hierarchy and one-handed outdoor use before chan
 
 ## Locked direction
 
-- Deep forest header and primary cards, warm cream background, leaf-green active states, amber pending work, and terracotta disputes
+- Earthy Harmony palette: olive `#606C38`, deep forest `#283618`, warm cream `#FEFAE0`, soil gold `#DDA15E`, and terracotta `#BC6C25`
 - Tapper wallet and Owner-custody wallet remain visible as a left/right pair
 - Tapper receives one dominant `สแกนใบเสร็จ` action followed by Sale, Settlement, and Export actions
 - Owner receives pending review as the first decision, before general metrics
 - Bottom Navigation uses four destinations: `ภาพรวม`, `รายการ`, `กระเป๋า`, and `เพิ่มเติม`; notifications remain a large header button with a numeric badge
-- Header uses a deep-forest `Curved Edge` background with a continuous downward arc, keeping identity and connection status inside a stable high-contrast area
-- Bottom Navigation uses an `Animated Circle Dock`: the circle glides to the selected destination, the icon rises with a short spring response, and the label remains large and stationary enough to read
+- Header uses an asymmetric SVG `Curved Edge` with a high–low organic wave inspired by the approved reference, keeping identity and connection status inside a stable high-contrast area
+- Bottom Navigation uses a full deep-forest background plus an `Animated Circle Dock`: the circle glides to the selected destination inside a cream cutout ring, the icon rises with a short spring response, and the label remains large and readable
 
 ## Bottom Navigation accessibility specification
 
