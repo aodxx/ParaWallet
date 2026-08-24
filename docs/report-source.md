@@ -56,6 +56,8 @@ No existing ParaWallet or rubber-project design was found in the connected Canva
 
 **Limitation:** D5 links an already registered active Tapper. It does not email or create a pending invitation for an unknown Google account.
 
+**Multi-Tapper isolation:** Because D5 allows more than one Tapper relationship, wallet custody and Settlement allocation are now scoped by `tapperId`. The Owner report remains garden-wide, while each Tapper sees and settles only the Owner entitlement arising from that Tapper's own confirmed Sales.
+
 ### D5 claim-to-source ledger
 
 - **Authorization Cheat Sheet:** OWASP Cheat Sheet Series, accessed 24 August 2026, https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html

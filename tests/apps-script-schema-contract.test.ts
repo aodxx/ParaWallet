@@ -87,6 +87,15 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('updateRowById_("GardenMembers", membership.id, { status: "inactive" })');
   });
 
+  it("scopes Tapper wallet and settlement allocation to the same Tapper", () => {
+    expect(code).toContain("function settlementOutstanding_(gardenId, ownerId, tapperId)");
+    expect(code).toContain("id_(row.tapperId) === id_(tapperId)");
+    expect(code).toContain("settlementOutstanding_(payload.gardenId, access.garden.ownerId, tapperId)");
+    expect(code).toContain("settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId)");
+    expect(code).toContain('id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"');
+    expect(code).toContain("var tapperSettlement = tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlement");
+  });
+
   it("migrates legacy Agreement values into the correct 16-column positions", () => {
     const source = code.match(/function mapLegacyAgreementRow_\(row\) \{[\s\S]*?\n\}/)?.[0];
     expect(source).toBeTruthy();

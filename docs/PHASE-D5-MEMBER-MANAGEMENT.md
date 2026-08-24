@@ -21,6 +21,7 @@ Agreement creation no longer requires Owner to type an internal Tapper ID. The f
 | Preserve financial history | Deactivation changes membership status to `inactive`; it never deletes Users, Sales, WalletEntries, Settlements, or AuditLogs. |
 | Trace sensitive changes | Add, reactivate, and deactivate operations write `AuditLogs` with the request envelope ID and send a notification to the Tapper. |
 | Serialize shared writes | Member mutations remain outside `READ_ONLY_ACTIONS_`, so they run under the existing Apps Script `ScriptLock` and durable RequestID replay handling. |
+| Isolate money by Tapper | Tapper wallet balances, settlement limits, and oldest-first allocation are filtered by the same `tapperId`; one Tapper's payment cannot settle another Tapper's Sale. |
 
 These decisions follow the [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), which recommends least privilege, deny-by-default behavior, and permission validation on every request; the [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html), which recommends audit trails for data addition, modification, and deletion; and the official [Google Apps Script Lock Service](https://developers.google.com/apps-script/reference/lock), which documents locking shared-resource mutations to prevent collisions.
 
@@ -43,6 +44,7 @@ No schema migration is required because D5 uses the existing `Users`, `GardenMem
 5. Open **ข้อตกลง** and confirm the Tapper appears by name/email in the selector.
 6. Re-add the same email and confirm no duplicate active membership row is created.
 7. Attempt deactivation while an active Agreement or outstanding balance exists and confirm the operation is rejected with a clear Thai message.
+8. If the garden has two Tappers, create confirmed Sales for both and verify each Settlement allocates only to Sales with the matching `tapperId`.
 
 ## Limitations and next slice
 

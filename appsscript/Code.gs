@@ -750,13 +750,17 @@ function ownerAdjustmentForSale_(saleId) {
   return round_(rows_("Adjustments").filter(function (row) { return id_(row.saleId) === id_(saleId) && row.status === "confirmed"; }).reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0));
 }
 
-function settlementOutstanding_(gardenId, ownerId) {
-  var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && row.status === "confirmed"; });
+function settlementOutstanding_(gardenId, ownerId, tapperId) {
+  var sales = rows_("Sales").filter(function (row) {
+    return id_(row.gardenId) === id_(gardenId) && row.status === "confirmed" && (!tapperId || id_(row.tapperId) === id_(tapperId));
+  });
   var total = sales.reduce(function (sum, sale) { return sum + numeric_(sale.ownerShare); }, 0);
   var saleIds = sales.reduce(function (map, sale) { map[id_(sale.id)] = true; return map; }, {});
   var adjustments = rows_("Adjustments").filter(function (row) { return row.status === "confirmed" && saleIds[id_(row.saleId)]; });
   var ownerAdjustment = adjustments.reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0);
-  var settlements = rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && id_(row.ownerId) === id_(ownerId) && row.status === "confirmed"; });
+  var settlements = rows_("Settlements").filter(function (row) {
+    return id_(row.gardenId) === id_(gardenId) && id_(row.ownerId) === id_(ownerId) && row.status === "confirmed" && (!tapperId || id_(row.tapperId) === id_(tapperId));
+  });
   var paid = settlements.reduce(function (sum, item) { return sum + numeric_(item.amount); }, 0);
   var entitlement = round_(total + ownerAdjustment);
   return { entitlement: entitlement, received: round_(paid), outstanding: round_(Math.max(0, entitlement - paid)) };
@@ -777,7 +781,8 @@ Services.wallet = function (user, payload) {
   var ownerEntitlement = confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) + adjustments.reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0);
   var tapperIncome = confirmed.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0) + adjustments.filter(function (row) { var sale = findById_("Sales", row.saleId); return sale && (!tapperId || id_(sale.tapperId) === id_(tapperId)); }).reduce(function (sum, row) { return sum + (row.adjustmentType === "tapper_credit" ? numeric_(row.amount) : row.adjustmentType === "tapper_debit" ? -numeric_(row.amount) : 0); }, 0);
   var settlement = settlementOutstanding_(garden.id, ownerId);
-  return { gardenId: garden.id, role: user.role, agreementCount: agreementRows.length, owner: { totalEntitlement: round_(ownerEntitlement), totalReceived: settlement.received, outstanding: settlement.outstanding, pending: pending.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0), disputed: disputed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) }, tapper: { totalIncome: round_(tapperIncome), ownerMoneyHeld: settlement.outstanding, ownerMoneyTransferred: settlement.received, pendingReviews: pending.length } };
+  var tapperSettlement = tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlement;
+  return { gardenId: garden.id, role: user.role, agreementCount: agreementRows.length, owner: { totalEntitlement: round_(ownerEntitlement), totalReceived: settlement.received, outstanding: settlement.outstanding, pending: pending.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0), disputed: disputed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) }, tapper: { totalIncome: round_(tapperIncome), ownerMoneyHeld: tapperSettlement.outstanding, ownerMoneyTransferred: tapperSettlement.received, pendingReviews: pending.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).length } };
 };
 
 Services.createSettlement = function (user, payload) {
@@ -804,7 +809,7 @@ Services.createSettlement = function (user, payload) {
     }
   }
   if (method === "cash" && !String(payload.location || "").trim()) throw new Error("CASH_LOCATION_REQUIRED");
-  var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId).outstanding;
+  var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId, tapperId).outstanding;
   if (numeric_(payload.amount) > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
   var settlementId = Utilities.getUuid();
   Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || nowIso_(), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_() });
@@ -823,11 +828,11 @@ Services.confirmSettlement = function (user, payload) {
     if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_CONFIRMABLE");
     var amount = numeric_(settlement.amount);
     if (amount <= 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
-    var outstanding = settlementOutstanding_(settlement.gardenId, settlement.ownerId).outstanding;
+    var outstanding = settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId).outstanding;
     if (amount > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
     var remaining = amount;
     var allocations = [];
-    rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(settlement.gardenId) && row.status === "confirmed"; }).sort(function (a, b) { return new Date(a.saleDate || a.createdAt).getTime() - new Date(b.saleDate || b.createdAt).getTime(); }).forEach(function (sale) {
+    rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(settlement.gardenId) && id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"; }).sort(function (a, b) { return new Date(a.saleDate || a.createdAt).getTime() - new Date(b.saleDate || b.createdAt).getTime(); }).forEach(function (sale) {
       if (remaining <= 0) return;
       var already = rows_("SettlementAllocations").filter(function (row) { return id_(row.saleId) === id_(sale.id) && row.settlementId !== settlement.id && row.status !== "rejected" && row.status !== "cancelled"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0);
       var allocated = Math.min(remaining, Math.max(0, numeric_(sale.ownerShare) + ownerAdjustmentForSale_(sale.id) - already));
