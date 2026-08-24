@@ -7,8 +7,8 @@
   "scope": "/ParaWallet/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#f7faf4",
-  "theme_color": "#184d36",
+  "background_color": "#fefae0",
+  "theme_color": "#283618",
   "lang": "th",
   "icons": [
     { "src": "/ParaWallet/icons/icon-48.png", "sizes": "48x48", "type": "image/png", "purpose": "any" },

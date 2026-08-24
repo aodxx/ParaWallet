@@ -1,4 +1,4 @@
-const CACHE = "parawallet-shell-v3";
+const CACHE = "parawallet-shell-v4";
 const BASE = "/ParaWallet/";
 const SHELL = [`${BASE}`, `${BASE}index.html`, `${BASE}manifest.webmanifest`, `${BASE}icon.svg`, `${BASE}vendor/lottie_light.min.js`, `${BASE}loading/animation.json`];
 
