@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
 describe("role-aware UI contract", () => {
   it("only exposes sale, receipt, and settlement creation modals to Tapper", () => {
@@ -55,6 +56,13 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ฉันตรวจนับและได้รับเงินสดจริงแล้ว");
     expect(app).toContain("api.settlements.evidence");
     expect(app).not.toContain("https://drive.google.com/file/d/");
+  });
+
+  it("keeps settlement confirmation reachable above the mobile bottom navigation", () => {
+    expect(app).toContain('className="sale-review settlement-review"');
+    expect(styles).toContain(".modal-backdrop{z-index:40}");
+    expect(styles).toContain("max-height:calc(100dvh - 12px)");
+    expect(styles).toContain(".settlement-review .sale-review-actions{position:sticky");
   });
 
   it("requires Owner to review receipt evidence and calculations before confirmation", () => {
