@@ -4,6 +4,7 @@ import GoogleSignIn from "./GoogleSignIn";
 import { Banknote, Bell, Camera, CheckCircle2, CircleDollarSign, Eye, FileDown, FileText, Image, Leaf, Menu, Plus, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
+type ConnectionState = "connecting" | "connected" | "degraded" | "disconnected";
 
 const fallback: DashboardData = { role: "owner", garden: undefined, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, pendingSales: 0, pendingSettlements: 0, unreadNotifications: 0, monthlySales: 0 };
 const money = (value: number) => `฿${Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
@@ -26,7 +27,7 @@ export default function App() {
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [connected, setConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [showGardenForm, setShowGardenForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [showSaleForm, setShowSaleForm] = useState(false);
@@ -36,67 +37,110 @@ export default function App() {
   const [showAgreementForm, setShowAgreementForm] = useState(false);
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const receiptCameraRef = useRef<HTMLInputElement>(null);
+  const refreshSequenceRef = useRef(0);
+  const hasSuccessfulSyncRef = useRef(false);
   const activeGarden = data.garden || gardens[0];
+  const connected = connectionState === "connected" || connectionState === "degraded";
   const pendingSales = data.pendingSales || 0;
   const pendingSettlements = data.pendingSettlements || 0;
   const unreadNotifications = data.unreadNotifications ?? notifications.filter((item) => !item.readAt).length;
 
   const handleSignOut = useCallback((reason = "") => {
+    refreshSequenceRef.current += 1;
+    hasSuccessfulSyncRef.current = false;
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setAuthToken("");
     setAuthTokenState("");
-    setConnected(false);
+    setConnectionState("disconnected");
     if (reason) setMessage(reason);
     window.google?.accounts?.id?.disableAutoSelect?.();
   }, []);
 
   const refresh = async (target: Screen = screen) => {
+    const refreshSequence = ++refreshSequenceRef.current;
+    const isCurrent = () => refreshSequence === refreshSequenceRef.current;
     setLoading(true);
     setMessage("");
+    setConnectionState((current) => hasSuccessfulSyncRef.current ? current : "connecting");
     try {
       let dashboard = data;
+      let partialFailure = false;
       // Navigation uses the dashboard already in memory. Re-fetching the heavy
       // dashboard read model before every list page made a single tab change take
       // 8–12 seconds on Apps Script.
       if (target === "overview" || !dashboard.garden?.id) {
         dashboard = await api.dashboard();
+        if (!isCurrent()) return;
         setData(dashboard);
         setRole(dashboard.role);
+        hasSuccessfulSyncRef.current = true;
+        setConnectionState("connected");
       }
       const garden = dashboard.garden || gardens[0];
       if (garden?.id) {
         if (target === "overview") {
-          const [gardenRows, agreementRows, walletRow] = await Promise.all([api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)]);
-          setGardens(gardenRows); setAgreements(agreementRows); setWallet(walletRow);
+          const [gardenResult, agreementResult, walletResult] = await Promise.allSettled([api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)]);
+          if (!isCurrent()) return;
+          if (gardenResult.status === "fulfilled") setGardens(gardenResult.value);
+          if (agreementResult.status === "fulfilled") setAgreements(agreementResult.value);
+          if (walletResult.status === "fulfilled") setWallet(walletResult.value);
+          partialFailure = [gardenResult, agreementResult, walletResult].some((result) => result.status === "rejected");
         } else if (target === "sales") {
-          const [saleRows, agreementRows] = await Promise.all([api.sales.list({ gardenId: garden.id }), api.agreements.list(garden.id)]);
-          setSales(saleRows); setAgreements(agreementRows);
+          const [saleResult, agreementResult] = await Promise.allSettled([api.sales.list({ gardenId: garden.id }), api.agreements.list(garden.id)]);
+          if (!isCurrent()) return;
+          if (saleResult.status === "fulfilled") setSales(saleResult.value);
+          if (agreementResult.status === "fulfilled") setAgreements(agreementResult.value);
+          partialFailure = [saleResult, agreementResult].some((result) => result.status === "rejected");
         } else if (target === "gardens") {
-          const [gardenRows, memberRows] = await Promise.all([api.gardens.list(), dashboard.role === "owner" ? api.members.list(garden.id) : Promise.resolve([])]);
-          setGardens(gardenRows); setMembers(memberRows);
+          const [gardenResult, memberResult] = await Promise.allSettled([api.gardens.list(), dashboard.role === "owner" ? api.members.list(garden.id) : Promise.resolve([])]);
+          if (!isCurrent()) return;
+          if (gardenResult.status === "fulfilled") setGardens(gardenResult.value);
+          if (memberResult.status === "fulfilled") setMembers(memberResult.value);
+          partialFailure = [gardenResult, memberResult].some((result) => result.status === "rejected");
         } else if (target === "agreements") {
-          const [agreementRows, memberRows] = await Promise.all([api.agreements.list(garden.id), dashboard.role === "owner" ? api.members.list(garden.id) : Promise.resolve([])]);
-          setAgreements(agreementRows); setMembers(memberRows);
+          const [agreementResult, memberResult] = await Promise.allSettled([api.agreements.list(garden.id), dashboard.role === "owner" ? api.members.list(garden.id) : Promise.resolve([])]);
+          if (!isCurrent()) return;
+          if (agreementResult.status === "fulfilled") setAgreements(agreementResult.value);
+          if (memberResult.status === "fulfilled") setMembers(memberResult.value);
+          partialFailure = [agreementResult, memberResult].some((result) => result.status === "rejected");
         } else if (target === "settlements") {
-          const [walletRow, settlementRows] = await Promise.all([api.wallets.me(garden.id), api.settlements.list(garden.id)]);
-          setWallet(walletRow); setSettlements(settlementRows);
+          const [walletResult, settlementResult] = await Promise.allSettled([api.wallets.me(garden.id), api.settlements.list(garden.id)]);
+          if (!isCurrent()) return;
+          if (walletResult.status === "fulfilled") setWallet(walletResult.value);
+          if (settlementResult.status === "fulfilled") setSettlements(settlementResult.value);
+          partialFailure = [walletResult, settlementResult].some((result) => result.status === "rejected");
         }
       }
       if (target === "notifications") {
         const notificationRows = await api.notifications.list();
+        if (!isCurrent()) return;
         setNotifications(notificationRows);
         setData((current) => ({ ...current, unreadNotifications: notificationRows.filter((item) => !item.readAt).length }));
       }
-      setConnected(true);
+      if (!isCurrent()) return;
+      hasSuccessfulSyncRef.current = true;
+      if (partialFailure) {
+        setConnectionState("degraded");
+        setMessage("ข้อมูลหลักเชื่อมต่อแล้ว แต่ข้อมูลบางส่วนยังไม่อัปเดต กด “ลองใหม่” เพื่อซิงก์อีกครั้ง");
+      } else {
+        setConnectionState("connected");
+        setMessage("");
+      }
     } catch (error) {
-      setConnected(false);
+      if (!isCurrent()) return;
       if (error instanceof ApiError && ["AUTH_REQUIRED", "INVALID_GOOGLE_ID_TOKEN", "GOOGLE_TOKEN_EXPIRED", "USER_NOT_REGISTERED"].includes(error.code)) {
         handleSignOut("เซสชัน Google หมดอายุหรือไม่มีสิทธิ์ โปรดเข้าสู่ระบบใหม่");
       } else {
-        setMessage(userMessageForApiError(error));
+        if (hasSuccessfulSyncRef.current) {
+          setConnectionState("degraded");
+          setMessage(`ยังใช้ข้อมูลที่โหลดล่าสุดได้ · ${userMessageForApiError(error)}`);
+        } else {
+          setConnectionState("disconnected");
+          setMessage(userMessageForApiError(error));
+        }
       }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
@@ -104,7 +148,7 @@ export default function App() {
     onAuthFailure(() => handleSignOut("เซสชัน Google หมดอายุหรือไม่มีสิทธิ์ โปรดเข้าสู่ระบบใหม่"));
     setAuthToken(authToken);
     if (authToken) void refresh("overview");
-    else { setConnected(false); setMessage("กรุณาเข้าสู่ระบบด้วย Google ก่อนเชื่อมต่อฐานข้อมูล"); }
+    else { setConnectionState("disconnected"); setMessage("กรุณาเข้าสู่ระบบด้วย Google ก่อนเชื่อมต่อฐานข้อมูล"); }
   }, [authToken]);
 
   const handleCredential = useCallback((token: string) => {
@@ -149,7 +193,7 @@ export default function App() {
       <div className="brand"><span className="brand-mark"><Leaf size={22} /></span><span><b>ParaWallet</b><small>DUAL WALLET SYSTEM</small></span></div>
       <div className="top-actions"><button className="secondary signout-button" onClick={() => handleSignOut()}>ออกจากระบบ</button><span className="role-badge">{role === "owner" ? "Owner" : "Tapper"}</span><button className="icon-button notification-button" onClick={() => openScreen("notifications")} aria-label={`การแจ้งเตือนที่ยังไม่อ่าน ${unreadNotifications} รายการ`}><Bell size={20} />{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button></div>
     </header>
-    {message && <div className={`sync-banner ${connected ? "connected" : "disconnected"}`} role="status"><strong>{connected ? "เชื่อมต่อแล้ว" : "ยังไม่เชื่อมต่อ"}</strong><span>{message}</span><button onClick={() => void refresh()} disabled={loading}>{loading ? "กำลังตรวจสอบ..." : "ลองใหม่"}</button></div>}
+    {message && <div className={`sync-banner ${connectionState}`} role="status"><strong>{connectionState === "connected" ? "เชื่อมต่อแล้ว" : connectionState === "degraded" ? "ข้อมูลยังไม่ครบ" : "ยังไม่เชื่อมต่อ"}</strong><span>{message}</span><button onClick={() => void refresh()} disabled={loading}>{loading ? "กำลังตรวจสอบ..." : "ลองใหม่"}</button></div>}
     <div className="mobile-context"><div><small>กำลังดูข้อมูล</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong></div><button onClick={() => openScreen("gardens")} aria-label="เปลี่ยนสวน"><Sprout size={18} /></button></div>
     <div className="layout">
       <aside className="sidebar">

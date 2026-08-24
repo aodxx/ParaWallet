@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d9";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d10";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -272,7 +272,8 @@ var HEADERS = {
 
 var Repositories = {
   book_: null,
-  resetRequestContext_: function () { this.book_ = null; },
+  rowsCache_: {},
+  resetRequestContext_: function () { this.book_ = null; this.rowsCache_ = {}; },
   workbook_: function () {
     if (!this.book_) this.book_ = SpreadsheetApp.openById(Config.spreadsheetId());
     return this.book_;
@@ -311,14 +312,17 @@ var Repositories = {
     });
   },
   rows_: function (name) {
+    if (Object.prototype.hasOwnProperty.call(this.rowsCache_, name)) return this.rowsCache_[name];
     var sheet = this.sheet_(name);
     var values = sheet.getDataRange().getValues();
     var headers = values.shift() || [];
-    return values.filter(function (row) { return row.some(function (cell) { return cell !== ""; }); }).map(function (row) {
+    var rows = values.filter(function (row) { return row.some(function (cell) { return cell !== ""; }); }).map(function (row) {
       var item = {};
       headers.forEach(function (header, index) { item[header] = row[index]; });
       return item;
     });
+    this.rowsCache_[name] = rows;
+    return rows;
   },
   findUserByEmail: function (email) {
     return this.rows_("Users").filter(function (row) { return String(row.email).toLowerCase() === String(email).toLowerCase() && row.status !== "disabled"; })[0] || null;
@@ -332,6 +336,7 @@ var Repositories = {
   append: function (name, values) {
     var sheet = this.sheet_(name);
     sheet.appendRow(HEADERS[name].map(function (key) { return values[key] === undefined ? "" : values[key]; }));
+    delete this.rowsCache_[name];
   }
 };
 
@@ -535,6 +540,7 @@ function updateRowById_(name, recordId, patch) {
     if (id_(values[i][idIndex]) === id_(recordId)) {
       Object.keys(patch).forEach(function (key) { var index = headers.indexOf(key); if (index >= 0) values[i][index] = patch[key]; });
       sheet.getRange(i + 2, 1, 1, headers.length).setValues([values[i]]);
+      delete Repositories.rowsCache_[name];
       return true;
     }
   }

@@ -29,6 +29,8 @@ export class ApiError extends Error {
 const apiErrorMessages: Record<string, string> = {
   TRANSACTION_BUSY: "ระบบกำลังประมวลผลข้อมูล กรุณาลองอีกครั้งในอีกสักครู่",
   API_ERROR: "เชื่อมต่อระบบข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง",
+  NETWORK_ERROR: "สัญญาณเชื่อมต่อไม่เสถียร ระบบลองเชื่อมต่อซ้ำแล้ว กรุณากดลองใหม่อีกครั้ง",
+  INVALID_API_RESPONSE: "ระบบข้อมูลตอบกลับไม่สมบูรณ์ กรุณากดลองใหม่อีกครั้ง",
   REQUEST_ID_REQUIRED: "คำขอไม่สมบูรณ์ กรุณาลองใหม่",
   SETTLEMENT_SLIP_REQUIRED: "กรุณาแนบสลิปการโอนเงิน",
   SETTLEMENT_SLIP_TOO_LARGE: "ไฟล์สลิปมีขนาดใหญ่เกินไป กรุณาเลือกไฟล์ไม่เกิน 4 MB",
@@ -82,20 +84,45 @@ export function newRequestId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
+const retryDelays = [0, 800, 2200];
+
+function waitForRetry(delay: number, signal?: AbortSignal) {
+  if (!delay) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const timer = globalThis.setTimeout(resolve, delay);
+    signal?.addEventListener("abort", () => {
+      globalThis.clearTimeout(timer);
+      reject(signal.reason || new DOMException("The operation was aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
 export async function callApi<TPayload, TResult>(action: string, payload?: TPayload, options: { signal?: AbortSignal; authToken?: string; requestId?: string } = {}): Promise<TResult> {
   if (!apiUrl) throw new Error("VITE_APPS_SCRIPT_URL is not configured");
   const requestId = options.requestId ?? newRequestId();
   const body: ApiRequest<TPayload> = { action, requestId, payload, authToken: options.authToken ?? currentAuthToken };
-  const retryDelays = [0, 250, 700];
   for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
-    if (retryDelays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
-    const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
-    const envelope = (await response.json()) as ApiResponse<TResult>;
-    if (envelope.status === "ok") return envelope.data as TResult;
-    const code = envelope.error?.code || "API_ERROR";
-    if (["AUTH_REQUIRED", "INVALID_GOOGLE_ID_TOKEN", "GOOGLE_TOKEN_EXPIRED", "USER_NOT_REGISTERED"].includes(code)) authFailureHandler?.();
-    const apiError = new ApiError(code, envelope.error?.message || "Apps Script request failed", envelope.error?.retryable === true);
-    if (!apiError.retryable || attempt === retryDelays.length - 1) throw apiError;
+    await waitForRetry(retryDelays[attempt], options.signal);
+    try {
+      const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
+      if (response.ok === false) throw new ApiError("NETWORK_ERROR", `Apps Script HTTP ${response.status}`, true);
+      let envelope: ApiResponse<TResult>;
+      try {
+        envelope = (await response.json()) as ApiResponse<TResult>;
+      } catch {
+        throw new ApiError("INVALID_API_RESPONSE", "Apps Script returned invalid JSON", true);
+      }
+      if (envelope.status === "ok") return envelope.data as TResult;
+      const code = envelope.error?.code || "API_ERROR";
+      if (["AUTH_REQUIRED", "INVALID_GOOGLE_ID_TOKEN", "GOOGLE_TOKEN_EXPIRED", "USER_NOT_REGISTERED"].includes(code)) authFailureHandler?.();
+      throw new ApiError(code, envelope.error?.message || "Apps Script request failed", envelope.error?.retryable === true);
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") throw caught;
+      const apiError = caught instanceof ApiError
+        ? caught
+        : new ApiError("NETWORK_ERROR", caught instanceof Error ? caught.message : "Apps Script network request failed", true);
+      if (!apiError.retryable || attempt === retryDelays.length - 1) throw apiError;
+    }
   }
   throw new ApiError("API_ERROR", "Apps Script request failed", true);
 }

@@ -57,7 +57,7 @@ describe("Apps Script API contract", () => {
       .mockResolvedValueOnce({ json: async () => ({ status: "ok", requestId: "req-6", data: { connected: true } }) });
     vi.stubGlobal("fetch", fetchMock);
     const request = callApi("dashboard.get", undefined, { requestId: "req-6" });
-    await vi.advanceTimersByTimeAsync(250);
+    await vi.advanceTimersByTimeAsync(800);
     await expect(request).resolves.toEqual({ connected: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).requestId).toBe("req-6");
@@ -65,10 +65,28 @@ describe("Apps Script API contract", () => {
     vi.useRealTimers();
   });
 
+  it("retries a transient network failure with the same request ID", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({ json: async () => ({ status: "ok", requestId: "req-network", data: { connected: true } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = callApi("dashboard.get", undefined, { requestId: "req-network" });
+    await vi.advanceTimersByTimeAsync(800);
+    await expect(request).resolves.toEqual({ connected: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).requestId).toBe("req-network");
+    vi.useRealTimers();
+  });
+
   it("shows a safe Thai message instead of an internal busy request key", () => {
     const error = new ApiError("TRANSACTION_BUSY", "TRANSACTION_BUSY:request:private-uuid", true);
     expect(userMessageForApiError(error)).toBe("ระบบกำลังประมวลผลข้อมูล กรุณาลองอีกครั้งในอีกสักครู่");
     expect(userMessageForApiError(error)).not.toContain("private-uuid");
+  });
+
+  it("explains when automatic network retries are exhausted", () => {
+    expect(userMessageForApiError(new ApiError("NETWORK_ERROR", "Failed to fetch", true))).toContain("ระบบลองเชื่อมต่อซ้ำแล้ว");
   });
 
   it("sends owner-controlled member mutations through the typed API", async () => {
