@@ -45,6 +45,7 @@ The following files are intentionally retained. Do not use their old release num
 - `PHASE-D9-PENDING-WORK-NOTIFICATIONS.md`
 - `PHASE-D10-CONNECTION-RESILIENCE.md`
 - `PHASE-D11-LOADING-UX.md`
+- `PHASE-D12-FOREST-FINTECH-UI.md`
 
 ## Current status precedence
 

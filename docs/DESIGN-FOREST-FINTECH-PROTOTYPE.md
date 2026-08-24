@@ -6,7 +6,7 @@ Prototype URL after GitHub Pages deployment: `https://aodxx.github.io/ParaWallet
 
 ## Purpose
 
-This prototype validates visual hierarchy and one-handed outdoor use before changing the production React screens. It contains no API calls, authentication, financial mutation, or production data.
+This prototype validated visual hierarchy and one-handed outdoor use before the approved direction was applied to the production React screens. The prototype itself contains no API calls, authentication, financial mutation, or production data.
 
 ## Locked direction
 
@@ -41,6 +41,8 @@ Motion is feedback, not decoration. It must never delay navigation, move financi
 
 The font stack prioritizes Android's Thai system font, followed by `Leelawadee UI`, Tahoma, and system sans-serif. Production must allow Android font scaling without clipped or overlapping labels.
 
-## Review gate before implementation
+## Production implementation
 
-Review both roles on a real phone at normal brightness and outdoors if possible. Confirm wallet meanings, first action, curved-header height, label readability, dock movement, badge visibility, thumb reach, and whether four navigation labels remain understandable. Only after approval should the visual tokens and composition be applied to `src/App.tsx` and `src/styles.css`.
+Phase D12 applies these tokens and composition rules in `src/App.tsx` and `src/styles.css`. The production navigation keeps four large destinations and moves secondary destinations into an accessible `เพิ่มเติม` bottom sheet. Financial logic, backend release, and schema are unchanged.
+
+The remaining gate is a real-phone acceptance pass at normal brightness and outdoors if possible. Confirm wallet meanings, first action, curved-header height, label readability, dock movement, badge visibility, thumb reach, and whether four navigation labels remain understandable.

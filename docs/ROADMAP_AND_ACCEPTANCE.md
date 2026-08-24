@@ -4,7 +4,7 @@ Updated: 24 August 2026
 
 ## Current release — stabilization
 
-The accepted baseline is backend `2026.08.24-phase-d10`, schema `2026-08-production-v3`, and frontend Phase D11. Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass in [`todo.md`](../todo.md) is recorded.
+The accepted baseline is backend `2026.08.24-phase-d10`, schema `2026-08-production-v3`, and frontend Phase D12. Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass in [`todo.md`](../todo.md) is recorded.
 
 Acceptance requires all of the following:
 
@@ -14,12 +14,12 @@ Acceptance requires all of the following:
 4. Bank transfer requires evidence; cash handover requires Owner acknowledgement; repeated RequestID creates no duplicate effect.
 5. Pending-work cards, notification badges, notification read state, and deep links refresh correctly for both roles.
 6. A temporary disconnect produces a clear retry state and recovers without blanking the screen or showing demo money.
-7. Loading animation, skeleton/content transition, text hierarchy, alignment, sticky actions, and keyboard-safe controls work on real mobile devices.
+7. Loading animation, skeleton/content transition, text hierarchy, curved header, animated dock, sticky actions, and keyboard-safe controls work on real mobile devices.
 8. `pnpm verify` passes before every release.
 
-## Visual-design exploration — next decision, not implementation
+## Visual-design baseline — implemented
 
-After documentation closure, the Owner and maintainer will select a visual direction. The design proposal may change color, typography, spacing, card composition, icon treatment, and motion, but must preserve current workflows, authorization, financial calculations, evidence rules, accessibility, and outdoor readability. Implementation begins only after a direction and screen priority are approved.
+The Owner-approved Forest Fintech direction is implemented in Phase D12. It changes color, typography hierarchy, spacing, card composition, header treatment, and navigation motion while preserving workflows, authorization, financial calculations, evidence rules, accessibility, and outdoor readability. Further visual expansion remains deferred until explicitly approved.
 
 ## Deferred expansion
 

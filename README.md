@@ -6,7 +6,7 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 
 | Component | Accepted baseline |
 |---|---|
-| Frontend | Phase D11 loading and transition UX on GitHub Pages |
+| Frontend | Phase D12 Forest Fintech UI on GitHub Pages |
 | Backend | `2026.08.24-phase-d10` |
 | Schema | `2026-08-production-v3` |
 | Automated verification | 98 tests, TypeScript, Apps Script syntax, and production build |
@@ -24,7 +24,7 @@ Repository: <https://github.com/aodxx/ParaWallet>
 - Bank-transfer slip evidence and cash-handover Owner confirmation
 - Pending-work queue, notifications, audit logs, date reports, and CSV export
 - RequestID idempotency, LockService write boundaries, schema guards, and connection recovery
-- Mobile-first Owner/Tapper views, PWA install support, and structured Lottie loading states
+- Mobile-first Owner/Tapper views, PWA install support, structured Lottie loading states, curved mobile header, and accessible animated dock navigation
 
 Optional expansion is intentionally frozen. See [todo.md](todo.md) for the deferred list; do not begin those items without a new Owner decision.
 
@@ -55,7 +55,7 @@ For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script We
 - Frontend changes are verified and deployed by the GitHub Pages workflow.
 - Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
 - After a backend deployment, require health to report `release=2026.08.24-phase-d10` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true`.
-- Run a migration only when its release document explicitly requires it. D10 and D11 require no schema migration.
+- Run a migration only when its release document explicitly requires it. D10–D12 require no schema migration.
 
 Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).
 

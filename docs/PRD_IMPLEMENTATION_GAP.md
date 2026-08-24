@@ -2,7 +2,7 @@
 
 Updated: 24 August 2026
 
-The PRD core is implemented through backend D10 and frontend D11. This matrix is a present-tense status record, not authorization to begin optional work.
+The PRD core is implemented through backend D10 and frontend D12. This matrix is a present-tense status record, not authorization to begin optional work.
 
 | PRD area | Current production status | Remaining boundary |
 |---|---|---|
@@ -15,7 +15,7 @@ The PRD core is implemented through backend D10 and frontend D11. This matrix is
 | Settlements | Partial bank/cash handover, slip evidence, Owner confirmation/rejection, oldest-first allocation, and balance guards are implemented | Additional payment rails are deferred |
 | Pending work and notifications | Role-aware pending queue, notification list/read, event generation, refresh, and badges are implemented in D9 | Push/LINE/email delivery is deferred |
 | Reports | Date filtering, financial summary rows, and CSV export are implemented | Advanced analytics and scheduled export are deferred |
-| PWA and mobile UX | Owner/Tapper screens, primary actions, bottom navigation, responsive layouts, loading/error/empty states, and connection recovery are implemented | A new visual direction requires separate approval before implementation |
+| PWA and mobile UX | Owner/Tapper screens, prioritized dual wallets, curved header, accessible animated dock, responsive layouts, loading/error/empty states, and connection recovery are implemented | Further visual expansion requires separate approval |
 | Security and reliability | Server authorization, LockService, durable RequestID idempotency, schema guards, audit logs, and deterministic workflow tests are implemented | Ongoing production monitoring remains operational work |
 
 ## Current release decision
