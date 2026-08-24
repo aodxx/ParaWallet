@@ -53,7 +53,10 @@
     .app-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
     .app-scroll::-webkit-scrollbar { display: none; }
 
-    .app-header { position: relative; padding: 38px 18px 14px; background: linear-gradient(150deg, var(--forest-950), var(--forest-800)); color: white; }
+    .app-header { position: relative; z-index: 2; margin-bottom: 28px; padding: 38px 18px 20px; background: linear-gradient(150deg, var(--forest-950), var(--forest-800)); color: white; }
+    .app-header::before { position: absolute; top: 20px; right: 58px; width: 118px; height: 118px; border: 1px solid rgba(255,255,255,.07); border-radius: 50%; box-shadow: 42px 34px 0 -18px rgba(255,255,255,.04); content: ""; pointer-events: none; }
+    .app-header::after { position: absolute; right: -8%; bottom: -28px; left: -8%; z-index: -1; height: 58px; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: #184d36; content: ""; pointer-events: none; }
+    .app-header > * { position: relative; z-index: 1; }
     .brand-row, .identity-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .brand { display: flex; align-items: center; gap: 9px; }
     .brand img { width: 31px; height: 31px; padding: 4px; border-radius: 10px; background: rgba(255,255,255,.92); }
@@ -116,13 +119,25 @@
     .task-value strong { display: block; font-size: 13px; }
     .task-value span { display: inline-flex; margin-top: 4px; border-radius: 999px; padding: 3px 7px; background: var(--amber-soft); color: #825d19; font-size: 9px; font-weight: 900; }
 
-    .bottom-nav { flex: 0 0 auto; position: relative; z-index: 10; min-height: calc(78px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; padding: 7px 7px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #d6e2d4; background: rgba(255,254,249,.97); box-shadow: 0 -10px 30px rgba(18,60,43,.10); backdrop-filter: blur(18px); }
-    .nav-item { position: relative; min-width: 0; min-height: 62px; display: grid; justify-items: center; align-content: center; gap: 3px; border: 0; border-radius: 16px; background: transparent; color: #5b7062; cursor: pointer; }
-    .nav-item .nav-icon { width: 44px; height: 31px; display: grid; place-items: center; border-radius: 999px; transition: background .18s ease, color .18s ease, transform .18s ease; }
-    .nav-item span { font-size: 14px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+    .bottom-nav { --active-left: 12.5%; flex: 0 0 auto; position: relative; z-index: 10; min-height: calc(86px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; padding: 10px 7px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #d6e2d4; background: rgba(255,254,249,.97); box-shadow: 0 -10px 30px rgba(18,60,43,.12); backdrop-filter: blur(18px); }
+    .bottom-nav[data-active="0"] { --active-left: 12.5%; }
+    .bottom-nav[data-active="1"] { --active-left: 37.5%; }
+    .bottom-nav[data-active="2"] { --active-left: 62.5%; }
+    .bottom-nav[data-active="3"] { --active-left: 87.5%; }
+    .dock-indicator { position: absolute; top: -17px; left: var(--active-left); z-index: 0; width: 58px; height: 58px; border: 5px solid var(--surface); border-radius: 50%; background: linear-gradient(145deg, #2c6a4b, #123c2b); box-shadow: 0 9px 20px rgba(18,60,43,.28), 0 0 0 1px rgba(18,60,43,.08); pointer-events: none; transform: translateX(-50%); transition: left .36s cubic-bezier(.34,1.56,.64,1), box-shadow .24s ease; }
+    .dock-indicator::after { position: absolute; right: 10px; bottom: 8px; width: 7px; height: 7px; border-radius: 50%; background: #99d77d; box-shadow: 0 0 0 4px rgba(153,215,125,.12); content: ""; }
+    .nav-item { position: relative; z-index: 1; min-width: 0; min-height: 66px; display: grid; justify-items: center; align-content: center; gap: 4px; border: 0; border-radius: 16px; background: transparent; color: #5b7062; cursor: pointer; transition: color .2s ease, transform .16s ease; -webkit-tap-highlight-color: transparent; }
+    .nav-item:active { transform: scale(.93); }
+    .nav-item .nav-icon { width: 44px; height: 31px; display: grid; place-items: center; border-radius: 999px; transition: color .2s ease, transform .32s cubic-bezier(.34,1.56,.64,1); }
+    .nav-item span { font-size: 14px; font-weight: 800; line-height: 1.15; white-space: nowrap; transition: color .2s ease, transform .24s ease; }
     .nav-item.active { color: var(--forest-900); }
-    .nav-item.active .nav-icon { background: var(--leaf-200); color: var(--forest-900); transform: translateY(-1px); }
+    .nav-item.active .nav-icon { color: white; transform: translateY(-15px) scale(1.08); animation: dock-icon-pop .38s cubic-bezier(.34,1.56,.64,1); }
+    .nav-item.active > span:last-of-type { transform: translateY(2px); }
     .nav-item .nav-badge { position: absolute; top: 3px; left: calc(50% + 10px); min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 5px; border: 2px solid var(--surface); border-radius: 999px; background: #eeb64b; color: #443413; font-size: 10px; font-weight: 900; }
+    .nav-item.active .nav-badge { top: -12px; left: calc(50% + 13px); border-color: var(--forest-900); animation: badge-pop .32s ease-out; }
+
+    @keyframes dock-icon-pop { 0% { transform: translateY(0) scale(.78) rotate(-8deg); } 68% { transform: translateY(-18px) scale(1.14) rotate(3deg); } 100% { transform: translateY(-15px) scale(1.08) rotate(0); } }
+    @keyframes badge-pop { 0% { transform: scale(.55); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
 
     .role-panel[hidden] { display: none; }
     .toast { position: absolute; right: 14px; bottom: 96px; left: 14px; z-index: 30; padding: 12px 15px; border-radius: 14px; background: var(--forest-950); color: white; box-shadow: 0 10px 28px rgba(12,40,27,.25); font-size: 12px; font-weight: 800; text-align: center; opacity: 0; pointer-events: none; transform: translateY(10px); transition: .2s ease; }
@@ -149,6 +164,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+      .nav-item.active .nav-icon, .nav-item.active .nav-badge { animation: none !important; }
     }
   </style>
 </head>
@@ -235,7 +251,8 @@
         </main>
       </div>
 
-      <nav class="bottom-nav" aria-label="เมนูหลัก">
+      <nav class="bottom-nav" aria-label="เมนูหลัก" data-active="0">
+        <span class="dock-indicator" aria-hidden="true"></span>
         <button class="nav-item active" data-label="ภาพรวม"><span class="nav-icon"><svg><use href="#i-home" /></svg></span><span>ภาพรวม</span></button>
         <button class="nav-item" data-label="รายการ"><span class="nav-icon"><svg><use href="#i-list" /></svg></span><span>รายการ</span><em class="nav-badge" id="workBadge">1</em></button>
         <button class="nav-item" data-label="กระเป๋า"><span class="nav-icon"><svg><use href="#i-wallet" /></svg></span><span>กระเป๋า</span></button>
@@ -273,9 +290,10 @@
     }
 
     roleButtons.forEach(button => button.addEventListener('click', () => setRole(button.dataset.roleSwitch)));
-    navItems.forEach(button => button.addEventListener('click', () => {
+    navItems.forEach((button, index) => button.addEventListener('click', () => {
       navItems.forEach(item => item.classList.remove('active'));
       button.classList.add('active');
+      button.closest('.bottom-nav').dataset.active = String(index);
       announce(`เมนู ${button.dataset.label} — ต้นแบบยังไม่เปลี่ยนหน้า`);
     }));
     document.querySelectorAll('.demo-action').forEach(button => button.addEventListener('click', () => announce('ต้นแบบนี้ใช้ตรวจดีไซน์และขนาดการกด')));
