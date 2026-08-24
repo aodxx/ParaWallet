@@ -18,6 +18,7 @@ The failure had two contributing causes:
 - The UI distinguishes `degraded` from `disconnected`. A degraded connection keeps the last verified values visible and labels them as not fully updated.
 - A refresh sequence prevents a slow, older response from overwriting a newer navigation result.
 - Apps Script caches parsed sheet rows for the lifetime of one request and invalidates the affected cache after append or update. No data is cached between requests.
+- `dashboard.get` returns the detailed Wallet model it already calculated, so the overview no longer launches a duplicate `wallets.me` request.
 
 ## Deployment and acceptance
 
@@ -27,4 +28,3 @@ The failure had two contributing causes:
 4. Confirm the authenticated role appears without first presenting stale values as live data.
 5. If a secondary read fails, confirm the banner says `ข้อมูลยังไม่ครบ`, the last verified amounts remain visible, and `ลองใหม่` resynchronizes the page.
 6. Confirm no duplicate Sale, Settlement, WalletEntry, Notification, or AuditLog rows are created. Read retries are side-effect free; mutation retries retain the same Request ID and remain idempotent.
-

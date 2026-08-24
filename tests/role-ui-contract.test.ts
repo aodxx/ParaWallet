@@ -58,6 +58,8 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('setConnectionState("degraded")');
     expect(app).toContain("ข้อมูลหลักเชื่อมต่อแล้ว แต่ข้อมูลบางส่วนยังไม่อัปเดต");
     expect(app).toContain("refreshSequenceRef");
+    expect(app).toContain("if (dashboard.walletDetails) setWallet(dashboard.walletDetails)");
+    expect(app).not.toContain("api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)");
   });
 
   it("makes the dual wallet and direct camera scan Tapper's primary workflow", () => {

@@ -73,18 +73,18 @@ export default function App() {
         if (!isCurrent()) return;
         setData(dashboard);
         setRole(dashboard.role);
+        if (dashboard.walletDetails) setWallet(dashboard.walletDetails);
         hasSuccessfulSyncRef.current = true;
         setConnectionState("connected");
       }
       const garden = dashboard.garden || gardens[0];
       if (garden?.id) {
         if (target === "overview") {
-          const [gardenResult, agreementResult, walletResult] = await Promise.allSettled([api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)]);
+          const [gardenResult, agreementResult] = await Promise.allSettled([api.gardens.list(), api.agreements.list(garden.id)]);
           if (!isCurrent()) return;
           if (gardenResult.status === "fulfilled") setGardens(gardenResult.value);
           if (agreementResult.status === "fulfilled") setAgreements(agreementResult.value);
-          if (walletResult.status === "fulfilled") setWallet(walletResult.value);
-          partialFailure = [gardenResult, agreementResult, walletResult].some((result) => result.status === "rejected");
+          partialFailure = [gardenResult, agreementResult].some((result) => result.status === "rejected");
         } else if (target === "sales") {
           const [saleResult, agreementResult] = await Promise.allSettled([api.sales.list({ gardenId: garden.id }), api.agreements.list(garden.id)]);
           if (!isCurrent()) return;

@@ -69,8 +69,8 @@ export type Settlement = { id: string; gardenId: string; amount: number; method:
 export type SettlementEvidence = { settlementId: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string; targetScreen?: "sales" | "settlements" | "gardens" | "agreements" | "notifications" };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
-export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; pendingReviews: number; pendingSales?: number; pendingSettlements?: number; unreadNotifications?: number; monthlySales: number; monthlySalesSeries?: number[] };
 export type WalletData = { gardenId: string; role: Role; owner: { totalEntitlement: number; totalReceived: number; outstanding: number; pending: number; disputed: number }; tapper: { totalIncome: number; ownerMoneyHeld: number; ownerMoneyTransferred: number; pendingReviews: number } };
+export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; walletDetails?: WalletData; pendingReviews: number; pendingSales?: number; pendingSettlements?: number; unreadNotifications?: number; monthlySales: number; monthlySalesSeries?: number[] };
 export type ReportData = { summary: { from: string; to: string; salesCount: number; confirmedSales: number; grossSales: number; ownerShare: number; tapperShare: number; deductions: number; settlements: number; outstanding: number }; rows: Sale[] };
 
 const apiUrl = (import.meta.env.VITE_APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwiW2tuD_RQUgygjZz-jIEfCLe03s6kdXXyz2Z2ZG8mUDwjvfA_luGrl4SpZ253UeH3/exec").replace(/\/$/, "");

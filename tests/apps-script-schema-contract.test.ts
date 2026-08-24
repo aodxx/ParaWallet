@@ -96,6 +96,7 @@ describe("Apps Script schema safety contract", () => {
     expect(dashboard).toContain('pendingSales: pendingSales');
     expect(dashboard).toContain('pendingSettlements: pendingSettlements');
     expect(dashboard).toContain('unreadNotifications: unreadNotifications');
+    expect(dashboard).toContain('walletDetails: wallet');
   });
 
   it("returns actionable notification targets and makes read idempotent", () => {

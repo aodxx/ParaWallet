@@ -463,6 +463,7 @@ var Services = {
         outstanding: wallet.owner.outstanding,
         currency: "THB"
       },
+      walletDetails: wallet,
       pendingReviews: pendingSales + pendingSettlements,
       pendingSales: pendingSales,
       pendingSettlements: pendingSettlements,
