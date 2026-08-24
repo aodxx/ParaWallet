@@ -27,6 +27,8 @@ Each tab has one stable header row created by `setupParaWalletSheets()` through 
 | `OcrRecords` | `id`, `fileId`, `provider`, `status`, `confidence`, `rawJson`, `reviewedBy`, `createdAt` |
 | `Files` | `id`, `driveFileId`, `folderType`, `mimeType`, `name`, `ownerId`, `createdAt` |
 
+`GardenMembers` must have at most one active relationship per garden/user pair. Deactivation changes `status` to `inactive`; it does not delete the row or any historical financial records.
+
 ## Bootstrap and immutability
 
 `setupParaWalletSheets()` opens the spreadsheet from `SHEET_ID`, creates missing tabs, writes the exact header row with `setValues()`, and freezes row 1 for newly initialized tabs. Existing tabs are validated and never overwritten silently. A mismatched header raises `SCHEMA_MISMATCH:<tab>`.

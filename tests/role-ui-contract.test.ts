@@ -12,7 +12,16 @@ describe("role-aware UI contract", () => {
 
   it("only exposes garden and agreement creation modals to Owner", () => {
     expect(app).toContain('showGardenForm && role === "owner"');
+    expect(app).toContain('showMemberForm && role === "owner"');
     expect(app).toContain('showAgreementForm && role === "owner"');
+  });
+
+  it("lets Owner manage registered Tapper accounts without typing internal IDs", () => {
+    expect(app).toContain("เพิ่ม Tapper เข้าสวน");
+    expect(app).toContain("api.members.add");
+    expect(app).toContain("api.members.deactivate");
+    expect(app).toContain("เลือก Tapper ในสวน");
+    expect(app).not.toContain("Tapper ID<input");
   });
 
   it("replaces Owner creation actions with review and report navigation", () => {

@@ -33,6 +33,13 @@ const apiErrorMessages: Record<string, string> = {
   SETTLEMENT_SLIP_REQUIRED: "กรุณาแนบสลิปการโอนเงิน",
   SETTLEMENT_SLIP_TOO_LARGE: "ไฟล์สลิปมีขนาดใหญ่เกินไป กรุณาเลือกไฟล์ไม่เกิน 4 MB",
   CASH_LOCATION_REQUIRED: "กรุณาระบุสถานที่ส่งมอบเงินสด",
+  MEMBER_EMAIL_REQUIRED: "กรุณากรอกอีเมล Google ของ Tapper",
+  TAPPER_USER_NOT_REGISTERED: "ยังไม่พบบัญชี Tapper ที่ active ใน Users กรุณาลงทะเบียนบัญชีก่อน",
+  MEMBER_ROLE_INVALID: "บัญชีนี้ไม่ได้ลงทะเบียนด้วยบทบาท Tapper",
+  MEMBER_HAS_ACTIVE_AGREEMENT: "ยังถอด Tapper ไม่ได้ เพราะมีข้อตกลงที่กำลังใช้งาน",
+  MEMBER_HAS_OPEN_ITEMS: "ยังถอด Tapper ไม่ได้ เพราะมีรายการขายหรือรายการส่งเงินรอดำเนินการ",
+  MEMBER_HAS_OUTSTANDING_BALANCE: "ยังถอด Tapper ไม่ได้ เพราะยังมีเงินของ Owner คงค้างอยู่",
+  OWNER_MEMBER_CANNOT_BE_REMOVED: "ไม่สามารถถอด Owner ออกจากสวนของตนเองได้",
 };
 
 export function userMessageForApiError(error: unknown) {
@@ -42,6 +49,7 @@ export function userMessageForApiError(error: unknown) {
 
 export type Garden = { id: string; ownerId?: string; name: string; locationText?: string; province?: string; district?: string; areaRai: number; treeCount: number; status: "active" | "archived" };
 export type Plot = { id: string; gardenId: string; name: string; notes?: string; status: string };
+export type GardenMember = { id: string; gardenId: string; userId: string; role: "owner" | "tapper"; status: "active" | "inactive"; name?: string; email?: string; createdAt?: string };
 export type Agreement = { id: string; gardenId: string; ownerId: string; tapperId: string; version: number; ownerPercentage: number; tapperPercentage: number; effectiveFrom: string; effectiveTo?: string; status: string };
 export type Sale = { id: string; gardenId: string; agreementId: string; saleDate: string; buyerName?: string; productType?: string; weightKg?: number; netWeight?: number; unitPrice?: number; grossSale?: number; buyerDeductions?: number; sharedExpenses?: number; splitBase?: number; ownerShare?: number; tapperShare?: number; status: string; receiptFileId?: string; ocrConfidence?: number | string; manualEntry?: boolean };
 export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
@@ -91,7 +99,11 @@ export const api = {
     list: (gardenId: string) => callApi("plots.list", { gardenId }),
     create: (payload: { gardenId: string; name: string; notes?: string }) => callApi("plots.create", payload),
   },
-  members: { list: (gardenId: string) => callApi("members.list", { gardenId }) },
+  members: {
+    list: (gardenId: string) => callApi<unknown, GardenMember[]>("members.list", { gardenId }),
+    add: (payload: { gardenId: string; email: string }, requestId?: string) => callApi<unknown, GardenMember>("members.add", payload, { requestId }),
+    deactivate: (payload: { gardenId: string; memberId: string }, requestId?: string) => callApi<unknown, GardenMember>("members.deactivate", payload, { requestId }),
+  },
   agreements: {
     list: (gardenId: string) => callApi<unknown, Agreement[]>("agreements.list", { gardenId }),
     create: (payload: Record<string, unknown>) => callApi("agreements.create", payload),

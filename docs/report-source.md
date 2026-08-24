@@ -43,3 +43,21 @@ No existing ParaWallet or rubber-project design was found in the connected Canva
 - **Apps Script quotas:** Google for Developers, updated 22 July 2026, https://developers.google.com/apps-script/guides/services/quotas
 - **Custom GitHub Pages workflows:** GitHub Docs, accessed 24 August 2026, https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
 - **Rubber-sector labor arrangements:** Department of Agriculture, https://lib.doa.go.th/multim/BB00280.pdf
+
+## Phase D5 addendum — membership lifecycle
+
+**Decision:** The next core gap is Owner-controlled Tapper membership. `members.list`, `members.add`, and `members.deactivate` are Owner-only on the target garden. Adding is idempotent and reuses an inactive relationship. Deactivation preserves history and fails while an active Agreement, open Sale/Settlement, or unallocated Owner entitlement remains.
+
+| Material claim | Evidence | Confidence | Decision |
+|---|---|---:|---|
+| Authorization should use least privilege, deny by default, and validate permission on every request. | [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) | High | Enforce `requireOwner_` in every membership service, independent of the PWA. |
+| Addition, modification, and deletion-like events should have an application audit trail. | [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) | High | Audit add/reactivate/deactivate with actor, garden-member entity, before/after state, and RequestID. |
+| Shared Apps Script writes require collision prevention. | [Google Apps Script Lock Service](https://developers.google.com/apps-script/reference/lock) | High | Keep member mutations under the existing ScriptLock and RequestID replay boundary. |
+
+**Limitation:** D5 links an already registered active Tapper. It does not email or create a pending invitation for an unknown Google account.
+
+### D5 claim-to-source ledger
+
+- **Authorization Cheat Sheet:** OWASP Cheat Sheet Series, accessed 24 August 2026, https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+- **Logging Cheat Sheet:** OWASP Cheat Sheet Series, accessed 24 August 2026, https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- **Lock Service:** Google for Developers, updated 13 April 2026, https://developers.google.com/apps-script/reference/lock

@@ -4,8 +4,8 @@ The repository currently has a working PWA shell, a single-file Apps Script foun
 
 | PRD area | Current state | Next implementation |
 |---|---|---|
-| Authentication and pairing | Auth boundary placeholder; no invite/pairing workflow | Add registered-user, garden-member, and invite-code operations with explicit role checks |
-| Garden and plot management | Garden read model only | Add garden/plot create, update, archive, and member management |
+| Authentication and pairing | Google token authentication, registered Users, and Owner-controlled garden membership are implemented | Add optional pending invite-code/email onboarding for people not yet registered |
+| Garden and plot management | Garden/plot create/list plus Owner member add/deactivate are implemented | Add garden/plot edit and archive UI with safe historical guards |
 | Agreements | Header exists but no API/UI CRUD | Add versioned agreement create/activate/read with immutable sale snapshot |
 | Products and buyers | Not implemented | Add product type and buyer repositories plus sale references |
 | Receipt/OCR | Drive and provider adapter exist; no complete review lifecycle | Add upload metadata, OCR review state, low-confidence fields, correction, and receipt detail |

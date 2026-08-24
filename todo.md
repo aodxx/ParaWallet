@@ -101,16 +101,16 @@
 - [x] Confirm Users sheet headers and active-row status for aodaod3826@gmail.com
 - [x] Register the signed-in Google account with owner role and required user fields
 - [x] Verify the user has garden/member scope needed for dashboard access; no garden rows exist yet, so dashboard will show an empty garden state
-- [ ] Re-test authenticated dashboard access after registration
-- [ ] Add a tapper user row with role=tapper and active status
-- [ ] Add owner-controlled garden member invite/add workflow
-- [ ] Link tapper to a garden through GardenMembers with role=tapper and active status
-- [ ] Ensure tapper dashboard visibility is scoped to assigned gardens and agreements
-- [ ] Test separate Owner and Tapper Google accounts end to end
-- [ ] Register pantipa3826@gmail.com / สมหมาย as an active tapper user
-- [ ] Identify the target garden before creating the GardenMembers relationship
-- [ ] Add the tapper GardenMembers row for the selected garden
-- [ ] Verify tapper sign-in and scoped garden visibility
+- [x] Re-test authenticated dashboard access after registration
+- [x] Add a tapper user row with role=tapper and active status
+- [x] Add owner-controlled garden member add/deactivate workflow
+- [x] Link tapper to a garden through GardenMembers with role=tapper and active status
+- [x] Ensure tapper dashboard visibility is scoped to assigned gardens and agreements
+- [x] Test separate Owner and Tapper Google accounts end to end
+- [x] Register pantipa3826@gmail.com / สมหมาย as an active tapper user
+- [x] Identify the target garden before creating the GardenMembers relationship
+- [x] Add the tapper GardenMembers row for the selected garden
+- [x] Verify tapper sign-in and scoped garden visibility
 - [x] Audit current manifest, favicon, Apple touch icon, and service-worker asset references
 - [x] Create standard PNG icons for 48, 72, 96, 128, 144, 152, 192, 384, and 512 pixels
 - [x] Create a maskable 512-pixel icon with safe-area padding

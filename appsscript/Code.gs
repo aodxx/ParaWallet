@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d4";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d5";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -85,6 +85,10 @@ function routeAction_(request) {
   if (request.action === "health.get") return healthCheck_();
   if (request.action === "diagnostics.get") return diagnosticsCheck_();
   var user = Auth.requireUser(request.authToken);
+  request.payload = request.payload && typeof request.payload === "object" ? request.payload : {};
+  // The durable RequestID belongs in every audit record. Clients send it at the
+  // envelope level, so copy it into the service payload after authentication.
+  request.payload.requestId = request.requestId;
   switch (request.action) {
     case "dashboard.get": return Services.dashboard(user);
     case "gardens.list": return Repositories.gardensForUser(user.id);
@@ -93,6 +97,8 @@ function routeAction_(request) {
     case "plots.list": return Services.listPlots(user, request.payload);
     case "plots.create": return Services.createPlot(user, request.payload);
     case "members.list": return Services.listMembers(user, request.payload);
+    case "members.add": return Services.addMember(user, request.payload);
+    case "members.deactivate": return Services.deactivateMember(user, request.payload);
     case "agreements.list": return Services.listAgreements(user, request.payload);
     case "agreements.create": return Services.createAgreement(user, request.payload);
     case "products.list": return Services.listProducts(user);
@@ -541,7 +547,93 @@ Services.createPlot = function (user, payload) {
   Repositories.append("Plots", { id: plotId, gardenId: payload.gardenId, name: payload.name, notes: payload.notes || "", status: "active", createdAt: nowIso_(), updatedAt: nowIso_() });
   return findById_("Plots", plotId);
 };
-Services.listMembers = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && row.status === "active"; }); };
+function memberView_(membership, usersById) {
+  var linkedUser = usersById ? usersById[id_(membership.userId)] : findById_("Users", membership.userId);
+  return {
+    id: membership.id,
+    gardenId: membership.gardenId,
+    userId: membership.userId,
+    role: membership.role,
+    status: membership.status,
+    createdAt: membership.createdAt,
+    name: linkedUser ? linkedUser.name : "",
+    email: linkedUser ? linkedUser.email : ""
+  };
+}
+
+Services.listMembers = function (user, payload) {
+  requireOwner_(user, payload.gardenId);
+  var usersById = {};
+  rows_("Users").forEach(function (row) { usersById[id_(row.id)] = row; });
+  return rows_("GardenMembers")
+    .filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && row.status === "active"; })
+    .map(function (row) { return memberView_(row, usersById); });
+};
+
+Services.addMember = function (user, payload) {
+  assertFinancialSchemaReady_();
+  var access = requireOwner_(user, payload.gardenId);
+  var email = String(payload.email || "").trim().toLowerCase();
+  if (!email || email.indexOf("@") <= 0) throw new Error("MEMBER_EMAIL_REQUIRED");
+  var target = Repositories.findUserByEmail(email);
+  if (!target || target.status !== "active") throw new Error("TAPPER_USER_NOT_REGISTERED");
+  if (target.role !== "tapper") throw new Error("MEMBER_ROLE_INVALID");
+
+  var memberships = rows_("GardenMembers").filter(function (row) {
+    return id_(row.gardenId) === id_(payload.gardenId) && id_(row.userId) === id_(target.id);
+  });
+  var active = memberships.filter(function (row) { return row.status === "active"; })[0];
+  if (active) return memberView_(active);
+
+  var before = memberships[0] || null;
+  var membershipId = before ? before.id : Utilities.getUuid();
+  var membership = { id: membershipId, gardenId: payload.gardenId, userId: target.id, role: "tapper", status: "active", createdAt: before ? before.createdAt : nowIso_() };
+  if (before) updateRowById_("GardenMembers", membershipId, { role: "tapper", status: "active" });
+  else Repositories.append("GardenMembers", membership);
+
+  writeAudit_(user, before ? "garden_member_reactivated" : "garden_member_added", "garden_member", membershipId, before, membership, payload.requestId);
+  notifyUser_(target.id, "garden_member_added", "คุณถูกเพิ่มเป็นคนกรีดของสวน", access.garden.name || "สวนของคุณ");
+  return memberView_(findById_("GardenMembers", membershipId));
+};
+
+function memberOwnerMoneyHeld_(gardenId, tapperId) {
+  var allocationsBySale = {};
+  rows_("SettlementAllocations").forEach(function (row) {
+    allocationsBySale[id_(row.saleId)] = round_(numeric_(allocationsBySale[id_(row.saleId)]) + numeric_(row.amount));
+  });
+  return round_(rows_("Sales").filter(function (sale) {
+    return id_(sale.gardenId) === id_(gardenId) && id_(sale.tapperId) === id_(tapperId) && sale.status === "confirmed";
+  }).reduce(function (sum, sale) {
+    var entitlement = round_(numeric_(sale.ownerShare) + ownerAdjustmentForSale_(sale.id));
+    return sum + Math.max(0, round_(entitlement - numeric_(allocationsBySale[id_(sale.id)])));
+  }, 0));
+}
+
+Services.deactivateMember = function (user, payload) {
+  assertFinancialSchemaReady_();
+  var access = requireOwner_(user, payload.gardenId);
+  var membership = findById_("GardenMembers", payload.memberId);
+  if (!membership || id_(membership.gardenId) !== id_(payload.gardenId) || membership.status !== "active") throw new Error("MEMBER_NOT_FOUND");
+  if (membership.role === "owner" || id_(membership.userId) === id_(access.garden.ownerId)) throw new Error("OWNER_MEMBER_CANNOT_BE_REMOVED");
+
+  var hasActiveAgreement = rows_("Agreements").some(function (row) {
+    return id_(row.gardenId) === id_(payload.gardenId) && id_(row.tapperId) === id_(membership.userId) && row.status === "active";
+  });
+  if (hasActiveAgreement) throw new Error("MEMBER_HAS_ACTIVE_AGREEMENT");
+  var hasOpenItems = rows_("Sales").some(function (row) {
+    return id_(row.gardenId) === id_(payload.gardenId) && id_(row.tapperId) === id_(membership.userId) && ["pending_owner_review", "disputed"].indexOf(row.status) >= 0;
+  }) || rows_("Settlements").some(function (row) {
+    return id_(row.gardenId) === id_(payload.gardenId) && id_(row.tapperId) === id_(membership.userId) && row.status === "pending_owner_confirmation";
+  });
+  if (hasOpenItems) throw new Error("MEMBER_HAS_OPEN_ITEMS");
+  if (memberOwnerMoneyHeld_(payload.gardenId, membership.userId) > 0) throw new Error("MEMBER_HAS_OUTSTANDING_BALANCE");
+
+  updateRowById_("GardenMembers", membership.id, { status: "inactive" });
+  var after = findById_("GardenMembers", membership.id);
+  writeAudit_(user, "garden_member_deactivated", "garden_member", membership.id, membership, after, payload.requestId);
+  notifyUser_(membership.userId, "garden_member_deactivated", "สิทธิ์คนกรีดของสวนถูกปิด", access.garden.name || "สวนของคุณ");
+  return memberView_(after);
+};
 
 Services.listAgreements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); }); };
 Services.createAgreement = function (user, payload) {

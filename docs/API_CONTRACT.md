@@ -40,7 +40,9 @@ Every mutation must include a unique `requestId`. A repeated RequestID returns t
 | `gardens.update` | gardenId plus editable fields | Garden Owner | Yes |
 | `plots.list` | gardenId | Garden member | No |
 | `plots.create` | gardenId, name | Garden Owner | Yes |
-| `members.list` | gardenId | Garden member | No |
+| `members.list` | gardenId | Garden Owner | No |
+| `members.add` | gardenId, registered Tapper email | Garden Owner | Yes: membership/audit/notification |
+| `members.deactivate` | gardenId, memberId | Garden Owner; no open agreement/items/balance | Yes: status/audit/notification |
 | `agreements.list` | gardenId | Garden member | No |
 | `agreements.create` | gardenId, tapperId, percentages, effectiveFrom | Garden Owner | Yes |
 | `products.list` | none | Authenticated user | No |

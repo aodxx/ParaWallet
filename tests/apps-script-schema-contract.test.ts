@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d4";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d5";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -65,6 +65,26 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("var wallet = Services.wallet(user, { gardenId: garden.id });");
     expect(code).toContain("monthlySales: round_(monthlySales.reduce");
     expect(code).toContain("monthlySalesSeries: monthlySalesSeries.map(round_)");
+  });
+
+  it("enforces owner-controlled, auditable garden membership", () => {
+    expect(code).toContain('case "members.add": return Services.addMember');
+    expect(code).toContain('case "members.deactivate": return Services.deactivateMember');
+    expect(code).toContain("request.payload.requestId = request.requestId");
+    expect(code).toMatch(/Services\.listMembers[\s\S]*?requireOwner_\(user, payload\.gardenId\)/);
+    expect(code).toMatch(/Services\.addMember[\s\S]*?requireOwner_\(user, payload\.gardenId\)/);
+    expect(code).toContain('throw new Error("TAPPER_USER_NOT_REGISTERED")');
+    expect(code).toContain('throw new Error("MEMBER_ROLE_INVALID")');
+    expect(code).toContain('"garden_member_added"');
+    expect(code).toContain('"garden_member_deactivated"');
+  });
+
+  it("does not deactivate a Tapper while financial rights remain open", () => {
+    expect(code).toContain('throw new Error("MEMBER_HAS_ACTIVE_AGREEMENT")');
+    expect(code).toContain('throw new Error("MEMBER_HAS_OPEN_ITEMS")');
+    expect(code).toContain('throw new Error("MEMBER_HAS_OUTSTANDING_BALANCE")');
+    expect(code).toContain("function memberOwnerMoneyHeld_");
+    expect(code).toContain('updateRowById_("GardenMembers", membership.id, { status: "inactive" })');
   });
 
   it("migrates legacy Agreement values into the correct 16-column positions", () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, callApi, onAuthFailure, setAuthToken, userMessageForApiError } from "../src/api";
+import { api, ApiError, callApi, onAuthFailure, setAuthToken, userMessageForApiError } from "../src/api";
 
 describe("Apps Script API contract", () => {
   afterEach(() => {
@@ -70,5 +70,15 @@ describe("Apps Script API contract", () => {
     expect(userMessageForApiError(error)).toBe("ระบบกำลังประมวลผลข้อมูล กรุณาลองอีกครั้งในอีกสักครู่");
     expect(userMessageForApiError(error)).not.toContain("private-uuid");
   });
-});
 
+  it("sends owner-controlled member mutations through the typed API", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "ok", requestId: "req-member", data: { id: "member-1" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await api.members.add({ gardenId: "garden-1", email: "tapper@example.com" }, "req-member");
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toMatchObject({ action: "members.add", requestId: "req-member", payload: { gardenId: "garden-1", email: "tapper@example.com" } });
+  });
+
+  it("explains why a Tapper with open money cannot be removed", () => {
+    expect(userMessageForApiError(new ApiError("MEMBER_HAS_OUTSTANDING_BALANCE", "internal"))).toContain("เงินของ Owner คงค้าง");
+  });
+});
