@@ -1,5 +1,7 @@
 # ParaWallet Phase D Research and Hardening Report
 
+> **Historical research record:** Later releases supersede this document's implementation status and production gate. See [`INDEX.md`](INDEX.md) for the current D10/D11 baseline. Source citations and phase decisions below remain preserved as evidence.
+
 **Audience:** ParaWallet owner and future maintainers  
 **Date:** 24 August 2026  
 **Scope:** Thailand; GitHub Pages PWA, Google Apps Script, Google Sheets, and Google Drive architecture  

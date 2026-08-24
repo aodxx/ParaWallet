@@ -1,25 +1,33 @@
-# ParaWallet Development Roadmap and Acceptance Criteria
+# ParaWallet Release Roadmap and Acceptance Gates
 
-## Phase 1 — Foundation
+Updated: 24 August 2026
 
-Create the Sheets tabs and header bootstrap, configure Script Properties, deploy a health endpoint, and publish the PWA shell. Acceptance requires that a new Apps Script deployment can bootstrap all tabs without duplicate headers, the PWA installs from GitHub Pages, and `health.get` returns a valid response envelope.
+## Current release — stabilization
 
-## Phase 2 — Identity and garden access
+The accepted baseline is backend `2026.08.24-phase-d10`, schema `2026-08-production-v3`, and frontend Phase D11. Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass in [`todo.md`](../todo.md) is recorded.
 
-Register users, define Owner/Tapper membership, and apply garden-scoped authorization to every read and write. Acceptance requires an Owner to see owned gardens, an active Tapper to see only assigned gardens, and unauthorized IDs to return an error without changing Sheets.
+Acceptance requires all of the following:
 
-## Phase 3 — Agreements, sales, and dual wallet
+1. Health reports the exact backend release and schema fingerprint; diagnostics reports `financialSchemaReady=true`.
+2. Owner and Tapper authenticate with separate active accounts and see only authorized gardens and records.
+3. Receipt/OCR or manual Sale creation reaches Owner pending review; confirmation creates one balanced ledger result.
+4. Bank transfer requires evidence; cash handover requires Owner acknowledgement; repeated RequestID creates no duplicate effect.
+5. Pending-work cards, notification badges, notification read state, and deep links refresh correctly for both roles.
+6. A temporary disconnect produces a clear retry state and recovers without blanking the screen or showing demo money.
+7. Loading animation, skeleton/content transition, text hierarchy, alignment, sticky actions, and keyboard-safe controls work on real mobile devices.
+8. `pnpm verify` passes before every release.
 
-Implement versioned agreements and the server-side calculator. Acceptance requires percentages to total 100, deductions to reduce the split base, owner and Tapper shares to balance exactly, and a historical sale to retain the agreement snapshot used when it was created.
+## Visual-design exploration — next decision, not implementation
 
-## Phase 4 — Payments and auditability
+After documentation closure, the Owner and maintainer will select a visual direction. The design proposal may change color, typography, spacing, card composition, icon treatment, and motion, but must preserve current workflows, authorization, financial calculations, evidence rules, accessibility, and outdoor readability. Implementation begins only after a direction and screen priority are approved.
 
-Implement partial payments, confirmation, disputes, wallet movements, notifications, audit logs, and RequestID idempotency. Acceptance requires a repeated RequestID to produce one write, concurrent requests to serialize under LockService, confirmations to notify the sender, and every state transition to have an audit event.
+## Deferred expansion
 
-## Phase 5 — Evidence and OCR
+Offline mutation queues, multi-garden portfolio views, full plot/product/buyer management, advanced reporting, external notification channels, invitations, and reversal timelines have no scheduled phase. They remain outside the current release until explicitly reopened.
 
-Store receipt/slip/evidence files in Drive and persist only Drive metadata in Sheets. Run OCR through the configured Gemini or Vision adapter. Acceptance requires no API key in frontend assets, low-confidence results to enter `needs_review`, editable fields to be available before sale creation, and the original Drive file to remain traceable.
+## Release discipline
 
-## Phase 6 — Reporting and release
-
-Add dashboard summaries, date-range reports, CSV export, offline shell behavior, deployment documentation, and automated build checks. Acceptance requires `pnpm build` to pass, GitHub Pages to serve the PWA at its repository base path, Apps Script responses to match the documented envelope, and the final checklist to cover role scope, lock boundaries, RequestID, Drive metadata, and secret storage.
+- Frontend-only releases do not require Apps Script deployment or migration.
+- Backend releases require a new Apps Script Web App version and fingerprint verification.
+- Schema changes require a previewable, backup-first migration and read-only diagnostics before financial mutations resume.
+- Historical Phase D reports are immutable evidence; current status lives in README, this roadmap, the gap matrix, and `todo.md`.

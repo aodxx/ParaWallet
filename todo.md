@@ -1,224 +1,47 @@
-# ParaWallet Project TODO
+# ParaWallet — Canonical Work Status
 
-- [x] Create GitHub Pages PWA shell with responsive Owner/Tapper dashboard
-- [x] Add PWA manifest, service worker, offline shell, and GitHub Pages base-path configuration
-- [x] Add frontend API client that calls Google Apps Script only and never writes Google Sheets directly
-- [x] Add RequestID generation and response-envelope handling in the API client; retry policy remains a hardening item
-- [x] Create Apps Script doGet/doPost router and authentication/role boundary
-- [x] Create Google Sheets repositories and header/schema bootstrap for all domain tables
-- [x] Create Apps Script calculator for agreement-based dual-wallet split and deductions
-- [x] Add LockService transaction wrapper for sale, payment, wallet, and idempotency writes
-- [x] Add RequestID idempotency repository and duplicate request response behavior
-- [x] Add Google Drive receipt/slip/evidence storage adapter and metadata records
-- [x] Add Gemini and Google Cloud Vision OCR adapter interfaces using PropertiesService secrets
-- [x] Add initial Owner/Tapper role-scoped garden, sale, payment, and audit API operations; agreement/wallet/notification expansion remains
-- [x] Add Data Model documentation for Google Sheets tabs and column contracts
-- [x] Add API Contract documentation with endpoint actions, payloads, errors, and security rules
-- [x] Add development phases and Apps Script-specific acceptance criteria documentation
-- [x] Add clasp/appsscript deployment configuration and GitHub Pages workflow
-- [x] Add unit tests for calculations and RequestID idempotency; Apps Script integration and lock-boundary tests remain
-- [x] Run frontend build and repository tests; Apps Script checks and final architecture review remain
-- [x] Consolidate appsscript/Config.gs, Locking.gs, Calculator.gs, SheetsRepo.gs, and Services.gs into one appsscript/Code.gs
-- [x] Remove redundant Apps Script source files and mark Code.gs as the single deployment source
-- [x] Update Apps Script setup documentation for the single Code.gs workflow
-- [x] Validate consolidated Code.gs syntax, function structure, frontend tests, and frontend build
-- [x] Commit and push the consolidated Apps Script implementation to GitHub
-- [x] Locate or create the Google Drive root folder named ยางพารา
-- [x] Create or confirm receipts, slips, and evidence subfolders under ยางพารา
-- [ ] Set DRIVE_ROOT_FOLDER_ID in Apps Script PropertiesService and verify the storage path
-- [x] Verify the provided Apps Script Web App URL returns a valid API response
-- [x] Verify the provided Spreadsheet ID is documented as SHEET_ID without exposing credentials
-- [x] Connect the PWA to the verified Apps Script URL via a safe frontend fallback; GitHub Actions variable could not be set due token permissions
-- [x] Add the provided Spreadsheet ID and Apps Script deployment notes to the setup documentation
-- [x] Run frontend tests and build after connecting the real endpoint configuration
-- [x] Verify bootstrap() creates every Data Model tab with the exact expected header order
-- [x] Verify append() and rows_() map every header consistently for all Sheets tabs
-- [x] Check bootstrap idempotency, blank-sheet behavior, and pre-existing-sheet edge cases
-- [x] Fix bootstrap/Data Model mismatches and push the verified correction if needed
-- [x] Add an explicit Apps Script setup function that invokes Repositories.bootstrap()
-- [x] Expose only a manual admin setup path rather than allowing unauthenticated bootstrap writes
-- [x] Document that the deployer must have Editor access to the ยางพารา Spreadsheet before initialization
-- [ ] Verify the 12 Data Model tabs appear after the user runs the setup action
-- [x] Locate and parse the authoritative PRD.md and reconcile it with the current architecture
-- [x] Inventory missing Owner/Tapper workflows and acceptance criteria against the current code
-- [x] Add initial garden, plot, and garden-member read/create/update API with role and membership checks; invite/pairing remains
-- [x] Add agreement creation, versioning, activation status, and historical snapshot API
-- [x] Add persisted sale list, duplicate-aware create path foundation, review confirm, and dispute API
-- [x] Add persisted dual-wallet aggregation and wallet entry API
-- [x] Add settlement partial-transfer allocation, confirmation, notification, and audit API
-- [x] Add notification read/list API and event creation for pending review/payment confirmation
-- [x] Add report API with custom date filtering and CSV-ready rows
-- [x] Add PWA screens/forms for gardens, agreements, sales, wallets, settlements, OCR review, notifications, and reports
-- [ ] Add Apps Script integration tests or deterministic contract tests for remaining workflows
-- [x] Run final frontend acceptance checks, frontend tests, Apps Script syntax check, and production build; real Spreadsheet bootstrap remains pending user execution
-- [x] Reproduce the white-screen issue on https://aodxx.github.io/ParaWallet/
-- [x] Inspect deployed HTML, JavaScript/CSS asset URLs, browser runtime errors, and service-worker scope
-- [x] Confirm the Vite base path and workflow asset paths are correct; the live site is using legacy branch-root publishing
-- [x] Add deployment workflow verification for the project subpath
-- [x] Verify workflow build and document mobile cache refresh steps
-- [x] Switch repository GitHub Pages source from legacy branch root to GitHub Actions workflow
-- [x] Confirm deployed HTML references built dist assets and not /src/main.tsx after switching Pages source
-- [x] Verify the live site renders after the Pages source-mode correction
-- [x] Check the latest GitHub Pages workflow run status after the user reran it
-- [x] Verify the live site now serves dist asset URLs and renders the PWA
-- [x] Document mobile hard refresh and service-worker cache reset steps
-- [x] Reproduce the live PWA API request and capture the Apps Script response/error
-- [ ] Verify SHEET_ID and Apps Script deployment point to the same Code.gs project
-- [x] Fix Auth.requireUser/authToken behavior so configured single-tenant PWA requests can reach Google Sheets
-- [x] Ensure PWA distinguishes live database data from fallback/demo data
-- [x] Add a safe health/schema diagnostic action for connection troubleshooting
-- [ ] Test dashboard read, garden create, and data refresh against the real Apps Script endpoint
-- [x] Reproduce the new white-screen failure from the latest GitHub Pages deployment
-- [x] Inspect production asset paths, runtime console errors, service-worker cache, and build output
-- [x] Add a top-level React runtime error boundary with a recoverable Thai error screen
-- [x] Make API parsing and startup loading fail safely without blanking the application
-- [x] Verify GitHub Actions deployment and live PWA rendering on desktop and mobile widths
-- [x] Document a stable mobile recovery path that does not require browser takeover
-- [x] Remove Session.getActiveUser/getEffectiveUser from the production authentication path
-- [x] Add Google Identity Services sign-in to the GitHub Pages PWA
-- [x] Verify Google OpenID Connect ID tokens in Apps Script without userinfo.email scope
-- [x] Persist and attach the signed-in ID token to API requests safely
-- [x] Add OAuth configuration and failure-state instructions for Google Cloud Console
-- [ ] Test signed-out, invalid-token, unregistered-user, and authenticated dashboard states
-- [ ] Rotate the exposed Google OAuth Client Secret in Google Cloud Console
-- [x] Configure VITE_GOOGLE_CLIENT_ID for GitHub Pages using the provided public Client ID; repository-variable API was unavailable, so the workflow uses a public fallback
-- [ ] Set Apps Script property GOOGLE_OAUTH_CLIENT_ID to the same Client ID
-- [ ] Redeploy Code.gs as a new Apps Script Web App version
-- [ ] Verify Google sign-in and Google Sheets dashboard access end to end
-- [ ] Verify the newly deployed Apps Script health and diagnostics responses
-- [ ] Verify OAuth-authenticated dashboard access reaches the Google Sheets repositories
-- [ ] Confirm the signed-in Google email maps to an active Users row
-- [ ] Confirm live PWA reports connected status and loads real database data
-- [ ] Record any remaining Apps Script or Sheets permission error with the exact remedy
-- [ ] Confirm GOOGLE_OAUTH_CLIENT_ID exists in the Apps Script project behind the deployed Web App URL
-- [ ] Confirm the property name and Client ID value match the PWA OAuth audience exactly
-- [ ] Redeploy a new Apps Script Web App version after saving the property
-- [ ] Re-test authenticated dashboard access and Google Sheets synchronization
-- [x] Remove the hard failure when GOOGLE_OAUTH_CLIENT_ID Script Property is missing
-- [x] Add a documented public Client ID fallback in Code.gs without using Client Secret
-- [x] Test Code.gs syntax and verify the deployed endpoint no longer returns MISSING_SCRIPT_PROPERTY
-- [x] Test PWA build and live connection status after the repair
-- [x] Confirm Users sheet headers and active-row status for aodaod3826@gmail.com
-- [x] Register the signed-in Google account with owner role and required user fields
-- [x] Verify the user has garden/member scope needed for dashboard access; no garden rows exist yet, so dashboard will show an empty garden state
-- [x] Re-test authenticated dashboard access after registration
-- [x] Add a tapper user row with role=tapper and active status
-- [x] Add owner-controlled garden member add/deactivate workflow
-- [x] Link tapper to a garden through GardenMembers with role=tapper and active status
-- [x] Ensure tapper dashboard visibility is scoped to assigned gardens and agreements
-- [x] Test separate Owner and Tapper Google accounts end to end
-- [x] Register pantipa3826@gmail.com / สมหมาย as an active tapper user
-- [x] Identify the target garden before creating the GardenMembers relationship
-- [x] Add the tapper GardenMembers row for the selected garden
-- [x] Verify tapper sign-in and scoped garden visibility
-- [x] Audit current manifest, favicon, Apple touch icon, and service-worker asset references
-- [x] Create standard PNG icons for 48, 72, 96, 128, 144, 152, 192, 384, and 512 pixels
-- [x] Create a maskable 512-pixel icon with safe-area padding
-- [x] Update PWA manifest and HTML metadata for cross-device installation
-- [x] Test production build and live icon asset responses
-- [x] Audit PRD.md requirements against current repository implementation and deployment evidence
-- [x] Reconcile PRD gaps with todo.md, code markers, tests, and Google Sheets state
-- [x] Classify unfinished items by production validation, security, reliability, usability, and deferred feature
-- [x] Produce a prioritized P0-P2 roadmap with acceptance gates
-- [x] Define reusable triggers and scope for the PWA + Apps Script + Sheets/Drive delivery skill
-- [x] Initialize a new skill package with required SKILL.md and resource folders
-- [x] Write reusable workflow instructions, checklists, failure handling, and acceptance gates
-- [x] Validate the skill package and deliver its SKILL.md attachment
-- [x] Audit current mobile layout, navigation, touch targets, hierarchy, and Owner/Tapper task flows
-- [x] Define a mobile-first visual system and bottom-navigation information architecture
-- [x] Redesign dashboard and primary action surfaces for one-handed use
-- [x] Redesign sale/OCR, settlement, garden, agreement, and notification flows for mobile
-- [x] Validate responsive CSS/build at mobile, tablet, and desktop breakpoint definitions; live-device screenshot validation remains recommended after deployment
-- [x] Reconcile PRD.md with docs/MOBILE_DESIGN_DIRECTION.md and the deployed mobile UI
-- [x] Update PRD mobile UX, navigation, responsive, accessibility, and reliability requirements
-- [x] Add mobile-specific acceptance criteria and release-scope items
-- [x] Validate PRD terminology and commit the synchronized documentation
-- [x] Audit Phase A P0 requirements against appsscript/Code.gs, src/App.tsx, api client, tests, and Sheets schema
-- [x] Fix settlement creation/confirmation so allocations and ledger effects occur only after Owner confirmation
-- [x] Make financial mutation idempotency and LockService behavior atomic for P0 mutation paths
-- [x] Enforce server-side calculation inputs and agreement/garden/tapper/date validation
-- [x] Remove or block demo financial values from production UI error states
-- [x] Add Phase A automated tests and run build/test verification
-- [x] Read and reconcile the authoritative Phase B requirements with the post-Phase-A repository baseline
-- [x] Implement the Phase B backend/API workflow without weakening Phase A financial invariants
-- [x] Connect Phase B workflows to the PWA and mobile UI with explicit loading/error/empty states
-- [x] Add Phase B regression tests and run syntax, typecheck, build, and production verification
-- [x] Document Phase B deployment steps and remaining risks
-- [x] Read and reconcile Phase C requirements with the post-Phase-B test and CI baseline
-- [x] Define a 30–50 test matrix covering business rules, authorization, idempotency, OCR, disputes, settlements, adjustments, and reconciliation
-- [x] Add deterministic test fixtures and integration/contract harnesses without writing production test data
-- [x] Add CI gates for tests, typecheck, Apps Script syntax check, build, and diff validation
-- [x] Run the complete Phase C verification suite and document remaining untested paths
-- [x] Read and reconcile Phase D scope with the current Apps Script deployment and production Sheets state
-- [ ] Run read-only health, diagnostics, schema, OAuth, membership, and Drive-access checks
-- [ ] Add integration/contract harness coverage for real response envelopes without storing credentials
-- [x] Obtain explicit approval before creating any real mutation test records or require a dedicated test garden
-- [x] Run authorized E2E mutations with evidence and cleanup/rollback verification
-- [x] Produce a Phase D evidence report and production sign-off checklist
-- [x] Create example Garden ป่าพะยอม with explicit example metadata in the real Spreadsheet
-- [x] Create active GardenMembers rows for the Owner and สมหมาย Tapper
-- [x] Verify the created Garden and memberships read back correctly
-- [x] Ask separately before creating example sales, settlements, disputes, or adjustments
-- [x] Define and record the example E2E transaction parameters and expected split
-- [x] Create the example Sale through the controlled Apps Script service path
-- [x] Confirm the Sale as Owner through the controlled Apps Script service path
-- [x] Create the example Settlement and confirm it as Owner
-- [x] Verify WalletEntries, SettlementAllocations, Notifications, and AuditLogs in the real Spreadsheet
-- [x] Produce the Phase D E2E evidence report and record any defects
-- [x] Accept Phase D5 Owner-controlled member workflow from production mobile evidence
-- [x] Add Phase D6 garden-scoped Receipt upload and trusted Receipt-to-Sale linkage
-- [x] Add authorized Sale receipt retrieval without public Drive sharing
-- [x] Require Owner evidence/calculation review before Sale confirmation in the PWA
-- [x] Design a one-time Apps Script E2E runner limited to garden-pahpayom-001 and clearly labeled test data
-- [x] Add one-time runner and verification helpers inside the single appsscript/Code.gs file
-- [x] Validate runner syntax and add a dry-run guard before any real mutation
-- [x] Document the minimal Apps Script Editor steps and post-run evidence checks
-- [x] Investigate the real Agreement row causing AGREEMENT_NOT_ACTIVE for saleDate 2026-08-21
-- [x] Fix the one-time E2E runner to require an active, date-valid Agreement before createSale
-- [x] Add safe recovery for the partially completed runner without duplicating Sale or Settlement records
-- [x] Re-run syntax, Vitest, typecheck, and build verification after the Agreement fix
-- [x] Verify repository Code.gs contains repairParaWalletAgreementSchema() and the E2E runner at the latest commit
-- [x] Verify whether the Apps Script project/deployment is still using the older Code.gs revision
-- [x] Document exact sync, save, and redeploy steps without creating duplicate financial records
-- [x] Support legacy Agreements headers with four trailing blank cells in the repair function
-- [x] Verify repaired Agreement maps status=active and effectiveFrom correctly before createSale
-- [x] Re-run repository verification and update the Apps Script rerun instructions
-- [x] Define an explicit non-production E2E fixture and expected financial outputs
-- [x] Build a deterministic in-memory Apps Script/Sheets-style E2E harness
-- [x] Add automated tests for Agreement, Sale, confirmation, Settlement, allocation, ledger, and idempotency transitions
-- [x] Run the complete verification suite and write a sandbox E2E report
-- [x] Define reusable ParaWallet delivery skill scope and trigger conditions
-- [x] Create the skill package with concise SKILL.md and focused reference files
-- [x] Validate the skill package with the official skill validator
-- [x] Deliver the reusable SKILL.md package to the user
-- [x] Read Agreement, Sales, Settlements, WalletEntries, SettlementAllocations, and AuditLogs for the approved garden without mutation
-- [x] Determine whether the duplicate Agreements are safe to supersede or require an editor-only repair
-- [ ] Run production health and diagnostics through the available Apps Script endpoint
-- [x] Record deployment synchronization findings and produce a safe status report
-- [x] Add a centralized Agreements schema validation guard before financial mutations
-- [x] Expose schema state in read-only diagnostics without changing production data
-- [x] Add regression tests for legacy headers, trailing blanks, and mutation blocking
-- [x] Update deployment and read-only verification documentation with the new guards
-- [x] Add schema diagnostics and financial mutation-guard guidance to the reusable skill
-- [x] Add production read-only audit and deployment-sync guidance to the reusable skill
-- [x] Validate the updated skill package and deliver the refreshed attachment
-- [x] Audit all remaining production-readiness TODOs and classify what can be completed without external account actions
-- [x] Complete all repository-side production hardening, documentation, tests, and build checks
-- [x] Run final read-only production verification without creating additional financial records
-- [x] Prepare the final handoff package with exact deployment state, tested capabilities, and unavoidable external blockers
-- [x] Add an elegant Developed by aod credit to the PWA layout
-- [x] Add an accessible Facebook icon link to the provided developer profile URL
-- [x] Verify mobile/desktop rendering and production build for the credit UI
-- [x] Gather the final setup and operating steps from the current ParaWallet implementation
-- [x] Write the complete Thai PWA real-use manual for Owner and Tapper workflows
-- [x] Add production go-live checklist, data safety rules, and troubleshooting guidance
-- [x] Review and deliver the final usage guide attachment
-- [x] Add an explicit backend release/schema fingerprint to health and diagnostics responses
-- [x] Replace the header-only Agreements repair with a backup-first semantic data migration
-- [x] Add regression coverage for legacy Agreement value mapping and lock flush ordering
-- [x] Run the backup-first Agreements migration once and verify the canonical 16-column schema against the production backup
-- [x] Verify the deployed backend reports `release=2026.08.24-phase-d1` and `schemaVersion=2026-08-agreements-v2`
-- [x] Run a read-only controlled E2E preflight and identify the remaining Gardens, Buyers, Sales, and Settlements legacy schemas before mutation
-- [x] Add a backup-first production schema migration and block the E2E runner until every critical header is canonical
-- [x] Deploy backend release `2026.08.24-phase-d2`, run `repairParaWalletProductionSchema()` once, and verify all 22 production headers are canonical
-- [x] Run one controlled authenticated production E2E only after the release and schema fingerprints match
+Updated: 24 August 2026
+
+This file is the current work queue. Phase reports under `docs/PHASE-D*.md` are release evidence, not open task lists.
+
+## Accepted production baseline
+
+- [x] Backend `2026.08.24-phase-d10` deployed with schema `2026-08-production-v3`
+- [x] Frontend Phase D11 deployed on GitHub Pages
+- [x] Production schema migration completed and all 22 domain headers verified
+- [x] Controlled Owner/Tapper production E2E completed
+- [x] D5 Owner-managed Tapper membership accepted on mobile
+- [x] D6 receipt evidence and Owner Sale review accepted
+- [x] D7–D8 bank/cash settlement evidence and confirmation accepted
+- [x] D9 pending-work queue and notifications implemented and accepted
+- [x] D10 connection resilience and actionable error/retry states deployed
+- [x] D11 Lottie loading, typography hierarchy, grid alignment, and non-overlapping state transitions deployed
+- [x] Automated verification passes 98 tests, TypeScript, Apps Script syntax, and production build
+- [x] Current README, operating manual, roadmap, gap matrix, and document index synchronized
+
+## Release closure — validation only
+
+These are operational checks, not new feature development.
+
+- [ ] Complete one final real-device acceptance pass for Owner and Tapper after D11: login, pending work, notification read, Sale review, bank transfer, cash handover, reconnect, and loading transitions
+- [ ] Confirm that any password or secret ever shared during testing has been rotated; do not record the replacement in this repository
+- [ ] Monitor Apps Script failures and connection interruptions during controlled real use; record exact request ID, time, role, action, and error before changing code
+- [ ] Preserve production migration backups and tagged E2E audit records
+
+## Deferred by Owner decision
+
+Do not start these items until the Owner explicitly reopens scope.
+
+- Offline draft queue and mutation retry synchronization
+- Multi-garden switching and portfolio overview
+- Settings/profile management and advanced user administration
+- Advanced filters, analytics, report variants, and scheduled exports
+- Full plots/products/buyers management screens
+- Invite code/email onboarding for users not yet registered
+- Immutable field-level OCR revision timeline and financial reversal workflow
+- QR invitation, push/LINE/email delivery, and other external notifications
+- Additional visual redesign implementation beyond an approved design direction
+
+## Change rule
+
+Core financial behavior, authorization, ledger math, schema, and evidence retention must not be changed as part of visual work. Any future feature starts with an explicit scope decision, acceptance criteria, tests, and a deployment note.

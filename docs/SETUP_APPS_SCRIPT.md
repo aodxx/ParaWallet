@@ -1,5 +1,7 @@
 # Apps Script Deployment Checklist
 
+> Current accepted backend: `2026.08.24-phase-d10`; schema: `2026-08-production-v3`. D10 and frontend D11 require no schema migration. Historical migration instructions apply only to the release that introduced them.
+
 Create a standalone Apps Script project and copy only `appsscript/Code.gs` and `appsscript/appsscript.json` into it, or use clasp with a local `.clasp.json` that contains the real Script ID. `Code.gs` is intentionally the single deployment source and already contains configuration, routing, repositories, calculator, locking, idempotency, Drive, OCR, and domain services. The committed `.clasp.json` is intentionally ignored and only serves as a template reference.
 
 Before deployment, create one Google Spreadsheet and one Drive root folder. Set these Script Properties in the Apps Script project:
@@ -20,3 +22,5 @@ ParaWallet now uses Google Identity Services and Google OpenID Connect ID tokens
 The PWA displays the official Google Sign-In button, stores only the short-lived ID token in browser storage, and sends it as `authToken` to Apps Script. Apps Script validates the token with Google’s `tokeninfo` endpoint, checks issuer, audience, expiry, subject, and verified email, then matches the verified email to an active row in `Users.email`. `PUBLIC_USER_EMAIL` and `DEFAULT_USER_EMAIL` are no longer used for authentication and may be removed.
 
 To diagnose synchronization without exposing Sheet data, send a POST request with action `diagnostics.get` and a unique `requestId`. The response reports whether `SHEET_ID` is configured, whether the spreadsheet is accessible, how many required tabs are missing, and how many Users rows exist. `health.get` only proves the Web App is reachable; it does not prove that Google Sheets is configured.
+
+After every backend deployment, verify health reports `release=2026.08.24-phase-d10` and `schemaVersion=2026-08-production-v3`, then authenticate and require diagnostics to report `financialSchemaReady=true`. A frontend-only Pages deployment does not require copying `Code.gs`, deploying Apps Script, or running a migration.

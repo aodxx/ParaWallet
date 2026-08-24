@@ -1,5 +1,7 @@
 # ParaWallet Final Handoff — 21 August 2026
 
+> **Historical snapshot:** This handoff preserves D1–D2 evidence and old test counts. For the current D10/D11 production baseline, use [`INDEX.md`](INDEX.md), [`../README.md`](../README.md), and [`../todo.md`](../todo.md).
+
 ## Executive conclusion
 
 ParaWallet has a production-oriented PWA and single-file Apps Script backend with server-side financial calculation, Google OAuth validation, Google Sheets repositories, Drive/OCR adapters, LockService boundaries, RequestID idempotency, audit logging, settlement allocation, dispute handling, schema diagnostics, and mutation guards. Repository-side verification is green, the D2 production migration is complete, and the controlled production E2E transaction has passed with reconciled Sheet evidence.

@@ -1,27 +1,66 @@
 # ParaWallet
 
-ParaWallet is a mobile-first Rubber Dual Wallet PWA. The browser application is designed for GitHub Pages, while Google Apps Script provides the authenticated API, business calculations, transaction locking, RequestID idempotency, Google Sheets repositories, Google Drive evidence storage, and OCR provider adapters.
+ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharing between a garden Owner and Tapper. The React PWA is hosted on GitHub Pages; Google Apps Script is the authenticated API and financial source of truth; Google Sheets stores domain records; and Google Drive stores receipt and settlement evidence.
+
+## Current production baseline
+
+| Component | Accepted baseline |
+|---|---|
+| Frontend | Phase D11 loading and transition UX on GitHub Pages |
+| Backend | `2026.08.24-phase-d10` |
+| Schema | `2026-08-production-v3` |
+| Automated verification | 98 tests, TypeScript, Apps Script syntax, and production build |
+| Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
+
+Live PWA: <https://aodxx.github.io/ParaWallet/>  
+Repository: <https://github.com/aodxx/ParaWallet>
+
+## Implemented scope
+
+- Google Identity sign-in with backend role and garden-membership authorization
+- Owner-managed gardens, Tapper membership, and versioned agreements
+- Receipt upload/OCR, review, duplicate signals, Sale confirmation, dispute, and adjustment
+- Confirmed/pending/disputed dual-wallet ledger with server-side calculations
+- Bank-transfer slip evidence and cash-handover Owner confirmation
+- Pending-work queue, notifications, audit logs, date reports, and CSV export
+- RequestID idempotency, LockService write boundaries, schema guards, and connection recovery
+- Mobile-first Owner/Tapper views, PWA install support, and structured Lottie loading states
+
+Optional expansion is intentionally frozen. See [todo.md](todo.md) for the deferred list; do not begin those items without a new Owner decision.
 
 ## Repository layout
 
 | Path | Responsibility |
 |---|---|
-| `src/` | GitHub Pages React PWA and Apps Script API client |
-| `public/` | PWA manifest, icon, and service worker |
-| `appsscript/Code.gs` | Single-file Apps Script Web App API, repositories, calculator, locks, idempotency, Drive, OCR, and domain services |
-| `docs/` | Architecture, Data Model, API Contract, roadmap, and acceptance criteria |
-| `.github/workflows/pages.yml` | GitHub Pages build and deployment |
+| `src/` | React PWA and Apps Script API client |
+| `public/` | PWA manifest, icons, service worker, and loading animation asset |
+| `appsscript/Code.gs` | Single deployment source for API, repositories, calculations, authorization, evidence, and domain services |
+| `docs/` | Current operating documents plus historical release evidence |
+| `tests/` | Deterministic unit, contract, and workflow tests |
+| `.github/workflows/pages.yml` | Verification and GitHub Pages deployment |
 
-## Local frontend
+Start with the [documentation index](docs/INDEX.md) to distinguish current operating documents from historical phase reports.
 
-Run `pnpm install`, then set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script Web App URL and run `pnpm dev`. Run `pnpm build` to produce the GitHub Pages artifact in `dist/`.
+## Local verification
 
-## Apps Script setup
+```bash
+pnpm install
+pnpm verify
+```
 
-Create a Google Apps Script project, set its Script ID in a local `.clasp.json`, and push the single `appsscript/Code.gs` file together with `appsscript/appsscript.json`. In Script Properties configure `SHEET_ID`, `DRIVE_ROOT_FOLDER_ID`, `ALLOWED_ORIGINS`, and exactly one or both OCR credentials: `GEMINI_API_KEY` and `GOOGLE_CLOUD_VISION_API_KEY`. Never place these values in GitHub Pages variables or committed source.
+For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script Web App URL and run `pnpm dev`. A production Pages build uses `VITE_BASE_PATH=/ParaWallet/`.
 
-Run `Repositories.bootstrap()` once from the Apps Script editor to create the required Sheets tabs. Deploy as a Web App with the documented `doGet` and `doPost` entrypoints. Use the Web App URL as the GitHub Actions variable `VITE_APPS_SCRIPT_URL`.
+## Deployment boundary
+
+- Frontend changes are verified and deployed by the GitHub Pages workflow.
+- Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
+- After a backend deployment, require health to report `release=2026.08.24-phase-d10` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true`.
+- Run a migration only when its release document explicitly requires it. D10 and D11 require no schema migration.
+
+Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).
 
 ## Architectural invariants
 
-The frontend never writes Google Sheets directly. All business writes happen inside Apps Script. Financial mutations use `LockService`; every client mutation supplies a unique RequestID; repeated RequestIDs return the original response; sale calculations snapshot agreement percentages; evidence bytes live in Drive while Sheets stores metadata; and OCR results require review when confidence is low.
+The frontend never writes Google Sheets directly. Financial writes happen in Apps Script under authorization and LockService. Every client mutation supplies a unique RequestID; repeated RequestIDs replay the original result. Sale calculations snapshot their Agreement. Evidence bytes remain in Drive while Sheets stores references. Confirmed financial history is corrected through audited state transitions, not direct row deletion.
+
+Never commit OAuth secrets, API keys, Spreadsheet IDs, Drive folder IDs, user passwords, or production evidence.

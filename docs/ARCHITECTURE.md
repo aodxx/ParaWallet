@@ -29,4 +29,4 @@ The frontend must not write to Sheets directly. API keys and spreadsheet/folder 
 
 ## Deployment
 
-Build the frontend with `pnpm build`, publish `dist/` to the `gh-pages` branch or GitHub Pages Actions, and set `VITE_APPS_SCRIPT_URL` as a GitHub Actions variable. Deploy `appsscript/` with clasp after setting Script Properties in the Apps Script project. The public Web App URL is the only backend URL exposed to the PWA.
+`pnpm verify` is the repository gate. The GitHub Pages workflow builds and publishes the frontend artifact at the repository base path. Apps Script remains a separate manual deployment: copy the single `appsscript/Code.gs` source into the existing project, save it, and create a new Web App version only when backend code changes. After deployment, compare the public health fingerprint with the repository and use authenticated diagnostics to require `financialSchemaReady=true`. Frontend-only releases do not require an Apps Script deploy or migration.

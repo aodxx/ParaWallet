@@ -3,7 +3,8 @@
 **ชื่อระบบ:** ParaWallet — Rubber Dual Wallet System  
 **แพลตฟอร์ม:** GitHub Pages PWA + Google Apps Script + Google Sheets + Google Drive  
 **ผู้จัดทำคู่มือ:** Manus AI  
-**สถานะคู่มือ:** สำหรับเตรียมใช้งานจริงแบบควบคุม
+**สถานะคู่มือ:** ใช้งานจริงแบบควบคุม — backend D10 / frontend D11  
+**อัปเดตล่าสุด:** 24 สิงหาคม 2026
 
 > **ข้อสำคัญ:** ParaWallet เป็นระบบบัญชีดิจิทัลสำหรับติดตามสิทธิในเงินและยอดที่ต้องส่งมอบ ไม่ใช่ธนาคาร ไม่รับฝากเงินจริง และไม่โอนเงินจริงจากภายในแอป ผู้ใช้ยังต้องโอนเงินผ่านธนาคารหรือส่งเงินสดตามวิธีปฏิบัตินอกระบบ แล้วบันทึกหลักฐานใน ParaWallet
 
@@ -36,7 +37,7 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 | Tapper ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | GardenMembers | ใช่ | Owner และ Tapper ผูกกับ garden เดียวกันและ active |
 | Production schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-production-v3` |
-| Web App deployment | ใช่ | health ต้องรายงาน `release=2026.08.24-phase-d2` |
+| Web App deployment | ใช่ | health ต้องรายงาน `release=2026.08.24-phase-d10` |
 
 ## 3. การเตรียม Apps Script และ Google Sheets
 
@@ -46,7 +47,7 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 
 ต้องตรวจ `Agreements`, `Gardens`, `Buyers`, `Sales` และ `Settlements` เป็นพิเศษ ระบบรุ่นล่าสุดจะรายงาน mismatch และบล็อก mutation ทางการเงินไว้ก่อน การแก้ schema ต้องทำผ่าน migration ใน Apps Script เท่านั้น ไม่ควรแก้ตำแหน่งคอลัมน์ด้วยมือใน Google Sheets
 
-รุ่น `2026.08.24-phase-d2` เพิ่ม `previewParaWalletProductionSchemaRepair()` แบบ read-only และ `repairParaWalletProductionSchema()` ซึ่งสำรองทุกชีต legacy เป็น `*_Backup_*` ก่อนย้ายค่าตามความหมาย รองรับเฉพาะ header รุ่นเก่าที่ระบบรู้จักและปฏิเสธรูปแบบอื่น ห้ามลบชีตสำรองจนกว่าจะผ่าน Production E2E และตรวจยอดย้อนหลังครบถ้วน
+การย้าย schema แบบ backup-first เสร็จสิ้นแล้วตั้งแต่ D2 และ Production E2E ผ่านแล้ว ให้เก็บชีต `*_Backup_*` และ tagged E2E records เป็นหลักฐาน ห้ามรัน migration ซ้ำเพียงเพราะ deploy frontend หรือ D10/D11; ให้รัน migration เฉพาะเมื่อ release note ของ backend รุ่นใหม่ระบุชัดเจน
 
 ## 4. การตั้งค่าโฟลเดอร์หลักฐานใน Google Drive
 
@@ -160,7 +161,7 @@ Owner ใช้ Dashboard เพื่อตรวจยอดส่วนแบ
 | ตรวจสอบ | ผ่านเมื่อ |
 |---|---|
 | Deployment | Web App ใช้ `Code.gs` revision ล่าสุดจาก repository |
-| Health | endpoint ตอบ `status=ok`, `release=2026.08.24-phase-d2` และ `schemaVersion=2026-08-production-v3` |
+| Health | endpoint ตอบ `status=ok`, `release=2026.08.24-phase-d10` และ `schemaVersion=2026-08-production-v3` |
 | Diagnostics | `financialSchemaReady=true` และไม่มี schema mismatch |
 | OAuth | Owner และ Tapper login ด้วยบัญชีที่ลงทะเบียนได้ |
 | Authorization | Owner เห็นเฉพาะสวนของตน และ Tapper เห็นเฉพาะสวนที่ผูก |
@@ -207,9 +208,9 @@ Health แปลว่า endpoint ตอบสนองเท่านั้น
 
 ## 16. ขอบเขตความพร้อมของรุ่นปัจจุบัน
 
-Repository รุ่นล่าสุดผ่าน automated verification 58 tests, TypeScript, Apps Script syntax และ production build แล้ว และ sandbox E2E ผ่านครบ Sale → Owner confirmation → Settlement → Owner confirmation อย่างไรก็ตามการรับรอง Production E2E บน Google Sheets จริงยังต้องยืนยันว่า Web App deployment ใช้ `Code.gs` revision ล่าสุดและทำ authenticated smoke test ในบัญชีจริงได้สำเร็จ
+Repository รุ่นล่าสุดผ่าน automated verification 98 tests, TypeScript, Apps Script syntax และ production build แล้ว Production E2E บน Google Sheets จริงผ่านแล้วสำหรับ Sale → Owner confirmation → Settlement → Owner confirmation และ D5–D10 ผ่านการรับรองจากวิดีโอมือถือของ Owner/Tapper ส่วน D11 ปรับ loading และ state transition โดยไม่เปลี่ยน backend หรือ schema
 
-จึงควรเปิดใช้แบบควบคุมในระยะแรก โดยให้ Owner ตรวจทุก Sale และทุก Settlement ก่อนยืนยัน และยังไม่ควรถือว่า health response เพียงอย่างเดียวเป็นหลักฐานว่า financial schema พร้อม
+ระบบพร้อมใช้งานจริงแบบควบคุม โดย Owner ยังต้องตรวจทุก Sale และ Settlement ก่อนยืนยัน ให้ตรวจทั้ง health fingerprint และ `financialSchemaReady=true`; health response เพียงอย่างเดียวยังไม่ใช่หลักฐานว่า Google Sheets และสิทธิ์ทุกส่วนพร้อม
 
 ## References
 
