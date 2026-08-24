@@ -41,6 +41,27 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d1";');
+    expect(code).toContain("release: PARAWALLET_RELEASE");
+    expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
+  });
+
+  it("migrates legacy Agreement values into the correct 16-column positions", () => {
+    const source = code.match(/function mapLegacyAgreementRow_\(row\) \{[\s\S]*?\n\}/)?.[0];
+    expect(source).toBeTruthy();
+    const mapper = new Function(`${source}; return mapLegacyAgreementRow_;`)() as (row: unknown[]) => unknown[];
+    const legacyRow = ["a1", "g1", "o1", "t1", 2, 60, 40, "2026-08-21", "", "{}", "active", "2026-08-21T00:00:00Z"];
+    expect(mapper(legacyRow)).toEqual([
+      "a1", "g1", "o1", "t1", 2, 60, 40,
+      "", "", "", "",
+      "2026-08-21", "", "{}", "active", "2026-08-21T00:00:00Z",
+    ]);
+  });
+
+  it("backs up Agreements and flushes writes before releasing the script lock", () => {
+    expect(code).toContain("sheet.copyTo(book).setName(backupName)");
+    expect(code).toContain("var migratedRows = legacyRows.map(mapLegacyAgreementRow_);");
+    expect(code).toContain("try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }");
   });
 
   it("guards all critical financial mutations before row writes", () => {

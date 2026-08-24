@@ -27,6 +27,8 @@ Errors use:
 
 Every mutation must include a unique `requestId`. A repeated RequestID returns the cached original response and must not append a second Sheet row or create a second Drive file.
 
+`health.get` and `diagnostics.get` include non-secret `release` and `schemaVersion` fields. Operators must compare them with the repository release before enabling financial mutations; `status=ok` alone proves only that the endpoint responds.
+
 ## Action contract
 
 | Action | Required payload | Role / scope | Mutation |

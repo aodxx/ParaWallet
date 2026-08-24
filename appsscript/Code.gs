@@ -11,6 +11,12 @@
  * GOOGLE_OAUTH_CLIENT_ID (required for Google Sign-In)
  */
 
+// Bump this identifier every time Code.gs is prepared for a production deploy.
+// health.get and diagnostics.get expose it so operators can prove which backend
+// revision is actually serving traffic without exposing source or credentials.
+var PARAWALLET_RELEASE = "2026.08.24-phase-d1";
+var PARAWALLET_SCHEMA_VERSION = "2026-08-agreements-v2";
+
 // =====================================================
 // 0. ADMIN SETUP ENTRYPOINTS
 // =====================================================
@@ -100,9 +106,9 @@ function routeAction_(request) {
   }
 }
 
-function healthCheck_() { return { service: "parawallet-appsscript", status: "ok", timestamp: new Date().toISOString() }; }
+function healthCheck_() { return { service: "parawallet-appsscript", status: "ok", release: PARAWALLET_RELEASE, schemaVersion: PARAWALLET_SCHEMA_VERSION, timestamp: new Date().toISOString() }; }
 function diagnosticsCheck_() {
-  var result = { service: "parawallet-appsscript", status: "ok", timestamp: new Date().toISOString(), sheetIdConfigured: false, sheetAccessible: false, missingSheets: [], registeredUsers: 0 };
+  var result = { service: "parawallet-appsscript", status: "ok", release: PARAWALLET_RELEASE, schemaVersion: PARAWALLET_SCHEMA_VERSION, timestamp: new Date().toISOString(), sheetIdConfigured: false, sheetAccessible: false, missingSheets: [], registeredUsers: 0 };
   try {
     result.sheetIdConfigured = Boolean(Config.get("SHEET_ID", false));
     if (!result.sheetIdConfigured) { result.status = "error"; result.error = "MISSING_SCRIPT_PROPERTY:SHEET_ID"; return result; }
@@ -178,7 +184,10 @@ var Locking = {
   run: function (key, callback) {
     var lock = LockService.getScriptLock();
     if (!lock.tryLock(10000)) throw new Error("TRANSACTION_BUSY:" + key);
-    try { return callback(); } finally { lock.releaseLock(); }
+    try { return callback(); } finally {
+      // Commit pending Spreadsheet writes while the script still owns the lock.
+      try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
+    }
   }
 };
 
@@ -898,19 +907,46 @@ function getAuthorizedE2ETestResult() {
 }
 
 
-// Repairs only the known legacy Agreements header shape created before the
-// current 16-column Data Model. This is editor-only and refuses unexpected
-// schemas so no unrelated table is modified.
+function mapLegacyAgreementRow_(row) {
+  return [
+    row[0], row[1], row[2], row[3], row[4], row[5], row[6],
+    "", "", "", "",
+    row[7], row[8], row[9], row[10], row[11]
+  ];
+}
+
+// Migrates only the known legacy Agreements schema created before the current
+// 16-column Data Model. It makes a full backup copy first, preserves the
+// meaning of effective dates/status/createdAt, and refuses unexpected schemas.
 function repairParaWalletAgreementSchema() {
-  var expected = HEADERS.Agreements;
-  var legacy = ["id", "gardenId", "ownerId", "tapperId", "version", "ownerPercentage", "tapperPercentage", "effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"];
-  var sheet = Repositories.sheet_("Agreements");
-  var actual = readHeaders_(sheet);
-  var legacyPrefix = actual.slice(0, legacy.length);
-  var trailingBlank = actual.slice(legacy.length).every(function (value) { return String(value || "") === ""; });
-  if (headersEqual_(actual, expected)) return { status: "already_correct", headers: actual };
-  if (legacyPrefix.length !== legacy.length || !headersEqual_(legacyPrefix, legacy) || !trailingBlank) throw new Error("AGREEMENTS_SCHEMA_UNEXPECTED:" + actual.join(","));
-  sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
-  sheet.setFrozenRows(1);
-  return { status: "repaired", previousHeaders: actual, headers: expected };
+  return Locking.run("admin:repair-agreements-schema", function () {
+    var expected = HEADERS.Agreements;
+    var legacy = ["id", "gardenId", "ownerId", "tapperId", "version", "ownerPercentage", "tapperPercentage", "effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"];
+    var sheet = Repositories.sheet_("Agreements");
+    var actual = readHeaders_(sheet);
+    var legacyPrefix = actual.slice(0, legacy.length);
+    var trailingBlank = actual.slice(legacy.length).every(function (value) { return String(value || "") === ""; });
+    if (headersEqual_(actual, expected)) return { status: "already_correct", headers: actual, schemaVersion: PARAWALLET_SCHEMA_VERSION };
+    if (legacyPrefix.length !== legacy.length || !headersEqual_(legacyPrefix, legacy) || !trailingBlank) throw new Error("AGREEMENTS_SCHEMA_UNEXPECTED:" + actual.join(","));
+
+    var book = SpreadsheetApp.openById(Config.spreadsheetId());
+    var suffix = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Etc/UTC", "yyyyMMdd_HHmmss");
+    var backupName = "Agreements_Backup_" + suffix;
+    if (book.getSheetByName(backupName)) backupName += "_" + Utilities.getUuid().slice(0, 6);
+    var backup = sheet.copyTo(book).setName(backupName);
+    backup.setFrozenRows(1);
+
+    var lastRow = sheet.getLastRow();
+    var sourceWidth = Math.max(actual.length, legacy.length);
+    var legacyRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, sourceWidth).getValues() : [];
+    var migratedRows = legacyRows.map(mapLegacyAgreementRow_);
+    var clearWidth = Math.max(sheet.getLastColumn(), expected.length);
+    sheet.getRange(1, 1, Math.max(lastRow, 1), clearWidth).clearContent();
+    sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+    if (migratedRows.length) sheet.getRange(2, 1, migratedRows.length, expected.length).setValues(migratedRows);
+    sheet.setFrozenRows(1);
+    SpreadsheetApp.flush();
+    assertHeaders_(sheet, "Agreements");
+    return { status: "migrated", backupSheet: backupName, migratedRows: migratedRows.length, previousHeaders: actual, headers: expected, schemaVersion: PARAWALLET_SCHEMA_VERSION };
+  });
 }

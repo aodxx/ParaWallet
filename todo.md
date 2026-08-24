@@ -209,3 +209,8 @@
 - [x] Write the complete Thai PWA real-use manual for Owner and Tapper workflows
 - [x] Add production go-live checklist, data safety rules, and troubleshooting guidance
 - [x] Review and deliver the final usage guide attachment
+- [x] Add an explicit backend release/schema fingerprint to health and diagnostics responses
+- [x] Replace the header-only Agreements repair with a backup-first semantic data migration
+- [x] Add regression coverage for legacy Agreement value mapping and lock flush ordering
+- [ ] Deploy backend release `2026.08.24-phase-d1`, run the migration once, and verify `financialSchemaReady=true`
+- [ ] Run one controlled authenticated production E2E only after the release and schema fingerprints match
