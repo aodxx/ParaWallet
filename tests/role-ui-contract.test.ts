@@ -49,7 +49,11 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ไฟล์สลิปต้องมีขนาดไม่เกิน 4 MB");
     expect(app).toContain("Owner ต้องกดยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ยืนยันว่าได้รับเงินสดแล้ว");
-    expect(app).toContain("ดูสลิปที่แนบ");
+    expect(app).toContain("ตรวจรายละเอียดการส่งเงิน");
+    expect(app).toContain("ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว");
+    expect(app).toContain("ฉันตรวจนับและได้รับเงินสดจริงแล้ว");
+    expect(app).toContain("api.settlements.evidence");
+    expect(app).not.toContain("https://drive.google.com/file/d/");
   });
 
   it("requires Owner to review receipt evidence and calculations before confirmation", () => {

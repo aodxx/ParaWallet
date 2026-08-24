@@ -47,3 +47,14 @@ No schema migration is required. D6 uses the existing `Receipts`, `Files`, `OcrR
 ## Known limitation
 
 D6 presents the stored receipt image and final reviewed Sale values. It does not yet store field-by-field OCR corrections as a separate immutable revision record; that remains a future evidence-lifecycle enhancement.
+
+## Production acceptance evidence
+
+Owner mobile screen recording `1000020247.mp4` was reviewed on 24 August 2026 after the D6 deployment.
+
+- Owner dashboard loaded the production garden and existing balances.
+- **รายการขาย** loaded the confirmed E2E Sale for 6,000 baht.
+- **ดูรายละเอียด** opened the D6 review modal on mobile.
+- The legacy manual-entry path correctly displayed **ไม่มีภาพใบเสร็จ** without failing or mutating the Sale.
+- The calculation remained consistent: gross 6,000; buyer deduction 100; shared expense 50; split base 5,850; Owner 3,510; Tapper 2,340.
+- The Sale remained **ยืนยันแล้ว** while the modal was opened repeatedly, confirming that review is read-only after confirmation.

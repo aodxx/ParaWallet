@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d6";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d7";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -70,7 +70,7 @@ function doPost(e) {
 var READ_ONLY_ACTIONS_ = [
   "health.get", "diagnostics.get", "dashboard.get", "gardens.list", "plots.list",
   "members.list", "agreements.list", "products.list", "buyers.list", "sales.list",
-  "sales.duplicateCheck", "sales.receipt", "wallets.me", "settlements.list", "notifications.list",
+  "sales.duplicateCheck", "sales.receipt", "wallets.me", "settlements.list", "settlements.evidence", "notifications.list",
   "reports.summary"
 ];
 function isReadOnlyAction_(action) { return READ_ONLY_ACTIONS_.indexOf(String(action || "")) >= 0; }
@@ -111,6 +111,7 @@ function routeAction_(request) {
     case "sales.dispute": return Services.disputeSale(user, request.payload);
     case "wallets.me": return Services.wallet(user, request.payload);
     case "settlements.list": return Services.listSettlements(user, request.payload);
+    case "settlements.evidence": return Services.settlementEvidence(user, request.payload);
     case "settlements.create": return Services.createSettlement(user, request.payload);
     case "settlements.confirm": return Services.confirmSettlement(user, request.payload);
     case "settlements.reject": return Services.rejectSettlement(user, request.payload);
@@ -831,6 +832,11 @@ Services.createSettlement = function (user, payload) {
       if (String(payload.slipData).length > 6000000) throw new Error("SETTLEMENT_SLIP_TOO_LARGE");
       var slip = DriveStorage.save(payload.slipData, payload.slipMimeType || "image/jpeg", payload.slipFilename || ("settlement-" + new Date().getTime()), "settlements", user.id);
       slipFileId = slip.fileId;
+    } else {
+      var trustedFile = rows_("Files").filter(function (row) {
+        return id_(row.driveFileId) === id_(slipFileId) && row.folderType === "settlements" && id_(row.ownerId) === id_(user.id);
+      })[0];
+      if (!trustedFile) throw new Error("SETTLEMENT_SLIP_ACCESS_DENIED");
     }
   }
   if (method === "cash" && !String(payload.location || "").trim()) throw new Error("CASH_LOCATION_REQUIRED");
@@ -845,12 +851,31 @@ Services.createSettlement = function (user, payload) {
 
 Services.listSettlements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return new Date(b.transferDate || b.createdAt).getTime() - new Date(a.transferDate || a.createdAt).getTime(); }); };
 
+Services.settlementEvidence = function (user, payload) {
+  var settlement = findById_("Settlements", payload.settlementId);
+  if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireGarden_(user, settlement.gardenId);
+  if (settlement.method !== "bank_transfer" || !settlement.slipFileId) throw new Error("SETTLEMENT_SLIP_NOT_FOUND");
+  var trustedFile = rows_("Files").filter(function (row) {
+    return id_(row.driveFileId) === id_(settlement.slipFileId) && row.folderType === "settlements" && id_(row.ownerId) === id_(settlement.tapperId);
+  })[0];
+  if (!trustedFile) throw new Error("SETTLEMENT_SLIP_ACCESS_DENIED");
+  var file = DriveApp.getFileById(settlement.slipFileId);
+  var blob = file.getBlob();
+  var bytes = blob.getBytes();
+  if (bytes.length > 4 * 1024 * 1024) throw new Error("SETTLEMENT_SLIP_TOO_LARGE");
+  var mimeType = blob.getContentType() || trustedFile.mimeType || "image/jpeg";
+  if (String(mimeType).indexOf("image/") !== 0 && mimeType !== "application/pdf") throw new Error("SETTLEMENT_SLIP_TYPE_INVALID");
+  return { settlementId: settlement.id, fileId: settlement.slipFileId, name: file.getName(), mimeType: mimeType, dataUrl: "data:" + mimeType + ";base64," + Utilities.base64Encode(bytes) };
+};
+
 Services.confirmSettlement = function (user, payload) {
   assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
   requireOwner_(user, settlement.gardenId);
     if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_CONFIRMABLE");
+    if (settlement.method === "bank_transfer" && !settlement.slipFileId) throw new Error("SETTLEMENT_SLIP_REQUIRED");
     var amount = numeric_(settlement.amount);
     if (amount <= 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
     var outstanding = settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId).outstanding;

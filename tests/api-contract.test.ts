@@ -89,6 +89,13 @@ describe("Apps Script API contract", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toMatchObject({ action: "sales.receipt", payload: { saleId: "sale-1" } });
   });
 
+  it("requests settlement slip evidence by settlement ID", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "ok", requestId: "req-slip", data: { settlementId: "settlement-1", dataUrl: "data:image/jpeg;base64,AA==" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await api.settlements.evidence("settlement-1");
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toMatchObject({ action: "settlements.evidence", payload: { settlementId: "settlement-1" } });
+  });
+
   it("shows a useful message for missing receipt evidence", () => {
     expect(userMessageForApiError(new ApiError("SALE_RECEIPT_NOT_FOUND", "internal"))).toBe("ไม่พบไฟล์ใบเสร็จของรายการนี้");
   });

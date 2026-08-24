@@ -55,6 +55,7 @@ Every mutation must include a unique `requestId`. A repeated RequestID returns t
 | `sales.dispute` | saleId, reason, optional note/evidence | Garden member | Yes: dispute/status/audit/notification |
 | `wallets.me` | gardenId | Garden member | No |
 | `settlements.create` | gardenId, amount, method; bank transfer requires slipData/slipFileId, cash requires location | Tapper | Yes: Drive evidence/settlement/audit/notification |
+| `settlements.evidence` | settlementId | Authorized garden member | No: reads Settlement-bound private Drive image/PDF |
 | `settlements.confirm` | settlementId | Garden Owner | Yes: status/audit/notification |
 | `payments.create` | gardenId, amount, method, recipient fields | Garden member | Yes |
 | `payments.confirm` | paymentId | Garden Owner | Yes |

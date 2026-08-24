@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d6";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d7";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -54,6 +54,18 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('slipFileId: slipFileId');
     expect(code).toContain('throw new Error("CASH_LOCATION_REQUIRED")');
     expect(code).not.toContain('writeAudit_(user, "settlement_created", "settlement", settlementId, null, payload');
+  });
+
+  it("serves settlement evidence only through the authorized settlement relationship", () => {
+    expect(code).toContain('case "settlements.evidence": return Services.settlementEvidence');
+    expect(code).toContain('"settlements.evidence"');
+    const service = code.match(/Services\.settlementEvidence = function[\s\S]*?\n};/)?.[0] || "";
+    expect(service).toContain('findById_("Settlements", payload.settlementId)');
+    expect(service).toContain("requireGarden_(user, settlement.gardenId)");
+    expect(service).toContain('row.folderType === "settlements"');
+    expect(service).toContain('id_(row.ownerId) === id_(settlement.tapperId)');
+    expect(service).toContain("DriveApp.getFileById(settlement.slipFileId)");
+    expect(service).toContain('dataUrl: "data:" + mimeType + ";base64,"');
   });
 
   it("keeps concurrent read models outside the global mutation lock", () => {

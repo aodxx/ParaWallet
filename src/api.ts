@@ -32,6 +32,9 @@ const apiErrorMessages: Record<string, string> = {
   REQUEST_ID_REQUIRED: "คำขอไม่สมบูรณ์ กรุณาลองใหม่",
   SETTLEMENT_SLIP_REQUIRED: "กรุณาแนบสลิปการโอนเงิน",
   SETTLEMENT_SLIP_TOO_LARGE: "ไฟล์สลิปมีขนาดใหญ่เกินไป กรุณาเลือกไฟล์ไม่เกิน 4 MB",
+  SETTLEMENT_SLIP_NOT_FOUND: "ไม่พบสลิปของรายการส่งเงินนี้",
+  SETTLEMENT_SLIP_ACCESS_DENIED: "ไม่สามารถเปิดสลิปที่ไม่ใช่หลักฐานของรายการนี้",
+  SETTLEMENT_SLIP_TYPE_INVALID: "สลิปต้องเป็นรูปภาพหรือไฟล์ PDF เท่านั้น",
   CASH_LOCATION_REQUIRED: "กรุณาระบุสถานที่ส่งมอบเงินสด",
   MEMBER_EMAIL_REQUIRED: "กรุณากรอกอีเมล Google ของ Tapper",
   TAPPER_USER_NOT_REGISTERED: "ยังไม่พบบัญชี Tapper ที่ active ใน Users กรุณาลงทะเบียนบัญชีก่อน",
@@ -61,6 +64,7 @@ export type Agreement = { id: string; gardenId: string; ownerId: string; tapperI
 export type Sale = { id: string; gardenId: string; agreementId: string; tapperId?: string; receiptId?: string; saleDate: string; ticketNumber?: string; buyerName?: string; productType?: string; weightKg?: number; netWeight?: number; unitPrice?: number; grossSale?: number; buyerDeductions?: number; sharedExpenses?: number; splitBase?: number; ownerShare?: number; tapperShare?: number; status: string; receiptFileId?: string; ocrConfidence?: number | string; manualEntry?: boolean; createdAt?: string };
 export type SaleReceiptEvidence = { saleId: string; receiptId?: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
+export type SettlementEvidence = { settlementId: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
 export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; pendingReviews: number; monthlySales: number; monthlySalesSeries?: number[] };
@@ -130,6 +134,7 @@ export const api = {
   wallets: { me: (gardenId: string) => callApi<unknown, WalletData>("wallets.me", { gardenId }) },
   settlements: {
     list: (gardenId: string) => callApi<unknown, Settlement[]>("settlements.list", { gardenId }),
+    evidence: (settlementId: string) => callApi<unknown, SettlementEvidence>("settlements.evidence", { settlementId }),
     create: (payload: Record<string, unknown>) => callApi<unknown, Settlement>("settlements.create", payload),
     confirm: (settlementId: string, requestId?: string) => callApi("settlements.confirm", { settlementId }, { requestId }),
     reject: (payload: { settlementId: string; reason: string }, requestId?: string) => callApi("settlements.reject", payload, { requestId }),
