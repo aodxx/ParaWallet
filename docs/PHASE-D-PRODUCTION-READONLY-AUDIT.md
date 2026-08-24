@@ -1,5 +1,20 @@
 # ParaWallet Phase D — Production Read-only Audit
 
+## Post-deployment verification — 24 สิงหาคม 2026
+
+ตรวจสอบหลังผู้ดูแล deploy backend และเรียก migration แล้ว โดยการตรวจครั้งนี้เป็น read-only และไม่สร้าง Sale, Settlement หรือรายการกระเป๋าเงินใด ๆ
+
+| Gate | หลักฐานจาก Spreadsheet จริง | ผล |
+|---|---|---|
+| Backup before migration | พบชีต `Agreements_Backup_20260824_085715` ซึ่งเก็บ legacy header 12 คอลัมน์และข้อมูล Agreement เดิม 2 แถว | ผ่าน |
+| Agreements schema | `Agreements` มี canonical header 16 คอลัมน์ตาม `Code.gs` | ผ่าน |
+| Semantic row mapping | ค่า id, garden, คู่สัญญา, version และสัดส่วน 60/40 ตรงกับ backup; ฟิลด์ legacy ท้ายแถวถูกย้ายไปตำแหน่ง canonical โดยไม่เลื่อนความหมาย | ผ่าน |
+| Production financial safety | `Sales`, `Settlements`, `SettlementAllocations` และ `WalletEntries` ยังมีเฉพาะ header | ผ่าน |
+| Garden membership | สวน `garden-pahpayom-001` มี Owner และ Tapper membership สถานะ active | ผ่าน |
+| Backend fingerprint | ยังอ่าน live health response หลัง deploy ไม่ได้จากสภาพแวดล้อมตรวจสอบ จึงยังไม่ยืนยัน `release=2026.08.24-phase-d1`, `schemaVersion=2026-08-agreements-v2` และ `financialSchemaReady=true` | รอยืนยัน |
+
+ดังนั้น migration และ data-safety gate ผ่านแล้ว แต่ยังไม่ควรเริ่ม controlled production E2E จนกว่า live health/diagnostics fingerprint จะตรงกับ release ที่คาดไว้ และต้องได้รับอนุมัติแยกต่างหากก่อนสร้างธุรกรรมจริง
+
 ## ขอบเขต
 
 การตรวจสอบครั้งนี้อ่านข้อมูลจาก Google Spreadsheet จริงเท่านั้น ไม่มีการแก้ไขหรือลบแถวใด ๆ และไม่มีการสร้างธุรกรรมเพิ่ม ตรวจเฉพาะสวน `garden-pahpayom-001` และข้อมูลที่เกี่ยวข้องกับ E2E test tag `E2E-PAHPAYOM-001`
