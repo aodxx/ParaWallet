@@ -186,6 +186,7 @@ export default function App() {
   };
 
   if (!authToken) return <AuthScreen clientId={googleClientId} message={message} onCredential={handleCredential} onError={setMessage} />;
+  if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen loading={loading || connectionState === "connecting"} message={message} onRetry={() => void refresh("overview")} onSignOut={() => handleSignOut()} />;
 
   return <div className="app-shell">
     <header className="topbar">
@@ -243,6 +244,10 @@ function DeveloperCredit() {
 
 function AuthScreen({ clientId, message, onCredential, onError }: { clientId: string; message: string; onCredential: (token: string) => void; onError: (message: string) => void }) {
   return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE ACCESS</p><h1>เข้าสู่ระบบ ParaWallet</h1><p>ใช้บัญชี Google เพื่อยืนยันตัวตน แล้วระบบจะโหลดข้อมูลเฉพาะสวนและสิทธิ์ของคุณจาก Google Sheets</p><GoogleSignIn clientId={clientId} onCredential={onCredential} onError={onError} />{message && <div className="notice">{message}</div>}<small>ระบบจะไม่เรียกใช้ Session.getEffectiveUser และจะไม่เก็บรหัสผ่าน Google</small></section></main>;
+}
+
+function InitialSyncScreen({ loading, message, onRetry, onSignOut }: { loading: boolean; message: string; onRetry: () => void; onSignOut: () => void }) {
+  return <main className="auth-screen"><section className="auth-card" role="status"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE SYNC</p><h1>{loading ? "กำลังตรวจสอบบัญชี..." : "ยังเชื่อมต่อข้อมูลไม่ได้"}</h1><p>{loading ? "ระบบกำลังโหลดบทบาท สวน และกระเป๋าเงินจาก Google Sheets กรุณารอสักครู่" : "ยังไม่แสดงหน้าของ Owner หรือ Tapper จนกว่าจะตรวจสอบสิทธิ์สำเร็จ เพื่อป้องกันการแสดงข้อมูลผิดบัญชี"}</p>{message && <div className="notice">{message}</div>}<div className="quick-actions"><button className="primary" onClick={onRetry} disabled={loading}>{loading ? "กำลังเชื่อมต่อ..." : "ลองใหม่"}</button><button className="secondary" onClick={onSignOut}>เปลี่ยนบัญชี Google</button></div></section></main>;
 }
 
 function Overview({ data, wallet, role, connected, onSale, onReceipt, onSettlement, onReviewSales, onReviewSettlements, onReports }: { data: DashboardData; wallet: WalletData | null; role: Role; connected: boolean; onSale: () => void; onReceipt: () => void; onSettlement: () => void; onReviewSales: () => void; onReviewSettlements: () => void; onReports: () => void }) {

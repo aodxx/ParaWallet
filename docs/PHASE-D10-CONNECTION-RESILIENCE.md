@@ -17,6 +17,7 @@ The failure had two contributing causes:
 - Secondary page models use `Promise.allSettled`; successful models are retained when another model fails.
 - The UI distinguishes `degraded` from `disconnected`. A degraded connection keeps the last verified values visible and labels them as not fully updated.
 - A refresh sequence prevents a slow, older response from overwriting a newer navigation result.
+- Before the first verified dashboard response, the PWA shows a neutral account-check screen instead of briefly rendering the default Owner layout for a Tapper.
 - Apps Script caches parsed sheet rows for the lifetime of one request and invalidates the affected cache after append or update. No data is cached between requests.
 - `dashboard.get` returns the detailed Wallet model it already calculated, so the overview no longer launches a duplicate `wallets.me` request.
 

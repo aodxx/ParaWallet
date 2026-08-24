@@ -62,6 +62,12 @@ describe("role-aware UI contract", () => {
     expect(app).not.toContain("api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)");
   });
 
+  it("does not render an Owner or Tapper dashboard before role verification finishes", () => {
+    expect(app).toContain("if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen");
+    expect(app).toContain("กำลังตรวจสอบบัญชี...");
+    expect(app).toContain("ยังไม่แสดงหน้าของ Owner หรือ Tapper จนกว่าจะตรวจสอบสิทธิ์สำเร็จ");
+  });
+
   it("makes the dual wallet and direct camera scan Tapper's primary workflow", () => {
     expect(app).toContain('className="dual-wallet-priority"');
     expect(app).toContain('className="scan-receipt-cta"');
