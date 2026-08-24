@@ -212,5 +212,6 @@
 - [x] Add an explicit backend release/schema fingerprint to health and diagnostics responses
 - [x] Replace the header-only Agreements repair with a backup-first semantic data migration
 - [x] Add regression coverage for legacy Agreement value mapping and lock flush ordering
-- [ ] Deploy backend release `2026.08.24-phase-d1`, run the migration once, and verify `financialSchemaReady=true`
+- [x] Run the backup-first Agreements migration once and verify the canonical 16-column schema against the production backup
+- [ ] Verify the deployed backend reports `release=2026.08.24-phase-d1`, `schemaVersion=2026-08-agreements-v2`, and `financialSchemaReady=true`
 - [ ] Run one controlled authenticated production E2E only after the release and schema fingerprints match
