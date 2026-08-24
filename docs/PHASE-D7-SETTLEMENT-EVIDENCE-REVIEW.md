@@ -43,3 +43,17 @@ No schema migration is required.
 6. Confirm the transfer and verify status, outstanding, allocation, WalletEntry, notification, and AuditLog.
 7. Create a cash Settlement and verify Owner must acknowledge physical receipt on the Owner phone before confirmation.
 8. Verify an unauthorized account cannot call `settlements.evidence` for the Settlement.
+
+## Production acceptance evidence — bank transfer
+
+Owner and Tapper mobile recordings `1000020250.mp4` and `1000020253.mp4` were reviewed on 24 August 2026. The attached bank slip was explicitly provided as test evidence and does not represent a real transfer.
+
+- Owner opened the pending 1 baht bank-transfer Settlement and the private slip loaded inside ParaWallet.
+- The D7.1 mobile fix kept both **ยืนยันยอดโอนแล้ว** and **ปฏิเสธรายการ** visible above the bottom navigation.
+- Owner checked **ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว** and completed confirmation.
+- The Settlement changed from **รอเจ้าของยืนยัน** to **ยืนยันแล้ว**.
+- Owner outstanding changed from 1,510 to 1,509 baht.
+- Tapper owner-money-held changed to 1,509 baht and owner-money-transferred changed from 2,000 to 2,001 baht.
+- Tapper and Owner both displayed the same confirmed 1 baht and 2,000 baht Settlement history.
+
+The production bank-transfer path is accepted. The cash handover path remains a separate production acceptance check.
