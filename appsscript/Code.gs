@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d2";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d3";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -44,6 +44,12 @@ function doPost(e) {
   try {
     request = parseRequest_(e);
     if (!request.requestId) return jsonResponse_(errorResponse_("REQUEST_ID_REQUIRED", "requestId is required", "unknown"));
+    // Read-only actions must not take the global ScriptLock. The PWA loads several
+    // independent read models in parallel; serialising those reads made all but
+    // one request time out with TRANSACTION_BUSY.
+    if (isReadOnlyAction_(request.action)) {
+      return jsonResponse_(okResponse_(request.requestId, routeAction_(request)));
+    }
     var response = Locking.run("request:" + request.requestId, function () {
       var cached = Idempotency.get(request.requestId);
       if (cached) return cached;
@@ -60,6 +66,14 @@ function doPost(e) {
     return jsonResponse_(errorResponse_(code, rawMessage, request && request.requestId ? request.requestId : "unknown"));
   }
 }
+
+var READ_ONLY_ACTIONS_ = [
+  "health.get", "diagnostics.get", "dashboard.get", "gardens.list", "plots.list",
+  "members.list", "agreements.list", "products.list", "buyers.list", "sales.list",
+  "sales.duplicateCheck", "wallets.me", "settlements.list", "notifications.list",
+  "reports.summary"
+];
+function isReadOnlyAction_(action) { return READ_ONLY_ACTIONS_.indexOf(String(action || "")) >= 0; }
 
 function parseRequest_(e) {
   var raw = e && e.postData && e.postData.contents ? e.postData.contents : "{}";
@@ -392,7 +406,26 @@ var OCR = {
 var Services = {
   dashboard: function (user) {
     var gardens = Repositories.gardensForUser(user.id);
-    return { role: user.role, garden: gardens[0] || null, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, monthlySales: 0 };
+    var garden = gardens[0] || null;
+    if (!garden) return { role: user.role, garden: null, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, monthlySales: 0 };
+    var wallet = Services.wallet(user, { gardenId: garden.id });
+    var monthStart = new Date().toISOString().slice(0, 7) + "-01";
+    var monthlySales = filterByDate_(rows_("Sales").filter(function (row) {
+      if (id_(row.gardenId) !== id_(garden.id) || row.status !== "confirmed") return false;
+      return user.role !== "tapper" || id_(row.tapperId) === id_(user.id);
+    }), monthStart, "", "saleDate");
+    return {
+      role: user.role,
+      garden: garden,
+      wallet: {
+        owner: wallet.owner.totalEntitlement,
+        tapper: wallet.tapper.totalIncome,
+        outstanding: wallet.owner.outstanding,
+        currency: "THB"
+      },
+      pendingReviews: wallet.tapper.pendingReviews,
+      monthlySales: round_(monthlySales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0))
+    };
   },
   createSale: function (user, payload) {
     return Locking.run("sale:" + payload.gardenId, function () {

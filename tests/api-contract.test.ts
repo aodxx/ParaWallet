@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, callApi, onAuthFailure, setAuthToken } from "../src/api";
+import { ApiError, callApi, onAuthFailure, setAuthToken, userMessageForApiError } from "../src/api";
 
 describe("Apps Script API contract", () => {
   afterEach(() => {
@@ -48,6 +48,27 @@ describe("Apps Script API contract", () => {
     onAuthFailure(authFailure);
     await expect(callApi("sales.create", {}, { requestId: "req-5" })).rejects.toBeInstanceOf(ApiError);
     expect(authFailure).not.toHaveBeenCalled();
+  });
+
+  it("retries a busy request with the same request ID", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ json: async () => ({ status: "error", requestId: "req-6", error: { code: "TRANSACTION_BUSY", message: "TRANSACTION_BUSY:request:req-6", retryable: true } }) })
+      .mockResolvedValueOnce({ json: async () => ({ status: "ok", requestId: "req-6", data: { connected: true } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = callApi("dashboard.get", undefined, { requestId: "req-6" });
+    await vi.advanceTimersByTimeAsync(250);
+    await expect(request).resolves.toEqual({ connected: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).requestId).toBe("req-6");
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).requestId).toBe("req-6");
+    vi.useRealTimers();
+  });
+
+  it("shows a safe Thai message instead of an internal busy request key", () => {
+    const error = new ApiError("TRANSACTION_BUSY", "TRANSACTION_BUSY:request:private-uuid", true);
+    expect(userMessageForApiError(error)).toBe("ระบบกำลังประมวลผลข้อมูล กรุณาลองอีกครั้งในอีกสักครู่");
+    expect(userMessageForApiError(error)).not.toContain("private-uuid");
   });
 });
 

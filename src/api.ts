@@ -26,6 +26,17 @@ export class ApiError extends Error {
   }
 }
 
+const apiErrorMessages: Record<string, string> = {
+  TRANSACTION_BUSY: "ระบบกำลังประมวลผลข้อมูล กรุณาลองอีกครั้งในอีกสักครู่",
+  API_ERROR: "เชื่อมต่อระบบข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง",
+  REQUEST_ID_REQUIRED: "คำขอไม่สมบูรณ์ กรุณาลองใหม่",
+};
+
+export function userMessageForApiError(error: unknown) {
+  if (error instanceof ApiError) return apiErrorMessages[error.code] || "ไม่สามารถโหลดข้อมูลได้ กรุณาลองอีกครั้ง";
+  return "ยังเชื่อมต่อ Google Sheets ไม่ได้ กรุณาลองอีกครั้ง";
+}
+
 export type Garden = { id: string; ownerId?: string; name: string; locationText?: string; province?: string; district?: string; areaRai: number; treeCount: number; status: "active" | "archived" };
 export type Plot = { id: string; gardenId: string; name: string; notes?: string; status: string };
 export type Agreement = { id: string; gardenId: string; ownerId: string; tapperId: string; version: number; ownerPercentage: number; tapperPercentage: number; effectiveFrom: string; effectiveTo?: string; status: string };
@@ -52,14 +63,18 @@ export async function callApi<TPayload, TResult>(action: string, payload?: TPayl
   if (!apiUrl) throw new Error("VITE_APPS_SCRIPT_URL is not configured");
   const requestId = options.requestId ?? newRequestId();
   const body: ApiRequest<TPayload> = { action, requestId, payload, authToken: options.authToken ?? currentAuthToken };
-  const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
-  const envelope = (await response.json()) as ApiResponse<TResult>;
-  if (envelope.status !== "ok") {
+  const retryDelays = [0, 250, 700];
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    if (retryDelays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+    const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: options.signal });
+    const envelope = (await response.json()) as ApiResponse<TResult>;
+    if (envelope.status === "ok") return envelope.data as TResult;
     const code = envelope.error?.code || "API_ERROR";
     if (["AUTH_REQUIRED", "INVALID_GOOGLE_ID_TOKEN", "GOOGLE_TOKEN_EXPIRED", "USER_NOT_REGISTERED"].includes(code)) authFailureHandler?.();
-    throw new ApiError(code, envelope.error?.message || "Apps Script request failed", envelope.error?.retryable === true);
+    const apiError = new ApiError(code, envelope.error?.message || "Apps Script request failed", envelope.error?.retryable === true);
+    if (!apiError.retryable || attempt === retryDelays.length - 1) throw apiError;
   }
-  return envelope.data as TResult;
+  throw new ApiError("API_ERROR", "Apps Script request failed", true);
 }
 
 export const api = {

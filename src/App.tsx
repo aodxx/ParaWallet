@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { api, Agreement, ApiError, DashboardData, Garden, Notification, Role, Sale, Settlement, WalletData, onAuthFailure, setAuthToken } from "./api";
+import { api, Agreement, ApiError, DashboardData, Garden, Notification, Role, Sale, Settlement, WalletData, onAuthFailure, setAuthToken, userMessageForApiError } from "./api";
 import GoogleSignIn from "./GoogleSignIn";
 import { Bell, CircleDollarSign, FileText, Leaf, Menu, Plus, ScanLine, Settings2, Sprout, WalletCards, X } from "lucide-react";
 
@@ -48,29 +48,31 @@ export default function App() {
       const dashboard = await api.dashboard();
       setData(dashboard);
       setRole(dashboard.role);
-      setConnected(true);
       const garden = dashboard.garden || gardens[0];
       if (garden?.id) {
-        const [gardenRows, saleRows, agreementRows, walletRow, settlementRows] = await Promise.all([
-          api.gardens.list(),
-          api.sales.list({ gardenId: garden.id }),
-          api.agreements.list(garden.id),
-          api.wallets.me(garden.id),
-          api.settlements.list(garden.id),
-        ]);
-        setGardens(gardenRows);
-        setSales(saleRows);
-        setAgreements(agreementRows);
-        setWallet(walletRow);
-        setSettlements(settlementRows);
+        if (target === "overview") {
+          const [gardenRows, agreementRows, walletRow] = await Promise.all([api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)]);
+          setGardens(gardenRows); setAgreements(agreementRows); setWallet(walletRow);
+        } else if (target === "sales") {
+          const [saleRows, agreementRows] = await Promise.all([api.sales.list({ gardenId: garden.id }), api.agreements.list(garden.id)]);
+          setSales(saleRows); setAgreements(agreementRows);
+        } else if (target === "gardens") {
+          setGardens(await api.gardens.list());
+        } else if (target === "agreements") {
+          setAgreements(await api.agreements.list(garden.id));
+        } else if (target === "settlements") {
+          const [walletRow, settlementRows] = await Promise.all([api.wallets.me(garden.id), api.settlements.list(garden.id)]);
+          setWallet(walletRow); setSettlements(settlementRows);
+        }
       }
       if (target === "notifications") setNotifications(await api.notifications.list());
+      setConnected(true);
     } catch (error) {
       setConnected(false);
       if (error instanceof ApiError && ["AUTH_REQUIRED", "INVALID_GOOGLE_ID_TOKEN", "GOOGLE_TOKEN_EXPIRED", "USER_NOT_REGISTERED"].includes(error.code)) {
         handleSignOut("เซสชัน Google หมดอายุหรือไม่มีสิทธิ์ โปรดเข้าสู่ระบบใหม่");
       } else {
-        setMessage(error instanceof Error ? error.message : "ยังเชื่อมต่อ Google Sheets ไม่ได้");
+        setMessage(userMessageForApiError(error));
       }
     } finally {
       setLoading(false);
