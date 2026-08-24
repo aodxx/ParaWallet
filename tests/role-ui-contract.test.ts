@@ -26,4 +26,20 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('screen === "settlements" && (!loading || settlements.length > 0)');
     expect(app).toContain('screen === "notifications" && (!loading || notifications.length > 0)');
   });
+
+  it("makes the dual wallet and direct camera scan Tapper's primary workflow", () => {
+    expect(app).toContain('className="dual-wallet-priority"');
+    expect(app).toContain('className="scan-receipt-cta"');
+    expect(app).toContain('receiptCameraRef.current?.click()');
+    expect(app).toContain('capture="environment"');
+    expect(app).toContain('initialFile={receiptInitialFile}');
+  });
+
+  it("collects transfer evidence and explains cash confirmation", () => {
+    expect(app).toContain("กรุณาแนบสลิปการโอนเงิน");
+    expect(app).toContain("ไฟล์สลิปต้องมีขนาดไม่เกิน 4 MB");
+    expect(app).toContain("Owner ต้องกดยืนยันว่าได้รับเงินสดแล้ว");
+    expect(app).toContain("ยืนยันว่าได้รับเงินสดแล้ว");
+    expect(app).toContain("ดูสลิปที่แนบ");
+  });
 });

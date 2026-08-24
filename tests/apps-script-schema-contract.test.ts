@@ -41,10 +41,19 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d3";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d4";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
+  });
+
+  it("stores settlement evidence in Drive without writing base64 into AuditLogs", () => {
+    expect(code).toContain('throw new Error("SETTLEMENT_SLIP_REQUIRED")');
+    expect(code).toContain('DriveStorage.save(payload.slipData');
+    expect(code).toContain('"settlements", user.id');
+    expect(code).toContain('slipFileId: slipFileId');
+    expect(code).toContain('throw new Error("CASH_LOCATION_REQUIRED")');
+    expect(code).not.toContain('writeAudit_(user, "settlement_created", "settlement", settlementId, null, payload');
   });
 
   it("keeps concurrent read models outside the global mutation lock", () => {

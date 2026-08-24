@@ -51,7 +51,7 @@ Every mutation must include a unique `requestId`. A repeated RequestID returns t
 | `sales.confirm` | saleId | Garden Owner | Yes: status/wallet/audit/notification |
 | `sales.dispute` | saleId, reason, optional note/evidence | Garden member | Yes: dispute/status/audit/notification |
 | `wallets.me` | gardenId | Garden member | No |
-| `settlements.create` | gardenId, amount, method, allocation fields | Owner or Tapper | Yes: settlement/allocation/audit/notification |
+| `settlements.create` | gardenId, amount, method; bank transfer requires slipData/slipFileId, cash requires location | Tapper | Yes: Drive evidence/settlement/audit/notification |
 | `settlements.confirm` | settlementId | Garden Owner | Yes: status/audit/notification |
 | `payments.create` | gardenId, amount, method, recipient fields | Garden member | Yes |
 | `payments.confirm` | paymentId | Garden Owner | Yes |
@@ -77,5 +77,7 @@ repairParaWalletProductionSchema();
 ## Security and transaction boundary
 
 Every authenticated action must resolve a registered user, verify garden ownership or active membership, enforce the role-specific permission, validate the state transition, and then enter a `LockService` critical section for writes. File bytes go to Drive, while Sheets store metadata and references only. API keys remain in Apps Script `PropertiesService`.
+
+Bank-transfer settlements store the uploaded slip in the configured Drive evidence folder and persist only `slipFileId` in the Settlements row and audit event. Cash settlements remain `pending_owner_confirmation` until the Owner explicitly confirms receipt on their device; only then are allocations and wallet debits written.
 
 The current repository is an architecture-ready MVP scaffold. Before production, the placeholder token/email resolver in `Auth.requireUser()` must be replaced by an approved identity provider and the remaining state-specific permission tests must be completed.

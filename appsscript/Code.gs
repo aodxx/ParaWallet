@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d3";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d4";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -699,12 +699,25 @@ Services.createSettlement = function (user, payload) {
   if (!tapperMember) throw new Error("TAPPER_NOT_ACTIVE_MEMBER");
   if (isOwner) throw new Error("TAPPER_SETTLEMENT_REQUIRED");
   if (numeric_(payload.amount) <= 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
+  var method = String(payload.method || "");
+  if (["bank_transfer", "cash"].indexOf(method) < 0) throw new Error("SETTLEMENT_METHOD_INVALID");
+  var slipFileId = String(payload.slipFileId || "");
+  if (method === "bank_transfer") {
+    if (!slipFileId && !payload.slipData) throw new Error("SETTLEMENT_SLIP_REQUIRED");
+    if (payload.slipData) {
+      // A 4 MB source file expands to roughly 5.4 MB as a data URL.
+      if (String(payload.slipData).length > 6000000) throw new Error("SETTLEMENT_SLIP_TOO_LARGE");
+      var slip = DriveStorage.save(payload.slipData, payload.slipMimeType || "image/jpeg", payload.slipFilename || ("settlement-" + new Date().getTime()), "settlements", user.id);
+      slipFileId = slip.fileId;
+    }
+  }
+  if (method === "cash" && !String(payload.location || "").trim()) throw new Error("CASH_LOCATION_REQUIRED");
   var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId).outstanding;
   if (numeric_(payload.amount) > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
   var settlementId = Utilities.getUuid();
-  Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: payload.method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || nowIso_(), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: payload.slipFileId || "", location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_() });
-  notifyUser_(access.garden.ownerId, "settlement_pending", "มีรายการส่งเงินรอยืนยัน", "ยอด " + payload.amount);
-  writeAudit_(user, "settlement_created", "settlement", settlementId, null, payload, payload.requestId);
+  Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || nowIso_(), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_() });
+  notifyUser_(access.garden.ownerId, "settlement_pending", method === "cash" ? "มีรายการเงินสดรอยืนยันรับเงิน" : "มีรายการโอนพร้อมสลิปรอยืนยัน", "ยอด " + payload.amount);
+  writeAudit_(user, "settlement_created", "settlement", settlementId, null, { gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "" }, payload.requestId);
   return findById_("Settlements", settlementId);
 };
 
@@ -911,6 +924,7 @@ function runAuthorizedE2ETestOnce() {
         amount: 2000,
         transferDate: "2026-08-21",
         referenceNo: runTag,
+        location: "สวนป่าพะยอม",
         note: "รายการทดสอบ E2E: ส่งเงินบางส่วน",
         requestId: settlementRequestId
       });

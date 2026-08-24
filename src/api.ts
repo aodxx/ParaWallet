@@ -30,6 +30,9 @@ const apiErrorMessages: Record<string, string> = {
   TRANSACTION_BUSY: "ระบบกำลังประมวลผลข้อมูล กรุณาลองอีกครั้งในอีกสักครู่",
   API_ERROR: "เชื่อมต่อระบบข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง",
   REQUEST_ID_REQUIRED: "คำขอไม่สมบูรณ์ กรุณาลองใหม่",
+  SETTLEMENT_SLIP_REQUIRED: "กรุณาแนบสลิปการโอนเงิน",
+  SETTLEMENT_SLIP_TOO_LARGE: "ไฟล์สลิปมีขนาดใหญ่เกินไป กรุณาเลือกไฟล์ไม่เกิน 4 MB",
+  CASH_LOCATION_REQUIRED: "กรุณาระบุสถานที่ส่งมอบเงินสด",
 };
 
 export function userMessageForApiError(error: unknown) {
@@ -41,7 +44,7 @@ export type Garden = { id: string; ownerId?: string; name: string; locationText?
 export type Plot = { id: string; gardenId: string; name: string; notes?: string; status: string };
 export type Agreement = { id: string; gardenId: string; ownerId: string; tapperId: string; version: number; ownerPercentage: number; tapperPercentage: number; effectiveFrom: string; effectiveTo?: string; status: string };
 export type Sale = { id: string; gardenId: string; agreementId: string; saleDate: string; buyerName?: string; productType?: string; weightKg?: number; netWeight?: number; unitPrice?: number; grossSale?: number; buyerDeductions?: number; sharedExpenses?: number; splitBase?: number; ownerShare?: number; tapperShare?: number; status: string; receiptFileId?: string; ocrConfidence?: number | string; manualEntry?: boolean };
-export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string };
+export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
 export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
 export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; pendingReviews: number; monthlySales: number; monthlySalesSeries?: number[] };
