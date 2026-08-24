@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d8";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d9";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -78,6 +78,24 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("var wallet = Services.wallet(user, { gardenId: garden.id });");
     expect(code).toContain("monthlySales: round_(monthlySales.reduce");
     expect(code).toContain("monthlySalesSeries: monthlySalesSeries.map(round_)");
+  });
+
+  it("counts every role-scoped pending task and unread notification on the dashboard", () => {
+    const dashboard = code.match(/dashboard: function \(user\)[\s\S]*?\n  },\n  createSale/)?.[0] || "";
+    expect(dashboard).toContain('row.status === "pending_owner_review" || row.status === "ocr_review"');
+    expect(dashboard).toContain('row.status !== "pending_owner_confirmation"');
+    expect(dashboard).toContain('pendingReviews: pendingSales + pendingSettlements');
+    expect(dashboard).toContain('pendingSales: pendingSales');
+    expect(dashboard).toContain('pendingSettlements: pendingSettlements');
+    expect(dashboard).toContain('unreadNotifications: unreadNotifications');
+  });
+
+  it("returns actionable notification targets and makes read idempotent", () => {
+    expect(code).toContain("function notificationTarget_(type)");
+    expect(code).toContain('if (value.indexOf("settlement_") === 0) return "settlements"');
+    expect(code).toContain('if (value.indexOf("sale_") === 0 || value.indexOf("dispute_") === 0) return "sales"');
+    expect(code).toContain('targetScreen: notificationTarget_(row.type)');
+    expect(code).toContain('if (notification.readAt) return Object.assign');
   });
 
   it("enforces owner-controlled, auditable garden membership", () => {

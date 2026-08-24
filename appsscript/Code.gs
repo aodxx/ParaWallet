@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d8";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d9";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -425,12 +425,23 @@ var Services = {
   dashboard: function (user) {
     var gardens = Repositories.gardensForUser(user.id);
     var garden = gardens[0] || null;
-    if (!garden) return { role: user.role, garden: null, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, monthlySales: 0 };
+    var userNotifications = rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); });
+    var unreadNotifications = userNotifications.filter(function (row) { return !row.readAt; }).length;
+    if (!garden) return { role: user.role, garden: null, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, pendingSales: 0, pendingSettlements: 0, unreadNotifications: unreadNotifications, monthlySales: 0 };
     var wallet = Services.wallet(user, { gardenId: garden.id });
     var monthStart = new Date().toISOString().slice(0, 7) + "-01";
-    var monthlySales = filterByDate_(rows_("Sales").filter(function (row) {
-      if (id_(row.gardenId) !== id_(garden.id) || row.status !== "confirmed") return false;
+    var gardenSales = rows_("Sales").filter(function (row) {
+      if (id_(row.gardenId) !== id_(garden.id)) return false;
       return user.role !== "tapper" || id_(row.tapperId) === id_(user.id);
+    });
+    var pendingSales = gardenSales.filter(function (row) { return row.status === "pending_owner_review" || row.status === "ocr_review"; }).length;
+    var pendingSettlements = rows_("Settlements").filter(function (row) {
+      if (id_(row.gardenId) !== id_(garden.id) || row.status !== "pending_owner_confirmation") return false;
+      return user.role === "owner" ? id_(row.ownerId) === id_(user.id) : id_(row.tapperId) === id_(user.id);
+    }).length;
+    var monthlySales = filterByDate_(gardenSales.filter(function (row) {
+      if (id_(row.gardenId) !== id_(garden.id) || row.status !== "confirmed") return false;
+      return true;
     }), monthStart, "", "saleDate");
     var monthlySalesSeries = [0, 0, 0, 0, 0];
     monthlySales.forEach(function (row) {
@@ -447,7 +458,10 @@ var Services = {
         outstanding: wallet.owner.outstanding,
         currency: "THB"
       },
-      pendingReviews: wallet.tapper.pendingReviews,
+      pendingReviews: pendingSales + pendingSettlements,
+      pendingSales: pendingSales,
+      pendingSettlements: pendingSettlements,
+      unreadNotifications: unreadNotifications,
       monthlySales: round_(monthlySales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0)),
       monthlySalesSeries: monthlySalesSeries.map(round_)
     };
@@ -982,8 +996,27 @@ Services.createAdjustment = function (user, payload) {
   return findById_("Adjustments", adjustmentId);
 };
 
-Services.listNotifications = function (user) { return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); }); };
-Services.readNotification = function (user, payload) { var notification = rows_("Notifications").filter(function (row) { return id_(row.id) === id_(payload.notificationId) && id_(row.userId) === id_(user.id); })[0]; if (!notification) throw new Error("NOTIFICATION_NOT_FOUND"); updateRowById_("Notifications", notification.id, { readAt: nowIso_() }); return findById_("Notifications", notification.id); };
+function notificationTarget_(type) {
+  var value = String(type || "");
+  if (value.indexOf("settlement_") === 0) return "settlements";
+  if (value.indexOf("sale_") === 0 || value.indexOf("dispute_") === 0) return "sales";
+  if (value.indexOf("garden_member_") === 0) return "gardens";
+  if (value.indexOf("agreement_") === 0) return "agreements";
+  return "notifications";
+}
+Services.listNotifications = function (user) {
+  return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); }).map(function (row) {
+    return Object.assign({}, row, { targetScreen: notificationTarget_(row.type) });
+  });
+};
+Services.readNotification = function (user, payload) {
+  var notification = rows_("Notifications").filter(function (row) { return id_(row.id) === id_(payload.notificationId) && id_(row.userId) === id_(user.id); })[0];
+  if (!notification) throw new Error("NOTIFICATION_NOT_FOUND");
+  if (notification.readAt) return Object.assign({}, notification, { targetScreen: notificationTarget_(notification.type) });
+  var readAt = nowIso_();
+  updateRowById_("Notifications", notification.id, { readAt: readAt });
+  return Object.assign({}, notification, { readAt: readAt, targetScreen: notificationTarget_(notification.type) });
+};
 
 Services.report = function (user, payload) {
   requireGarden_(user, payload.gardenId);

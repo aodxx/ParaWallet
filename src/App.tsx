@@ -5,7 +5,7 @@ import { Banknote, Bell, Camera, CheckCircle2, CircleDollarSign, Eye, FileDown, 
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
 
-const fallback: DashboardData = { role: "owner", garden: undefined, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, monthlySales: 0 };
+const fallback: DashboardData = { role: "owner", garden: undefined, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, pendingSales: 0, pendingSettlements: 0, unreadNotifications: 0, monthlySales: 0 };
 const money = (value: number) => `฿${Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 const dateToday = () => new Date().toISOString().slice(0, 10);
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
@@ -37,6 +37,9 @@ export default function App() {
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const receiptCameraRef = useRef<HTMLInputElement>(null);
   const activeGarden = data.garden || gardens[0];
+  const pendingSales = data.pendingSales || 0;
+  const pendingSettlements = data.pendingSettlements || 0;
+  const unreadNotifications = data.unreadNotifications ?? notifications.filter((item) => !item.readAt).length;
 
   const handleSignOut = useCallback((reason = "") => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -79,7 +82,11 @@ export default function App() {
           setWallet(walletRow); setSettlements(settlementRows);
         }
       }
-      if (target === "notifications") setNotifications(await api.notifications.list());
+      if (target === "notifications") {
+        const notificationRows = await api.notifications.list();
+        setNotifications(notificationRows);
+        setData((current) => ({ ...current, unreadNotifications: notificationRows.filter((item) => !item.readAt).length }));
+      }
       setConnected(true);
     } catch (error) {
       setConnected(false);
@@ -117,38 +124,55 @@ export default function App() {
 
   const openScreen = (next: Screen) => { setScreen(next); void refresh(next); };
 
+  const openNotification = async (item: Notification) => {
+    const wasUnread = !item.readAt;
+    const target = item.targetScreen || notificationTargetScreen(item.type);
+    if (wasUnread) {
+      const readAt = new Date().toISOString();
+      setNotifications((items) => items.map((row) => row.id === item.id ? { ...row, readAt } : row));
+      setData((current) => ({ ...current, unreadNotifications: Math.max(0, (current.unreadNotifications || 0) - 1) }));
+    }
+    if (target !== "notifications") setScreen(target);
+    try {
+      if (wasUnread) await api.notifications.read(item.id);
+      if (target !== "notifications") await refresh(target);
+    } catch (caught) {
+      setMessage(userMessageForApiError(caught));
+    }
+  };
+
   if (!authToken) return <AuthScreen clientId={googleClientId} message={message} onCredential={handleCredential} onError={setMessage} />;
 
   return <div className="app-shell">
     <header className="topbar">
       <button className="icon-button mobile-only" aria-label="เปิดเมนู"><Menu size={21} /></button>
       <div className="brand"><span className="brand-mark"><Leaf size={22} /></span><span><b>ParaWallet</b><small>DUAL WALLET SYSTEM</small></span></div>
-      <div className="top-actions"><button className="secondary signout-button" onClick={() => handleSignOut()}>ออกจากระบบ</button><span className="role-badge">{role === "owner" ? "Owner" : "Tapper"}</span><button className="icon-button" onClick={() => openScreen("notifications")} aria-label="การแจ้งเตือน"><Bell size={20} /></button></div>
+      <div className="top-actions"><button className="secondary signout-button" onClick={() => handleSignOut()}>ออกจากระบบ</button><span className="role-badge">{role === "owner" ? "Owner" : "Tapper"}</span><button className="icon-button notification-button" onClick={() => openScreen("notifications")} aria-label={`การแจ้งเตือนที่ยังไม่อ่าน ${unreadNotifications} รายการ`}><Bell size={20} />{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button></div>
     </header>
     {message && <div className={`sync-banner ${connected ? "connected" : "disconnected"}`} role="status"><strong>{connected ? "เชื่อมต่อแล้ว" : "ยังไม่เชื่อมต่อ"}</strong><span>{message}</span><button onClick={() => void refresh()} disabled={loading}>{loading ? "กำลังตรวจสอบ..." : "ลองใหม่"}</button></div>}
     <div className="mobile-context"><div><small>กำลังดูข้อมูล</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong></div><button onClick={() => openScreen("gardens")} aria-label="เปลี่ยนสวน"><Sprout size={18} /></button></div>
     <div className="layout">
       <aside className="sidebar">
         <div className="garden-selector"><small>กำลังดูข้อมูล</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong><span>{activeGarden ? `${activeGarden.areaRai || 0} ไร่ · ${(activeGarden.treeCount || 0).toLocaleString()} ต้น` : "เชื่อมต่อ Apps Script เพื่อเริ่มต้น"}</span></div>
-        <nav>{nav.map(([key, label, icon]) => <button key={key} className={screen === key ? "active" : ""} onClick={() => openScreen(key)}>{icon}{label}{key === "sales" && data.pendingReviews > 0 && <em>{data.pendingReviews}</em>}</button>)}</nav>
+        <nav>{nav.map(([key, label, icon]) => { const badge = key === "sales" ? pendingSales : key === "settlements" ? pendingSettlements : key === "notifications" ? unreadNotifications : 0; return <button key={key} className={screen === key ? "active" : ""} onClick={() => openScreen(key)}>{icon}{label}{badge > 0 && <em>{badge}</em>}</button>; })}</nav>
         <button className="settings"><Settings2 size={18} />ตั้งค่า</button>
       </aside>
       <main className="content">
         <div className="page-heading"><div><p>{new Date().toLocaleDateString("th-TH", { dateStyle: "full" })}</p><h1>{screenTitle(screen)}</h1><span>{role === "owner" ? "ภาพรวมสิทธิในเงิน รายการตรวจสอบ และยอดคงค้าง" : "รายได้ของคุณ เงินเจ้าของที่ถืออยู่ และรายการส่งเงิน"}</span></div><button className="period">เดือนนี้⌄</button></div>
         {message && <div className="notice">{message}</div>}
         {loading && <div className="notice">กำลังโหลดข้อมูลจาก Google Apps Script...</div>}
-        {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => receiptCameraRef.current?.click()} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openScreen("sales")} onReports={() => openScreen("reports")} />}
+        {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => receiptCameraRef.current?.click()} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openScreen("sales")} onReviewSettlements={() => openScreen("settlements")} onReports={() => openScreen("reports")} />}
         {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onReview={setReviewSale} onRefresh={() => refresh("sales")} />}
         {screen === "gardens" && <GardensScreen garden={activeGarden} gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} members={members} role={role} onCreate={() => setShowGardenForm(true)} onAddMember={() => setShowMemberForm(true)} onDeactivate={async (member) => { if (!activeGarden || !window.confirm(`ถอด ${member.name || member.email || "Tapper"} ออกจากสวนนี้หรือไม่\n\nระบบจะอนุญาตเมื่อไม่มีข้อตกลง รายการค้าง หรือยอดเงินคงค้างเท่านั้น`)) return; try { await api.members.deactivate({ gardenId: activeGarden.id, memberId: member.id }); await refresh("gardens"); setMessage("ปิดสิทธิ์ Tapper ในสวนแล้ว โดยยังเก็บประวัติเดิมไว้ครบถ้วน"); } catch (caught) { setMessage(userMessageForApiError(caught)); } }} />}
         {screen === "agreements" && (!loading || agreements.length > 0) && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
         {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
         {screen === "reports" && <ReportsScreen garden={activeGarden} />}
-        {screen === "notifications" && (!loading || notifications.length > 0) && <NotificationsScreen notifications={notifications} onRead={async (id) => { await api.notifications.read(id); setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item)); }} />}
+        {screen === "notifications" && (!loading || notifications.length > 0) && <NotificationsScreen notifications={notifications} onOpen={openNotification} />}
       </main>
     </div>
     <DeveloperCredit />
     <input ref={receiptCameraRef} className="camera-input" type="file" accept="image/*" capture="environment" aria-label="เปิดกล้องสแกนใบเสร็จ" onChange={(event) => { const selected = event.target.files?.[0] || null; event.target.value = ""; if (selected) { setReceiptInitialFile(selected); setShowReceiptForm(true); } }} />
-    <nav className="mobile-bottom-nav" aria-label="เมนูหลักบนมือถือ"><button className={screen === "overview" ? "active" : ""} onClick={() => openScreen("overview")}><Leaf size={19} /><span>ภาพรวม</span></button><button className={screen === "sales" ? "active" : ""} onClick={() => openScreen("sales")}><FileText size={19} /><span>รายการ</span>{data.pendingReviews > 0 && <em>{data.pendingReviews}</em>}</button><button className={screen === "settlements" ? "active" : ""} onClick={() => openScreen("settlements")}><WalletCards size={19} /><span>กระเป๋า</span></button><button className={screen === "notifications" ? "active" : ""} onClick={() => openScreen("notifications")}><Bell size={19} /><span>แจ้งเตือน</span></button><button className={screen === "gardens" || screen === "agreements" || screen === "reports" ? "active" : ""} onClick={() => openScreen("gardens")}><Menu size={19} /><span>เพิ่มเติม</span></button></nav>
+    <nav className="mobile-bottom-nav" aria-label="เมนูหลักบนมือถือ"><button className={screen === "overview" ? "active" : ""} onClick={() => openScreen("overview")}><Leaf size={19} /><span>ภาพรวม</span></button><button className={screen === "sales" ? "active" : ""} onClick={() => openScreen("sales")}><FileText size={19} /><span>รายการ</span>{pendingSales > 0 && <em>{pendingSales}</em>}</button><button className={screen === "settlements" ? "active" : ""} onClick={() => openScreen("settlements")}><WalletCards size={19} /><span>กระเป๋า</span>{pendingSettlements > 0 && <em>{pendingSettlements}</em>}</button><button className={screen === "notifications" ? "active" : ""} onClick={() => openScreen("notifications")}><Bell size={19} /><span>แจ้งเตือน</span>{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button><button className={screen === "gardens" || screen === "agreements" || screen === "reports" ? "active" : ""} onClick={() => openScreen("gardens")}><Menu size={19} /><span>เพิ่มเติม</span></button></nav>
     {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); void refresh("gardens"); }} />}
     {showMemberForm && role === "owner" && <MemberForm garden={activeGarden} onClose={() => setShowMemberForm(false)} onSaved={() => { setShowMemberForm(false); void refresh("gardens"); }} />}
     {showSaleForm && role === "tapper" && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); void refresh("sales"); }} />}
@@ -157,6 +181,14 @@ export default function App() {
     {showAgreementForm && role === "owner" && <AgreementForm garden={activeGarden} members={members} onClose={() => setShowAgreementForm(false)} onSaved={() => { setShowAgreementForm(false); void refresh("agreements"); }} />}
     {showSettlementForm && role === "tapper" && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={() => { setShowSettlementForm(false); void refresh("settlements"); }} />}
   </div>;
+}
+
+function notificationTargetScreen(type: string): Screen {
+  if (type.startsWith("settlement_")) return "settlements";
+  if (type.startsWith("sale_") || type.startsWith("dispute_")) return "sales";
+  if (type.startsWith("garden_member_")) return "gardens";
+  if (type.startsWith("agreement_")) return "agreements";
+  return "notifications";
 }
 
 function screenTitle(screen: Screen) { return ({ overview: "ภาพรวมการแบ่งรายได้", sales: "รายการขายยาง", gardens: "สวนและแปลง", agreements: "ข้อตกลงแบ่งรายได้", settlements: "การส่งเงิน", reports: "รายงาน", notifications: "การแจ้งเตือน" } as Record<Screen, string>)[screen]; }
@@ -169,7 +201,7 @@ function AuthScreen({ clientId, message, onCredential, onError }: { clientId: st
   return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE ACCESS</p><h1>เข้าสู่ระบบ ParaWallet</h1><p>ใช้บัญชี Google เพื่อยืนยันตัวตน แล้วระบบจะโหลดข้อมูลเฉพาะสวนและสิทธิ์ของคุณจาก Google Sheets</p><GoogleSignIn clientId={clientId} onCredential={onCredential} onError={onError} />{message && <div className="notice">{message}</div>}<small>ระบบจะไม่เรียกใช้ Session.getEffectiveUser และจะไม่เก็บรหัสผ่าน Google</small></section></main>;
 }
 
-function Overview({ data, wallet, role, connected, onSale, onReceipt, onSettlement, onReviewSales, onReports }: { data: DashboardData; wallet: WalletData | null; role: Role; connected: boolean; onSale: () => void; onReceipt: () => void; onSettlement: () => void; onReviewSales: () => void; onReports: () => void }) {
+function Overview({ data, wallet, role, connected, onSale, onReceipt, onSettlement, onReviewSales, onReviewSettlements, onReports }: { data: DashboardData; wallet: WalletData | null; role: Role; connected: boolean; onSale: () => void; onReceipt: () => void; onSettlement: () => void; onReviewSales: () => void; onReviewSettlements: () => void; onReports: () => void }) {
   const owner = wallet?.owner.totalEntitlement ?? data.wallet.owner;
   const tapper = wallet?.tapper.totalIncome ?? data.wallet.tapper;
   const outstanding = wallet?.owner.outstanding ?? data.wallet.outstanding;
@@ -177,7 +209,7 @@ function Overview({ data, wallet, role, connected, onSale, onReceipt, onSettleme
   const salesSeriesMax = Math.max(1, ...salesSeries);
   const showMoney = (value: number) => connected ? money(value) : "—";
   if (role === "tapper") return <TapperOverview data={data} wallet={wallet} connected={connected} salesSeries={salesSeries} salesSeriesMax={salesSeriesMax} onReceipt={onReceipt} onSale={onSale} onSettlement={onSettlement} onReports={onReports} />;
-  return <><section className="metrics"><Metric label="สิทธิของเจ้าของสวน" value={showMoney(owner)} icon={<WalletCards />} /><Metric label="เงินเจ้าของที่ยังอยู่กับคนกรีด" value={showMoney(outstanding)} icon={<CircleDollarSign />} /><Metric label="รายการรอตรวจสอบ" value={connected ? `${data.pendingReviews} รายการ` : "—"} icon={<FileText />} /><Metric label="ขายยางสะสม" value={showMoney(data.monthlySales)} icon={<Sprout />} /></section><section className="hero-grid"><div className="sales-card"><div><small>ยอดขายรวมเดือนนี้</small><strong>{showMoney(data.monthlySales)}</strong><span className="growth">{connected ? "ข้อมูลจาก Apps Script" : "รอเชื่อมต่อฐานข้อมูล"}</span></div><div className="bars">{connected && salesSeries.some((value) => value > 0) ? salesSeries.map((value, i) => <div key={i} style={{ height: `${Math.max(8, value / salesSeriesMax * 100)}%` }}><span>ส.{i + 1}</span></div>) : <p className="empty-chart">{connected ? "ยังไม่มียอดขายที่ยืนยันในเดือนนี้" : "กราฟจะแสดงเมื่อโหลดข้อมูลจริงสำเร็จ"}</p>}</div></div><div className="wallet-card"><div className="card-title"><span><WalletCards size={20} />กระเป๋าคู่</span><small>สิทธิในเงิน ไม่ใช่เงินฝาก</small></div><WalletLine label="เจ้าของสวน" amount={showMoney(owner)} percent={60} color="green" /><WalletLine label="คนกรีดยาง" amount={showMoney(tapper)} percent={40} color="gold" /><p className="balance">เจ้าของยังรอรับ {showMoney(outstanding)}</p></div></section><section className="quick-actions"><button onClick={onReviewSales}><FileText size={18} />ตรวจสอบรายการขาย</button><button onClick={onReports}>รายงานและส่งออก</button></section></>;
+  return <><section className="metrics"><Metric label="สิทธิของเจ้าของสวน" value={showMoney(owner)} icon={<WalletCards />} /><Metric label="เงินเจ้าของที่ยังอยู่กับคนกรีด" value={showMoney(outstanding)} icon={<CircleDollarSign />} /><Metric label="งานรอตรวจสอบ" value={connected ? `${data.pendingReviews} รายการ` : "—"} icon={<FileText />} /><Metric label="ขายยางสะสม" value={showMoney(data.monthlySales)} icon={<Sprout />} /></section><section className="pending-work" aria-label="งานที่เจ้าของต้องตรวจสอบ"><div><strong>งานที่ต้องทำ</strong><span>รายการขายและการส่งเงินที่รอ Owner ดำเนินการ</span></div><div className="pending-work-actions"><button onClick={onReviewSales}><FileText size={18} /><span>รายการขายรอตรวจ</span><strong>{data.pendingSales || 0}</strong></button><button onClick={onReviewSettlements}><WalletCards size={18} /><span>การส่งเงินรอยืนยัน</span><strong>{data.pendingSettlements || 0}</strong></button></div></section><section className="hero-grid"><div className="sales-card"><div><small>ยอดขายรวมเดือนนี้</small><strong>{showMoney(data.monthlySales)}</strong><span className="growth">{connected ? "ข้อมูลจาก Apps Script" : "รอเชื่อมต่อฐานข้อมูล"}</span></div><div className="bars">{connected && salesSeries.some((value) => value > 0) ? salesSeries.map((value, i) => <div key={i} style={{ height: `${Math.max(8, value / salesSeriesMax * 100)}%` }}><span>ส.{i + 1}</span></div>) : <p className="empty-chart">{connected ? "ยังไม่มียอดขายที่ยืนยันในเดือนนี้" : "กราฟจะแสดงเมื่อโหลดข้อมูลจริงสำเร็จ"}</p>}</div></div><div className="wallet-card"><div className="card-title"><span><WalletCards size={20} />กระเป๋าคู่</span><small>สิทธิในเงิน ไม่ใช่เงินฝาก</small></div><WalletLine label="เจ้าของสวน" amount={showMoney(owner)} percent={60} color="green" /><WalletLine label="คนกรีดยาง" amount={showMoney(tapper)} percent={40} color="gold" /><p className="balance">เจ้าของยังรอรับ {showMoney(outstanding)}</p></div></section><section className="quick-actions"><button onClick={onReports}>รายงานและส่งออก</button></section></>;
 }
 
 function TapperOverview({ data, wallet, connected, salesSeries, salesSeriesMax, onReceipt, onSale, onSettlement, onReports }: { data: DashboardData; wallet: WalletData | null; connected: boolean; salesSeries: number[]; salesSeriesMax: number; onReceipt: () => void; onSale: () => void; onSettlement: () => void; onReports: () => void }) {
@@ -202,7 +234,7 @@ function TapperOverview({ data, wallet, connected, salesSeries, salesSeriesMax, 
         <button onClick={onReports}><FileDown size={21} /><span>รายงาน/ส่งออก</span></button>
       </div>
     </section>
-    <section className="tapper-summary-grid"><Metric label="รายการรอตรวจสอบ" value={connected ? `${data.pendingReviews} รายการ` : "—"} icon={<FileText />} /><Metric label="ยอดขายเดือนนี้" value={showMoney(data.monthlySales)} icon={<Sprout />} /></section>
+    <section className="tapper-summary-grid"><Metric label="รายการกำลังรอ Owner ยืนยัน" value={connected ? `${data.pendingReviews} รายการ` : "—"} icon={<FileText />} /><Metric label="ยอดขายเดือนนี้" value={showMoney(data.monthlySales)} icon={<Sprout />} /></section>
     <section className="tapper-sales-card sales-card"><div><small>ยอดขายที่ยืนยันแล้วรายสัปดาห์</small><strong>{showMoney(data.monthlySales)}</strong><span className="growth">{connected ? "ข้อมูลจาก Apps Script" : "รอเชื่อมต่อฐานข้อมูล"}</span></div><div className="bars">{connected && salesSeries.some((value) => value > 0) ? salesSeries.map((value, i) => <div key={i} style={{ height: `${Math.max(8, value / salesSeriesMax * 100)}%` }}><span>ส.{i + 1}</span></div>) : <p className="empty-chart">{connected ? "ยังไม่มียอดขายที่ยืนยันในเดือนนี้" : "กราฟจะแสดงเมื่อโหลดข้อมูลจริงสำเร็จ"}</p>}</div></section>
   </div>;
 }
@@ -292,7 +324,10 @@ function SettlementReviewModal({ settlement, role, onClose, onChanged }: { settl
 
 function ReportsScreen({ garden }: { garden?: Garden }) { const [from, setFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)); const [to, setTo] = useState(dateToday()); const [report, setReport] = useState<{ summary: Record<string, number | string>; rows: Sale[] } | null>(null); const [busy, setBusy] = useState(false); const load = async () => { if (!garden) return; setBusy(true); try { setReport(await api.reports.summary({ gardenId: garden.id, from, to })); } catch { setReport(null); } finally { setBusy(false); } }; const exportCsv = () => { if (!report) return; const lines = [["saleDate","buyerName","grossSale","ownerShare","tapperShare","status"], ...report.rows.map((row) => [row.saleDate, row.buyerName || "", row.grossSale || 0, row.ownerShare || 0, row.tapperShare || 0, row.status])]; const blob = new Blob([lines.map((line) => line.join(",")).join("\n")], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "parawallet-report.csv"; anchor.click(); URL.revokeObjectURL(url); }; return <section className="panel"><div className="panel-head"><div><h2>รายงานตามช่วงเวลา</h2><p>คำนวณจาก Sales และ Settlements บน Apps Script</p></div><button className="secondary" disabled={!report} onClick={exportCsv}>Export CSV</button></div><div className="filters"><label>ตั้งแต่<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>ถึง<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label><button className="primary" onClick={load}>{busy ? "กำลังโหลด..." : "ดูรายงาน"}</button></div>{report ? <div className="report-grid">{[["ยอดขายรวม", money(Number(report.summary.grossSales))], ["ส่วนเจ้าของ", money(Number(report.summary.ownerShare))], ["ส่วนคนกรีด", money(Number(report.summary.tapperShare))], ["ยอดคงค้าง", money(Number(report.summary.outstanding))]].map(([label, value]) => <div className="metric" key={label}><small>{label}</small><strong>{value}</strong></div>)}</div> : <Empty text="เลือกช่วงวันที่เพื่อโหลดรายงาน" />}</section>; }
 
-function NotificationsScreen({ notifications, onRead }: { notifications: Notification[]; onRead: (id: string) => void }) { return <section className="panel"><div className="panel-head"><div><h2>การแจ้งเตือน</h2><p>รายการใหม่ การตรวจสอบ การโต้แย้ง และการรับเงิน</p></div></div>{notifications.length === 0 ? <Empty text="ยังไม่มีการแจ้งเตือน" /> : <div className="data-list">{notifications.map((item) => <article className={`data-row ${item.readAt ? "read" : "unread"}`} key={item.id} onClick={() => onRead(item.id)}><div><strong>{item.title}</strong><span>{item.body}</span></div><span>{new Date(item.createdAt).toLocaleDateString("th-TH")}</span></article>)}</div>}</section>; }
+function NotificationsScreen({ notifications, onOpen }: { notifications: Notification[]; onOpen: (item: Notification) => void }) {
+  const unread = notifications.filter((item) => !item.readAt).length;
+  return <section className="panel"><div className="panel-head"><div><h2>การแจ้งเตือน</h2><p>{unread > 0 ? `ยังไม่อ่าน ${unread} รายการ · แตะเพื่อเปิดงานที่เกี่ยวข้อง` : "อ่านครบแล้ว · รายการใหม่จะปรากฏที่นี่"}</p></div></div>{notifications.length === 0 ? <Empty text="ยังไม่มีการแจ้งเตือน" /> : <div className="data-list">{notifications.map((item) => <button type="button" className={`data-row notification-row ${item.readAt ? "read" : "unread"}`} key={item.id} onClick={() => onOpen(item)}><span className="notification-state" aria-hidden="true" /><span className="notification-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}</small></span><span className="notification-action">เปิดรายการ</span></button>)}</div>}</section>;
+}
 
 function GardenForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ name: "", province: "", district: "", areaRai: "", treeCount: "" }); const [busy, setBusy] = useState(false); const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); try { await api.gardens.create({ name: form.name, province: form.province, district: form.district, areaRai: Number(form.areaRai), treeCount: Number(form.treeCount) }); onSaved(); } finally { setBusy(false); } }; return <Modal title="เพิ่มสวนใหม่" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>ชื่อสวน<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>จังหวัด<input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} /></label><label>อำเภอ<input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /></label><label>พื้นที่ (ไร่)<input type="number" min="0" value={form.areaRai} onChange={(e) => setForm({ ...form, areaRai: e.target.value })} /></label><label>จำนวนต้นยาง<input type="number" min="0" value={form.treeCount} onChange={(e) => setForm({ ...form, treeCount: e.target.value })} /></label><button className="primary" disabled={busy}>{busy ? "กำลังบันทึก..." : "บันทึกสวน"}</button></form></Modal>; }
 

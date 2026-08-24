@@ -26,9 +26,24 @@ describe("role-aware UI contract", () => {
   });
 
   it("replaces Owner creation actions with review and report navigation", () => {
-    expect(app).toContain("ตรวจสอบรายการขาย");
+    expect(app).toContain("รายการขายรอตรวจ");
+    expect(app).toContain("การส่งเงินรอยืนยัน");
     expect(app).toContain("onReports");
     expect(app).toContain('role === "tapper" && <button className="primary" onClick={onSale}');
+  });
+
+  it("shows separate pending and unread badges and opens notification targets", () => {
+    expect(app).toContain("const pendingSales = data.pendingSales || 0");
+    expect(app).toContain("const pendingSettlements = data.pendingSettlements || 0");
+    expect(app).toContain("const unreadNotifications = data.unreadNotifications");
+    expect(app).toContain('pendingSettlements > 0 && <em>{pendingSettlements}</em>');
+    expect(app).toContain('unreadNotifications > 0 && <em>{unreadNotifications}</em>');
+    expect(app).toContain("const openNotification = async (item: Notification)");
+    expect(app).toContain("notificationRows.filter((item) => !item.readAt).length");
+    expect(app).toContain("notificationTargetScreen(item.type)");
+    expect(app).toContain("await api.notifications.read(item.id)");
+    expect(app).toContain('await refresh(target)');
+    expect(app).toContain('className={`data-row notification-row');
   });
 
   it("does not refetch the heavy dashboard before every tab", () => {

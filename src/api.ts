@@ -65,9 +65,9 @@ export type Sale = { id: string; gardenId: string; agreementId: string; tapperId
 export type SaleReceiptEvidence = { saleId: string; receiptId?: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
 export type SettlementEvidence = { settlementId: string; fileId: string; name: string; mimeType: string; dataUrl: string };
-export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string };
+export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string; targetScreen?: "sales" | "settlements" | "gardens" | "agreements" | "notifications" };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
-export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; pendingReviews: number; monthlySales: number; monthlySalesSeries?: number[] };
+export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; pendingReviews: number; pendingSales?: number; pendingSettlements?: number; unreadNotifications?: number; monthlySales: number; monthlySalesSeries?: number[] };
 export type WalletData = { gardenId: string; role: Role; owner: { totalEntitlement: number; totalReceived: number; outstanding: number; pending: number; disputed: number }; tapper: { totalIncome: number; ownerMoneyHeld: number; ownerMoneyTransferred: number; pendingReviews: number } };
 export type ReportData = { summary: { from: string; to: string; salesCount: number; confirmedSales: number; grossSales: number; ownerShare: number; tapperShare: number; deductions: number; settlements: number; outstanding: number }; rows: Sale[] };
 
