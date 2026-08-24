@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d7";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d8";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -107,6 +107,18 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId)");
     expect(code).toContain('id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"');
     expect(code).toContain("var tapperSettlement = tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlement");
+  });
+
+  it("keeps settlement confirmation reads bounded as sale history grows", () => {
+    expect(code).toContain("Repositories.resetRequestContext_();");
+    expect(code).toContain("workbook_: function ()");
+    expect(code).toContain('var existingAllocations = rows_("SettlementAllocations");');
+    expect(code).toContain('var confirmedAdjustments = rows_("Adjustments")');
+    const service = code.match(/Services\.confirmSettlement = function[\s\S]*?\n};/)?.[0] || "";
+    const saleLoop = service.match(/rows_\("Sales"\)[\s\S]*?if \(remaining !== 0\)/)?.[0] || "";
+    expect(saleLoop).not.toContain('rows_("SettlementAllocations")');
+    expect(saleLoop).not.toContain("ownerAdjustmentForSale_");
+    expect(service).toContain('return Object.assign({}, settlement, { status: "confirmed" });');
   });
 
   it("binds scanned receipt evidence to the authenticated Tapper and Sale", () => {

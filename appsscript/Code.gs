@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d7";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d8";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -40,6 +40,9 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  // Apps Script may reuse the same V8 isolate for multiple requests. Keep the
+  // workbook cache request-scoped so each call sees the latest committed data.
+  Repositories.resetRequestContext_();
   var request;
   try {
     request = parseRequest_(e);
@@ -268,7 +271,13 @@ var HEADERS = {
 };
 
 var Repositories = {
-  sheet_: function (name) { return SpreadsheetApp.openById(Config.spreadsheetId()).getSheetByName(name); },
+  book_: null,
+  resetRequestContext_: function () { this.book_ = null; },
+  workbook_: function () {
+    if (!this.book_) this.book_ = SpreadsheetApp.openById(Config.spreadsheetId());
+    return this.book_;
+  },
+  sheet_: function (name) { return this.workbook_().getSheetByName(name); },
   bootstrap: function () {
     var book = SpreadsheetApp.openById(Config.spreadsheetId());
     var created = [];
@@ -885,10 +894,18 @@ Services.confirmSettlement = function (user, payload) {
     if (amount > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
     var remaining = amount;
     var allocations = [];
+    var existingAllocations = rows_("SettlementAllocations");
+    var confirmedAdjustments = rows_("Adjustments").filter(function (row) { return row.status === "confirmed"; });
+    var adjustmentBySaleId = confirmedAdjustments.reduce(function (map, row) {
+      var saleId = id_(row.saleId);
+      var delta = row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0;
+      map[saleId] = round_(numeric_(map[saleId]) + delta);
+      return map;
+    }, {});
     rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(settlement.gardenId) && id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"; }).sort(function (a, b) { return new Date(a.saleDate || a.createdAt).getTime() - new Date(b.saleDate || b.createdAt).getTime(); }).forEach(function (sale) {
       if (remaining <= 0) return;
-      var already = rows_("SettlementAllocations").filter(function (row) { return id_(row.saleId) === id_(sale.id) && row.settlementId !== settlement.id && row.status !== "rejected" && row.status !== "cancelled"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0);
-      var allocated = Math.min(remaining, Math.max(0, numeric_(sale.ownerShare) + ownerAdjustmentForSale_(sale.id) - already));
+      var already = existingAllocations.filter(function (row) { return id_(row.saleId) === id_(sale.id) && row.settlementId !== settlement.id && row.status !== "rejected" && row.status !== "cancelled"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0);
+      var allocated = Math.min(remaining, Math.max(0, numeric_(sale.ownerShare) + numeric_(adjustmentBySaleId[id_(sale.id)]) - already));
       if (allocated > 0) { allocations.push({ saleId: sale.id, amount: round_(allocated) }); remaining = round_(remaining - allocated); }
     });
     if (remaining !== 0) throw new Error("SETTLEMENT_ALLOCATION_MISMATCH");
@@ -897,7 +914,7 @@ Services.confirmSettlement = function (user, payload) {
     updateRowById_("Settlements", settlement.id, { status: "confirmed" });
     writeAudit_(user, "settlement_confirmed", "settlement", settlement.id, settlement, { status: "confirmed", allocations: allocations }, payload.requestId);
     notifyUser_(settlement.tapperId, "settlement_confirmed", "เจ้าของยืนยันการรับเงิน", "ยอด " + settlement.amount);
-  return findById_("Settlements", settlement.id);
+  return Object.assign({}, settlement, { status: "confirmed" });
 };
 
 Services.rejectSettlement = function (user, payload) {
