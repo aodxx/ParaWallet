@@ -56,4 +56,18 @@ Owner and Tapper mobile recordings `1000020250.mp4` and `1000020253.mp4` were re
 - Tapper owner-money-held changed to 1,509 baht and owner-money-transferred changed from 2,000 to 2,001 baht.
 - Tapper and Owner both displayed the same confirmed 1 baht and 2,000 baht Settlement history.
 
-The production bank-transfer path is accepted. The cash handover path remains a separate production acceptance check.
+The production bank-transfer path is accepted.
+
+## Production acceptance evidence — cash handover
+
+Tapper and Owner mobile recordings `1000020254.mp4` and `1000020255.mp4` were reviewed on 24 August 2026.
+
+- Tapper created a 1 baht cash Settlement without a transfer slip and supplied the handover location plus a test note.
+- Owner opened **ตรวจและยืนยัน** and saw the amount, cash method, handover location, note, and the physical-receipt acknowledgement.
+- The confirmation action was available only after Owner checked **ฉันตรวจนับและได้รับเงินสดจริงแล้ว**.
+- The Apps Script confirmation took roughly one minute on the recorded mobile connection; the interface remained in **กำลังยืนยัน...** until the request completed and did not permit a duplicate action.
+- The Settlement changed from **รอเจ้าของยืนยัน** to **ยืนยันแล้ว**.
+- Owner outstanding changed from 1,509 to 1,508 baht.
+- The previously confirmed 1 baht bank transfer and 2,000 baht cash handover remained unchanged.
+
+Both production settlement methods are accepted. Phase D7 is complete.
