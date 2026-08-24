@@ -81,4 +81,15 @@ describe("Apps Script API contract", () => {
   it("explains why a Tapper with open money cannot be removed", () => {
     expect(userMessageForApiError(new ApiError("MEMBER_HAS_OUTSTANDING_BALANCE", "internal"))).toContain("เงินของ Owner คงค้าง");
   });
+
+  it("requests Sale receipt evidence without exposing a raw Drive URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ status: "ok", requestId: "req-receipt", data: { saleId: "sale-1", dataUrl: "data:image/jpeg;base64,AA==" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await api.sales.receipt("sale-1");
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toMatchObject({ action: "sales.receipt", payload: { saleId: "sale-1" } });
+  });
+
+  it("shows a useful message for missing receipt evidence", () => {
+    expect(userMessageForApiError(new ApiError("SALE_RECEIPT_NOT_FOUND", "internal"))).toBe("ไม่พบไฟล์ใบเสร็จของรายการนี้");
+  });
 });

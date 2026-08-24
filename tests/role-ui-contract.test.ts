@@ -51,4 +51,21 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ดูสลิปที่แนบ");
   });
+
+  it("requires Owner to review receipt evidence and calculations before confirmation", () => {
+    expect(app).toContain("SaleReviewModal");
+    expect(app).toContain("ตรวจหลักฐานและตัวเลขแล้ว");
+    expect(app).toContain("api.sales.receipt");
+    expect(app).toContain("หลักฐานใบเสร็จ");
+    expect(app).toContain("ฐานแบ่งเงิน");
+    expect(app).toContain("ยืนยันรายการขาย");
+    expect(app).not.toContain("await api.sales.confirm(sale.id); onRefresh();");
+  });
+
+  it("links the scanned Receipt record and garden scope into Sale creation", () => {
+    expect(app).toContain("gardenId: garden.id, data, mimeType: selected.type");
+    expect(app).toContain("setReceiptId");
+    expect(app).toContain("agreementId: agreement.id, receiptId");
+    expect(app).toContain("!receiptId || !receiptFileId");
+  });
 });

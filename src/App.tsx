@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, Agreement, ApiError, DashboardData, Garden, GardenMember, Notification, Role, Sale, Settlement, WalletData, onAuthFailure, setAuthToken, userMessageForApiError } from "./api";
+import { api, Agreement, ApiError, DashboardData, Garden, GardenMember, Notification, Role, Sale, SaleReceiptEvidence, Settlement, WalletData, onAuthFailure, setAuthToken, userMessageForApiError } from "./api";
 import GoogleSignIn from "./GoogleSignIn";
-import { Banknote, Bell, Camera, CircleDollarSign, FileDown, FileText, Leaf, Menu, Plus, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
+import { Banknote, Bell, Camera, CheckCircle2, CircleDollarSign, Eye, FileDown, FileText, Image, Leaf, Menu, Plus, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
 
@@ -30,6 +30,7 @@ export default function App() {
   const [showGardenForm, setShowGardenForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [showSaleForm, setShowSaleForm] = useState(false);
+  const [reviewSale, setReviewSale] = useState<Sale | null>(null);
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [receiptInitialFile, setReceiptInitialFile] = useState<File | null>(null);
   const [showAgreementForm, setShowAgreementForm] = useState(false);
@@ -137,7 +138,7 @@ export default function App() {
         {message && <div className="notice">{message}</div>}
         {loading && <div className="notice">กำลังโหลดข้อมูลจาก Google Apps Script...</div>}
         {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => receiptCameraRef.current?.click()} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openScreen("sales")} onReports={() => openScreen("reports")} />}
-        {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onRefresh={() => refresh("sales")} />}
+        {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onReview={setReviewSale} onRefresh={() => refresh("sales")} />}
         {screen === "gardens" && <GardensScreen garden={activeGarden} gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} members={members} role={role} onCreate={() => setShowGardenForm(true)} onAddMember={() => setShowMemberForm(true)} onDeactivate={async (member) => { if (!activeGarden || !window.confirm(`ถอด ${member.name || member.email || "Tapper"} ออกจากสวนนี้หรือไม่\n\nระบบจะอนุญาตเมื่อไม่มีข้อตกลง รายการค้าง หรือยอดเงินคงค้างเท่านั้น`)) return; try { await api.members.deactivate({ gardenId: activeGarden.id, memberId: member.id }); await refresh("gardens"); setMessage("ปิดสิทธิ์ Tapper ในสวนแล้ว โดยยังเก็บประวัติเดิมไว้ครบถ้วน"); } catch (caught) { setMessage(userMessageForApiError(caught)); } }} />}
         {screen === "agreements" && (!loading || agreements.length > 0) && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
         {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
@@ -151,6 +152,7 @@ export default function App() {
     {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); void refresh("gardens"); }} />}
     {showMemberForm && role === "owner" && <MemberForm garden={activeGarden} onClose={() => setShowMemberForm(false)} onSaved={() => { setShowMemberForm(false); void refresh("gardens"); }} />}
     {showSaleForm && role === "tapper" && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); void refresh("sales"); }} />}
+    {reviewSale && <SaleReviewModal sale={reviewSale} role={role} onClose={() => setReviewSale(null)} onChanged={() => { setReviewSale(null); void refresh("sales"); }} />}
     {showReceiptForm && role === "tapper" && <ReceiptForm garden={activeGarden} agreement={agreements[0]} initialFile={receiptInitialFile} onClose={() => { setShowReceiptForm(false); setReceiptInitialFile(null); }} onSaved={() => { setShowReceiptForm(false); setReceiptInitialFile(null); void refresh("sales"); }} />}
     {showAgreementForm && role === "owner" && <AgreementForm garden={activeGarden} members={members} onClose={() => setShowAgreementForm(false)} onSaved={() => { setShowAgreementForm(false); void refresh("agreements"); }} />}
     {showSettlementForm && role === "tapper" && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={() => { setShowSettlementForm(false); void refresh("settlements"); }} />}
@@ -205,7 +207,42 @@ function TapperOverview({ data, wallet, connected, salesSeries, salesSeriesMax, 
   </div>;
 }
 
-function SalesScreen({ sales, role, onSale, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onRefresh: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>รายการขายล่าสุด</h2><p>รายการที่อ้างอิงกลับไปยังบิลและ Agreement snapshot</p></div><div className="panel-actions"><button className="secondary" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button>}</div></div>{sales.length === 0 ? <Empty text="ยังไม่มีรายการขายจากสวนที่เลือก" /> : <div className="data-list">{sales.map((sale) => <article className="data-row" key={sale.id}><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{sale.saleDate} · {sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span></div><div><strong>{money(sale.grossSale || 0)}</strong><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div>{role === "owner" && sale.status === "pending_owner_review" && <div className="panel-actions"><button className="link-button" onClick={async () => { await api.sales.confirm(sale.id); onRefresh(); }}>ยืนยัน</button><button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลที่คัดค้านรายการ"); if (reason) { await api.sales.dispute({ saleId: sale.id, reason }); onRefresh(); } }}>คัดค้าน</button></div>}{(role === "owner" || role === "tapper") && sale.status === "confirmed" && <div className="panel-actions"><button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลที่คัดค้านรายการ"); if (reason) { await api.sales.dispute({ saleId: sale.id, reason }); onRefresh(); } }}>คัดค้าน</button>{role === "owner" && <button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลการปรับยอด"); const amount = Number(window.prompt("จำนวนเงินที่ปรับ", "0") || 0); const type = window.prompt("ประเภท: owner_credit / owner_debit / tapper_credit / tapper_debit", "owner_debit") || "owner_debit"; if (reason && amount > 0) { await api.adjustments.create({ saleId: sale.id, adjustmentType: type, amount, reason }); onRefresh(); } }}>ปรับยอด</button>}</div>}{role === "owner" && sale.status === "disputed" && <div className="panel-actions"><button className="link-button" onClick={async () => { const resolution = window.prompt("ผลการตรวจสอบข้อพิพาท"); if (resolution) { await api.disputes.resolve({ decision: "resolved", resolution, saleId: sale.id }); onRefresh(); } }}>แก้ไขข้อพิพาท</button><button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลที่ยกข้อพิพาท"); if (reason) { await api.disputes.resolve({ decision: "rejected", resolution: reason, saleId: sale.id }); onRefresh(); } }}>ยกข้อพิพาท</button></div>}</article>)}</div>}</section>; }
+function SalesScreen({ sales, role, onSale, onReview, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onReview: (sale: Sale) => void; onRefresh: () => void }) {
+  return <section className="panel"><div className="panel-head"><div><h2>รายการขายล่าสุด</h2><p>เปิดดูบิลและรายละเอียดการคำนวณก่อนยืนยันทุกครั้ง</p></div><div className="panel-actions"><button className="secondary" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button>}</div></div>{sales.length === 0 ? <Empty text="ยังไม่มีรายการขายจากสวนที่เลือก" /> : <div className="data-list">{sales.map((sale) => <article className="data-row sale-row" key={sale.id}><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{sale.saleDate} · {sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span><small className="evidence-label">{sale.receiptFileId ? <><Image size={13} />มีภาพใบเสร็จ · OCR {Math.round(Number(sale.ocrConfidence || 0) * 100)}%</> : <><FileText size={13} />บันทึกด้วยมือ</>}</small></div><div><strong>{money(sale.grossSale || 0)}</strong><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><div className="panel-actions sale-row-actions"><button className={role === "owner" && sale.status === "pending_owner_review" ? "primary" : "link-button"} onClick={() => onReview(sale)}>{role === "owner" && sale.status === "pending_owner_review" ? <><ShieldCheck size={15} />ตรวจและยืนยัน</> : <><Eye size={15} />ดูรายละเอียด</>}</button>{role === "owner" && sale.status === "confirmed" && <button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลการปรับยอด"); const amount = Number(window.prompt("จำนวนเงินที่ปรับ", "0") || 0); const type = window.prompt("ประเภท: owner_credit / owner_debit / tapper_credit / tapper_debit", "owner_debit") || "owner_debit"; if (reason && amount > 0) { await api.adjustments.create({ saleId: sale.id, adjustmentType: type, amount, reason }); onRefresh(); } }}>ปรับยอด</button>}{role === "owner" && sale.status === "disputed" && <button className="link-button" onClick={async () => { const resolution = window.prompt("ผลการตรวจสอบข้อพิพาท"); if (resolution) { await api.disputes.resolve({ decision: "resolved", resolution, saleId: sale.id }); onRefresh(); } }}>แก้ไขข้อพิพาท</button>}</div></article>)}</div>}</section>;
+}
+
+function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role: Role; onClose: () => void; onChanged: () => void }) {
+  const [evidence, setEvidence] = useState<SaleReceiptEvidence | null>(null);
+  const [loadingEvidence, setLoadingEvidence] = useState(Boolean(sale.receiptFileId));
+  const [reviewed, setReviewed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    if (!sale.receiptFileId) { setLoadingEvidence(false); return () => { active = false; }; }
+    void api.sales.receipt(sale.id).then((result) => { if (active) setEvidence(result); }).catch((caught) => { if (active) setError(userMessageForApiError(caught)); }).finally(() => { if (active) setLoadingEvidence(false); });
+    return () => { active = false; };
+  }, [sale.id, sale.receiptFileId]);
+  const confirmSale = async () => {
+    if (!reviewed) return;
+    setBusy(true); setError("");
+    try { await api.sales.confirm(sale.id); onChanged(); }
+    catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setBusy(false); }
+  };
+  const disputeSale = async () => {
+    const reason = window.prompt("เหตุผลที่คัดค้านรายการ");
+    if (!reason) return;
+    setBusy(true); setError("");
+    try { await api.sales.dispute({ saleId: sale.id, reason }); onChanged(); }
+    catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setBusy(false); }
+  };
+  const canDispute = ["pending_owner_review", "confirmed"].includes(sale.status);
+  return <Modal title="ตรวจรายละเอียดรายการขาย" onClose={onClose}><div className="sale-review"><div className="sale-review-summary"><div><small>ยอดขายก่อนหัก</small><strong>{money(sale.grossSale || 0)}</strong><span>{sale.saleDate} · {sale.buyerName || "ไม่ระบุร้านรับซื้อ"}</span></div><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><section className="receipt-evidence"><div className="receipt-evidence-head"><div><Image size={18} /><span><strong>หลักฐานใบเสร็จ</strong><small>{sale.receiptFileId ? `OCR ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "รายการบันทึกด้วยมือ"}</small></span></div></div>{loadingEvidence ? <div className="receipt-placeholder">กำลังโหลดภาพจาก Google Drive...</div> : evidence ? <img src={evidence.dataUrl} alt={`ใบเสร็จรายการขาย ${sale.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่มีภาพใบเสร็จ</strong><span>รายการนี้ถูกบันทึกด้วยมือ โปรดตรวจตัวเลขกับหลักฐานภายนอกก่อนยืนยัน</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดและการแบ่งเงิน</h3><div className="sale-detail-grid"><Detail label="ประเภทสินค้า" value={sale.productType || "ไม่ระบุ"} /><Detail label="น้ำหนักสุทธิ" value={`${sale.netWeight || sale.weightKg || 0} กก.`} /><Detail label="ราคาต่อหน่วย" value={money(sale.unitPrice || 0)} /><Detail label="หักหน้าร้าน" value={money(sale.buyerDeductions || 0)} /><Detail label="ค่าใช้จ่ายร่วม" value={money(sale.sharedExpenses || 0)} /><Detail label="ฐานแบ่งเงิน" value={money(sale.splitBase || 0)} /></div><div className="split-review"><div><small>สิทธิ Owner</small><strong>{money(sale.ownerShare || 0)}</strong></div><div><small>สิทธิ Tapper</small><strong>{money(sale.tapperShare || 0)}</strong></div></div><small className="agreement-reference">Agreement: {sale.agreementId}</small></section>{role === "owner" && sale.status === "pending_owner_review" && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>ฉันตรวจหลักฐานและตัวเลขแล้ว</strong><small>เมื่อยืนยัน ระบบจะเปลี่ยน WalletEntries จาก pending เป็น confirmed</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{canDispute && <button className="danger-button" disabled={busy} onClick={() => void disputeSale()}>คัดค้านรายการ</button>}{role === "owner" && sale.status === "pending_owner_review" && <button className="primary" disabled={busy || !reviewed || loadingEvidence || Boolean(sale.receiptFileId && !evidence)} onClick={() => void confirmSale()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : "ยืนยันรายการขาย"}</button>}</div></div></Modal>;
+}
+
+function Detail({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><strong>{value}</strong></div>; }
 
 function GardensScreen({ garden, gardens, members, role, onCreate, onAddMember, onDeactivate }: { garden?: Garden; gardens: Garden[]; members: GardenMember[]; role: Role; onCreate: () => void; onAddMember: () => void; onDeactivate: (member: GardenMember) => void }) {
   return <section className="panel"><div className="panel-head"><div><h2>สวนและแปลง</h2><p>จัดการพื้นที่ จำนวนต้นยาง และสมาชิกที่เข้าถึงข้อมูลสวน</p></div>{role === "owner" && <button className="primary" onClick={onCreate}><Plus size={16} />เพิ่มสวน</button>}</div>{gardens.length === 0 ? <Empty text="ยังไม่มีสวนที่เชื่อมต่อกับบัญชี" /> : <div className="card-grid">{gardens.map((item) => <div className="info-card" key={item.id}><span className="eyebrow">ACTIVE GARDEN</span><h3>{item.name}</h3><p>{item.province || "ไม่ระบุจังหวัด"} · {item.district || "ไม่ระบุอำเภอ"}</p><strong>{item.areaRai || 0} ไร่ · {(item.treeCount || 0).toLocaleString()} ต้น</strong></div>)}</div>}{role === "owner" && garden && <section className="member-management" aria-label="จัดการสมาชิกสวน"><div className="member-management-head"><div><span><Users size={19} />สมาชิกสวน</span><small>เฉพาะ Owner เท่านั้นที่เพิ่มหรือปิดสิทธิ์ Tapper ได้</small></div><button className="secondary" onClick={onAddMember}><UserPlus size={16} />เพิ่ม Tapper</button></div>{members.length === 0 ? <Empty text="ยังไม่มีสมาชิกที่ active ในสวนนี้" /> : <div className="member-list">{members.map((member) => <article className="member-row" key={member.id}><div className="member-avatar">{member.role === "owner" ? "O" : "T"}</div><div><strong>{member.name || (member.role === "owner" ? "Owner" : "Tapper")}</strong><span>{member.email || member.userId}</span><small>{member.role === "owner" ? "เจ้าของสวน" : "คนกรีดยาง · ใช้งานอยู่"}</small></div>{member.role === "tapper" && <button className="danger-button" onClick={() => onDeactivate(member)}><UserMinus size={15} />ปิดสิทธิ์</button>}</article>)}</div>}</section>}</section>;
@@ -282,27 +319,31 @@ function labelStatus(status: string) { return ({ pending_owner_review: "รอ�
 function ReceiptForm({ garden, agreement, initialFile, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; initialFile?: File | null; onClose: () => void; onSaved: () => void }) {
   const [file, setFile] = useState<File | null>(initialFile || null);
   const [fields, setFields] = useState<Record<string, string>>({ saleDate: dateToday(), buyerName: "", productType: "", weightKg: "", unitPrice: "", grossSale: "", buyerDeductions: "0" });
+  const [receiptId, setReceiptId] = useState("");
   const [receiptFileId, setReceiptFileId] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [status, setStatus] = useState("upload");
   const [duplicate, setDuplicate] = useState<{ possibleDuplicate: boolean; matches?: Sale[] }>({ possibleDuplicate: false });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const initialFileProcessed = useRef(false);
   const handleFile = async (selected: File | null) => {
-    if (!selected) return;
+    if (!selected || !garden) return;
+    if (selected.size > MAX_EVIDENCE_BYTES) { setError("ภาพใบเสร็จต้องมีขนาดไม่เกิน 4 MB"); return; }
     setFile(selected);
-    setBusy(true);
+    setBusy(true); setError(""); setReceiptId(""); setReceiptFileId("");
     try {
       const data = await readFileAsDataUrl_(selected);
-      const result = await api.receipts.extract({ data, mimeType: selected.type, filename: selected.name });
+      const result = await api.receipts.extract({ gardenId: garden.id, data, mimeType: selected.type, filename: selected.name });
       const extracted = (result as { ocr?: { fields?: Record<string, unknown>; confidence?: number; score?: number; needsReview?: boolean; reviewLevel?: string }; file?: { fileId?: string } }).ocr;
       const next = extracted?.fields || {};
       setFields((current) => ({ ...current, ...Object.fromEntries(Object.entries(next).map(([key, value]) => [key, String(value ?? "")])) }));
+      setReceiptId(String((result as { receiptId?: string }).receiptId || ""));
       setReceiptFileId(String((result as { file?: { fileId?: string } }).file?.fileId || ""));
       setConfidence(Number(extracted?.score !== undefined ? Number(extracted.score) / 100 : extracted?.confidence || 0));
       setStatus(extracted?.reviewLevel === "mandatory" || extracted?.needsReview ? "needs_review" : "ready");
-    } catch (error) {
-      setStatus("error");
+    } catch (caught) {
+      setStatus("error"); setError(userMessageForApiError(caught));
     } finally {
       setBusy(false);
     }
@@ -324,13 +365,14 @@ function ReceiptForm({ garden, agreement, initialFile, onClose, onSaved }: { gar
     setBusy(true);
     try {
       const duplicateResult = await checkDuplicate();
-      if (duplicateResult?.possibleDuplicate && status !== "confirmed_duplicate") { setStatus("duplicate"); return; }
-      await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, saleDate: fields.saleDate, buyerName: fields.buyerName, productType: fields.productType, weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId: receiptFileId, ocrConfidence: confidence || 0, manualEntry: false });
+      if (duplicateResult?.possibleDuplicate && status !== "duplicate") { setStatus("duplicate"); return; }
+      await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, receiptId, saleDate: fields.saleDate, buyerName: fields.buyerName, productType: fields.productType, weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId, manualEntry: false });
       onSaved();
-    } finally { setBusy(false); }
+    } catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setBusy(false); }
   };
   const setField = (key: string, value: string) => setFields((current) => ({ ...current, [key]: value }));
-  return <Modal title="สแกนบิลและตรวจสอบ OCR" onClose={onClose}><div className="form-grid"><label>ถ่ายใหม่หรือเลือกรูปอื่น<input type="file" accept="image/*" capture="environment" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label>{file && <div className="calculation-preview"><span>ไฟล์: {file.name}</span><strong>{busy ? "กำลังอ่าน OCR..." : `สถานะ ${status}`}</strong></div>}<label>วันที่ขาย<input type="date" value={fields.saleDate} onChange={(e) => setField("saleDate", e.target.value)} /></label><label>ร้านรับซื้อ<input value={fields.buyerName} onChange={(e) => setField("buyerName", e.target.value)} /></label><label>ประเภทสินค้า<input value={fields.productType} onChange={(e) => setField("productType", e.target.value)} /></label><label>น้ำหนักสุทธิ (กก.)<input type="number" step="0.01" value={fields.weightKg} onChange={(e) => setField("weightKg", e.target.value)} /></label><label>ราคา/กก.<input type="number" step="0.01" value={fields.unitPrice} onChange={(e) => setField("unitPrice", e.target.value)} /></label><label>ยอดก่อนหัก<input type="number" step="0.01" value={fields.grossSale} onChange={(e) => setField("grossSale", e.target.value)} /></label><label>รายการหัก<input type="number" step="0.01" value={fields.buyerDeductions} onChange={(e) => setField("buyerDeductions", e.target.value)} /></label>{confidence !== null && <div className={`calculation-preview ${confidence < 0.9 ? "low-confidence" : ""}`}><span>OCR validation score: {(confidence * 100).toFixed(0)}%</span><strong>{confidence < 0.8 ? "ต้องตรวจสอบข้อมูลก่อนสร้างรายการ" : confidence < 0.9 ? "แนะนำให้ตรวจสอบข้อมูลที่อ่านได้" : "คะแนนสูง แต่ควรตรวจสอบก่อนยืนยัน"}</strong></div>}{duplicate.possibleDuplicate && <div className="calculation-preview low-confidence"><span>พบรายการที่อาจซ้ำ {duplicate.matches?.length || 0} รายการ</span><strong>ตรวจสอบก่อนกดยืนยันอีกครั้ง</strong></div>}<button className="secondary" onClick={() => void checkDuplicate()} disabled={!garden || busy}>ตรวจรายการซ้ำ</button><button className="primary" onClick={() => void submit()} disabled={!garden || !agreement || busy || !fields.saleDate}>{status === "duplicate" ? "ยืนยันว่าเป็นบิลคนละรายการ" : busy ? "กำลังบันทึก..." : "ยืนยันข้อมูลและสร้างรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี Agreement ที่ active ก่อนสร้างรายการขาย</small>}</div></Modal>;
+  return <Modal title="สแกนบิลและตรวจสอบ OCR" onClose={onClose}><div className="form-grid"><label>ถ่ายใหม่หรือเลือกรูปอื่น<input type="file" accept="image/*" capture="environment" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label>{file && <div className="calculation-preview"><span>ไฟล์: {file.name}</span><strong>{busy ? "กำลังอ่าน OCR..." : `สถานะ ${status}`}</strong></div>}<label>วันที่ขาย<input type="date" value={fields.saleDate} onChange={(e) => setField("saleDate", e.target.value)} /></label><label>ร้านรับซื้อ<input value={fields.buyerName} onChange={(e) => setField("buyerName", e.target.value)} /></label><label>ประเภทสินค้า<input value={fields.productType} onChange={(e) => setField("productType", e.target.value)} /></label><label>น้ำหนักสุทธิ (กก.)<input type="number" step="0.01" value={fields.weightKg} onChange={(e) => setField("weightKg", e.target.value)} /></label><label>ราคา/กก.<input type="number" step="0.01" value={fields.unitPrice} onChange={(e) => setField("unitPrice", e.target.value)} /></label><label>ยอดก่อนหัก<input type="number" step="0.01" value={fields.grossSale} onChange={(e) => setField("grossSale", e.target.value)} /></label><label>รายการหัก<input type="number" step="0.01" value={fields.buyerDeductions} onChange={(e) => setField("buyerDeductions", e.target.value)} /></label>{confidence !== null && <div className={`calculation-preview ${confidence < 0.9 ? "low-confidence" : ""}`}><span>OCR validation score: {(confidence * 100).toFixed(0)}%</span><strong>{confidence < 0.8 ? "ต้องตรวจสอบข้อมูลก่อนสร้างรายการ" : confidence < 0.9 ? "แนะนำให้ตรวจสอบข้อมูลที่อ่านได้" : "คะแนนสูง แต่ควรตรวจสอบก่อนยืนยัน"}</strong></div>}{duplicate.possibleDuplicate && <div className="calculation-preview low-confidence"><span>พบรายการที่อาจซ้ำ {duplicate.matches?.length || 0} รายการ</span><strong>ตรวจสอบก่อนกดยืนยันอีกครั้ง</strong></div>}{error && <div className="form-error" role="alert">{error}</div>}<button className="secondary" onClick={() => void checkDuplicate()} disabled={!garden || busy}>ตรวจรายการซ้ำ</button><button className="primary" onClick={() => void submit()} disabled={!garden || !agreement || !receiptId || !receiptFileId || busy || !fields.saleDate}>{status === "duplicate" ? "ยืนยันว่าเป็นบิลคนละรายการ" : busy ? "กำลังบันทึก..." : "ยืนยันข้อมูลและสร้างรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี Agreement ที่ active ก่อนสร้างรายการขาย</small>}</div></Modal>;
 }
 
 function readFileAsDataUrl_(file: File) { return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = reject; reader.readAsDataURL(file); }); }

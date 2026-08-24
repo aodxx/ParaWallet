@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d5";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.24-phase-d6";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -94,6 +94,33 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId)");
     expect(code).toContain('id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"');
     expect(code).toContain("var tapperSettlement = tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlement");
+  });
+
+  it("binds scanned receipt evidence to the authenticated Tapper and Sale", () => {
+    expect(code).toContain('case "sales.receipt": return Services.saleReceipt');
+    expect(code).toContain('"sales.receipt"');
+    expect(code).toContain("requireTapper_(user, payload.gardenId)");
+    expect(code).toContain('throw new Error("SALE_RECEIPT_REQUIRED")');
+    expect(code).toContain('throw new Error("SALE_RECEIPT_ACCESS_DENIED")');
+    expect(code).toContain('throw new Error("SALE_RECEIPT_MISMATCH")');
+    expect(code).toContain('receiptId: receipt ? receipt.id : ""');
+    expect(code).toContain("var receiptFileId = receipt ? receipt.fileId : \"\"");
+  });
+
+  it("serves only the receipt referenced by an authorized garden Sale", () => {
+    const service = code.match(/Services\.saleReceipt = function[\s\S]*?\n};/)?.[0] || "";
+    expect(service).toContain('findById_("Sales", payload.saleId)');
+    expect(service).toContain("requireGarden_(user, sale.gardenId)");
+    expect(service).toContain("DriveApp.getFileById(fileId)");
+    expect(service).toContain('String(mimeType).indexOf("image/")');
+    expect(service).toContain('dataUrl: "data:" + mimeType + ";base64,"');
+  });
+
+  it("normalizes and limits receipt image data before OCR and Drive writes", () => {
+    expect(code).toContain('var contentBase64 = String(fileBase64 || "").split(",").pop()');
+    expect(code).toContain('throw new Error("RECEIPT_IMAGE_TYPE_INVALID")');
+    expect(code).toContain('throw new Error("RECEIPT_IMAGE_TOO_LARGE")');
+    expect(code).toContain('OCR.extract(contentBase64, mimeType)');
   });
 
   it("migrates legacy Agreement values into the correct 16-column positions", () => {

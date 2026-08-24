@@ -165,6 +165,10 @@
 - [x] Create the example Settlement and confirm it as Owner
 - [x] Verify WalletEntries, SettlementAllocations, Notifications, and AuditLogs in the real Spreadsheet
 - [x] Produce the Phase D E2E evidence report and record any defects
+- [x] Accept Phase D5 Owner-controlled member workflow from production mobile evidence
+- [x] Add Phase D6 garden-scoped Receipt upload and trusted Receipt-to-Sale linkage
+- [x] Add authorized Sale receipt retrieval without public Drive sharing
+- [x] Require Owner evidence/calculation review before Sale confirmation in the PWA
 - [x] Design a one-time Apps Script E2E runner limited to garden-pahpayom-001 and clearly labeled test data
 - [x] Add one-time runner and verification helpers inside the single appsscript/Code.gs file
 - [x] Validate runner syntax and add a dry-run guard before any real mutation

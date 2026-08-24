@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.24-phase-d5";
+var PARAWALLET_RELEASE = "2026.08.24-phase-d6";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -70,7 +70,7 @@ function doPost(e) {
 var READ_ONLY_ACTIONS_ = [
   "health.get", "diagnostics.get", "dashboard.get", "gardens.list", "plots.list",
   "members.list", "agreements.list", "products.list", "buyers.list", "sales.list",
-  "sales.duplicateCheck", "wallets.me", "settlements.list", "notifications.list",
+  "sales.duplicateCheck", "sales.receipt", "wallets.me", "settlements.list", "notifications.list",
   "reports.summary"
 ];
 function isReadOnlyAction_(action) { return READ_ONLY_ACTIONS_.indexOf(String(action || "")) >= 0; }
@@ -106,6 +106,7 @@ function routeAction_(request) {
     case "sales.create": return Services.createSale(user, request.payload);
     case "sales.list": return Services.listSales(user, request.payload);
     case "sales.duplicateCheck": return Services.duplicateCheck(user, request.payload);
+    case "sales.receipt": return Services.saleReceipt(user, request.payload);
     case "sales.confirm": return Services.confirmSale(user, request.payload);
     case "sales.dispute": return Services.disputeSale(user, request.payload);
     case "wallets.me": return Services.wallet(user, request.payload);
@@ -371,9 +372,10 @@ var DriveStorage = {
 
 var OCR = {
   extract: function (fileBase64, mimeType) {
+    var contentBase64 = String(fileBase64 || "").split(",").pop();
     var prompt = "Extract rubber sale receipt fields as JSON: saleDate, buyerName, productType, weightKg, unitPrice, grossSale, buyerDeductions. Return only JSON.";
-    if (Config.geminiKey()) return this.gemini_(fileBase64, mimeType, prompt);
-    if (Config.visionKey()) return this.vision_(fileBase64, mimeType);
+    if (Config.geminiKey()) return this.gemini_(contentBase64, mimeType, prompt);
+    if (Config.visionKey()) return this.vision_(contentBase64, mimeType);
     return { provider: "none", confidence: 0, score: 0, needsReview: true, reviewLevel: "mandatory", fields: {} };
   },
   score_: function (fields) {
@@ -675,13 +677,19 @@ Services.createSale = function (user, payload) {
   var access = requireTapper_(user, payload.gardenId);
   var agreement = activeAgreement_(payload.gardenId, payload.agreementId, payload.saleDate);
   if (id_(agreement.tapperId) !== id_(user.id)) throw new Error("AGREEMENT_TAPPER_MISMATCH");
+  var receipt = payload.receiptId ? findById_("Receipts", payload.receiptId) : null;
+  if (payload.manualEntry !== true && !receipt) throw new Error("SALE_RECEIPT_REQUIRED");
+  if (receipt && id_(receipt.createdBy) !== id_(user.id)) throw new Error("SALE_RECEIPT_ACCESS_DENIED");
+  if (receipt && payload.receiptFileId && id_(receipt.fileId) !== id_(payload.receiptFileId)) throw new Error("SALE_RECEIPT_MISMATCH");
+  var receiptFileId = receipt ? receipt.fileId : "";
+  var receiptConfidence = receipt ? numeric_(parseJson_(receipt.ocrConfidenceJson, {}).confidence) : numeric_(payload.ocrConfidence);
   var weight = numeric_(payload.netWeight || payload.weightKg);
   var unitPrice = numeric_(payload.pricePerUnit || payload.unitPrice);
   if (weight <= 0 || unitPrice < 0) throw new Error("SALE_INPUT_INVALID");
   if (numeric_(payload.buyerDeductions) < 0 || numeric_(payload.sharedExpenses) < 0) throw new Error("DEDUCTION_INVALID");
   var calc = Calculator.sale({ weightKg: weight, unitPrice: unitPrice, buyerDeductions: payload.buyerDeductions, sharedExpenses: payload.sharedExpenses, ownerPercentage: agreement.ownerPercentage, tapperPercentage: agreement.tapperPercentage });
     var saleId = Utilities.getUuid();
-    Repositories.append("Sales", { id: saleId, gardenId: payload.gardenId, plotId: payload.plotId || "", agreementId: agreement.id, tapperId: user.id, receiptId: payload.receiptId || "", buyerId: payload.buyerId || "", saleDate: payload.saleDate, ticketNumber: payload.ticketNumber || "", productTypeId: payload.productTypeId || "", buyerName: payload.buyerName || "", productType: payload.productType || "", grossWeight: payload.grossWeight || weight, tareWeight: payload.tareWeight || 0, netWeight: weight, drc: payload.drc || "", weightKg: weight, unitPrice: unitPrice, pricePerUnit: unitPrice, grossSale: calc.grossSale, buyerDeductions: numeric_(payload.buyerDeductions), sharedExpenses: numeric_(payload.sharedExpenses), splitBase: calc.splitBase, ownerShare: calc.ownerShare, tapperShare: calc.tapperShare, netReceived: calc.splitBase, status: "pending_owner_review", manualEntry: payload.manualEntry === true, receiptFileId: payload.receiptFileId || "", ocrConfidence: payload.ocrConfidence || "", createdAt: nowIso_(), updatedAt: nowIso_() });
+    Repositories.append("Sales", { id: saleId, gardenId: payload.gardenId, plotId: payload.plotId || "", agreementId: agreement.id, tapperId: user.id, receiptId: receipt ? receipt.id : "", buyerId: payload.buyerId || "", saleDate: payload.saleDate, ticketNumber: payload.ticketNumber || "", productTypeId: payload.productTypeId || "", buyerName: payload.buyerName || "", productType: payload.productType || "", grossWeight: payload.grossWeight || weight, tareWeight: payload.tareWeight || 0, netWeight: weight, drc: payload.drc || "", weightKg: weight, unitPrice: unitPrice, pricePerUnit: unitPrice, grossSale: calc.grossSale, buyerDeductions: numeric_(payload.buyerDeductions), sharedExpenses: numeric_(payload.sharedExpenses), splitBase: calc.splitBase, ownerShare: calc.ownerShare, tapperShare: calc.tapperShare, netReceived: calc.splitBase, status: "pending_owner_review", manualEntry: payload.manualEntry === true, receiptFileId: receiptFileId, ocrConfidence: receiptConfidence, createdAt: nowIso_(), updatedAt: nowIso_() });
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: agreement.ownerId, saleId: saleId, settlementId: "", entryType: "sale_entitlement", direction: "credit", amount: calc.ownerShare, status: "pending", createdAt: nowIso_() });
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: user.id, saleId: saleId, settlementId: "", entryType: "tapper_income", direction: "credit", amount: calc.tapperShare, status: "pending", createdAt: nowIso_() });
     notifyUser_(agreement.ownerId, "sale_pending_review", "มีรายการขายใหม่รอตรวจ", "รายการขาย " + saleId + " รอการยืนยัน");
@@ -697,6 +705,23 @@ Services.listSales = function (user, payload) {
   if (payload.productTypeId) sales = sales.filter(function (row) { return id_(row.productTypeId) === id_(payload.productTypeId); });
   sales.sort(function (a, b) { return new Date(b.saleDate || b.createdAt).getTime() - new Date(a.saleDate || a.createdAt).getTime(); });
   return sales;
+};
+
+Services.saleReceipt = function (user, payload) {
+  var sale = findById_("Sales", payload.saleId);
+  if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireGarden_(user, sale.gardenId);
+  var receipt = sale.receiptId ? findById_("Receipts", sale.receiptId) : null;
+  var fileId = receipt ? receipt.fileId : sale.receiptFileId;
+  if (!fileId) throw new Error("SALE_RECEIPT_NOT_FOUND");
+  if (receipt && id_(receipt.fileId) !== id_(sale.receiptFileId) && sale.receiptFileId) throw new Error("SALE_RECEIPT_MISMATCH");
+  var file = DriveApp.getFileById(fileId);
+  var blob = file.getBlob();
+  var bytes = blob.getBytes();
+  if (bytes.length > 4 * 1024 * 1024) throw new Error("RECEIPT_IMAGE_TOO_LARGE");
+  var mimeType = blob.getContentType() || "image/jpeg";
+  if (String(mimeType).indexOf("image/") !== 0) throw new Error("RECEIPT_IMAGE_TYPE_INVALID");
+  return { saleId: sale.id, receiptId: receipt ? receipt.id : sale.receiptId, fileId: fileId, name: file.getName(), mimeType: mimeType, dataUrl: "data:" + mimeType + ";base64," + Utilities.base64Encode(bytes) };
 };
 
 Services.duplicateCheck = function (user, payload) {
@@ -927,8 +952,13 @@ Services.report = function (user, payload) {
 
 Services.extractReceipt = function (user, payload) {
   requireTapper_(user, payload.gardenId);
-  var file = DriveStorage.save(payload.data, payload.mimeType, payload.filename, "receipts", user.id);
-  var result = OCR.extract(payload.data, payload.mimeType);
+  var mimeType = String(payload.mimeType || "").toLowerCase();
+  if (!payload.data) throw new Error("RECEIPT_IMAGE_REQUIRED");
+  if (mimeType.indexOf("image/") !== 0) throw new Error("RECEIPT_IMAGE_TYPE_INVALID");
+  var contentBase64 = String(payload.data).split(",").pop();
+  if (Utilities.base64Decode(contentBase64).length > 4 * 1024 * 1024) throw new Error("RECEIPT_IMAGE_TOO_LARGE");
+  var file = DriveStorage.save(contentBase64, mimeType, payload.filename, "receipts", user.id);
+  var result = OCR.extract(contentBase64, mimeType);
   var receiptId = Utilities.getUuid();
   Repositories.append("Receipts", { id: receiptId, fileId: file.fileId, fileUrl: "", imageHash: payload.imageHash || "", ocrRawJson: JSON.stringify(result.fields || {}), ocrConfidenceJson: JSON.stringify({ confidence: result.confidence, needsReview: result.needsReview }), createdBy: user.id, manualNetAmount: false, createdAt: nowIso_() });
   Repositories.append("OcrRecords", { id: Utilities.getUuid(), fileId: file.fileId, provider: result.provider, status: result.needsReview ? "needs_review" : "ready", confidence: result.confidence, rawJson: JSON.stringify(result.fields || {}), reviewedBy: "", createdAt: nowIso_() });

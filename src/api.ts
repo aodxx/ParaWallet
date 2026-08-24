@@ -40,6 +40,13 @@ const apiErrorMessages: Record<string, string> = {
   MEMBER_HAS_OPEN_ITEMS: "ยังถอด Tapper ไม่ได้ เพราะมีรายการขายหรือรายการส่งเงินรอดำเนินการ",
   MEMBER_HAS_OUTSTANDING_BALANCE: "ยังถอด Tapper ไม่ได้ เพราะยังมีเงินของ Owner คงค้างอยู่",
   OWNER_MEMBER_CANNOT_BE_REMOVED: "ไม่สามารถถอด Owner ออกจากสวนของตนเองได้",
+  RECEIPT_IMAGE_REQUIRED: "กรุณาถ่ายหรือเลือกภาพใบเสร็จ",
+  RECEIPT_IMAGE_TYPE_INVALID: "รองรับเฉพาะไฟล์ภาพใบเสร็จ",
+  RECEIPT_IMAGE_TOO_LARGE: "ภาพใบเสร็จมีขนาดใหญ่เกินไป กรุณาเลือกไฟล์ไม่เกิน 4 MB",
+  SALE_RECEIPT_REQUIRED: "รายการจากการสแกนต้องมีหลักฐานใบเสร็จ",
+  SALE_RECEIPT_ACCESS_DENIED: "ไม่สามารถใช้ใบเสร็จที่ไม่ได้สร้างจากบัญชี Tapper นี้",
+  SALE_RECEIPT_NOT_FOUND: "ไม่พบไฟล์ใบเสร็จของรายการนี้",
+  SALE_RECEIPT_MISMATCH: "ข้อมูลใบเสร็จกับรายการขายไม่ตรงกัน กรุณาตรวจสอบใหม่",
 };
 
 export function userMessageForApiError(error: unknown) {
@@ -51,7 +58,8 @@ export type Garden = { id: string; ownerId?: string; name: string; locationText?
 export type Plot = { id: string; gardenId: string; name: string; notes?: string; status: string };
 export type GardenMember = { id: string; gardenId: string; userId: string; role: "owner" | "tapper"; status: "active" | "inactive"; name?: string; email?: string; createdAt?: string };
 export type Agreement = { id: string; gardenId: string; ownerId: string; tapperId: string; version: number; ownerPercentage: number; tapperPercentage: number; effectiveFrom: string; effectiveTo?: string; status: string };
-export type Sale = { id: string; gardenId: string; agreementId: string; saleDate: string; buyerName?: string; productType?: string; weightKg?: number; netWeight?: number; unitPrice?: number; grossSale?: number; buyerDeductions?: number; sharedExpenses?: number; splitBase?: number; ownerShare?: number; tapperShare?: number; status: string; receiptFileId?: string; ocrConfidence?: number | string; manualEntry?: boolean };
+export type Sale = { id: string; gardenId: string; agreementId: string; tapperId?: string; receiptId?: string; saleDate: string; ticketNumber?: string; buyerName?: string; productType?: string; weightKg?: number; netWeight?: number; unitPrice?: number; grossSale?: number; buyerDeductions?: number; sharedExpenses?: number; splitBase?: number; ownerShare?: number; tapperShare?: number; status: string; receiptFileId?: string; ocrConfidence?: number | string; manualEntry?: boolean; createdAt?: string };
+export type SaleReceiptEvidence = { saleId: string; receiptId?: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
 export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
@@ -110,11 +118,12 @@ export const api = {
   },
   products: { list: () => callApi<undefined, unknown[]>("products.list") },
   buyers: { list: (gardenId: string) => callApi("buyers.list", { gardenId }) },
-  receipts: { extract: (payload: { data: string; mimeType: string; filename: string }) => callApi("receipts.extract", payload) },
+  receipts: { extract: (payload: { gardenId: string; data: string; mimeType: string; filename: string; imageHash?: string }) => callApi("receipts.extract", payload) },
   sales: {
     create: (payload: Record<string, unknown>) => callApi("sales.create", payload),
     list: (payload: { gardenId: string; from?: string; to?: string; status?: string; productTypeId?: string }) => callApi<unknown, Sale[]>("sales.list", payload),
     duplicateCheck: (payload: Record<string, unknown>) => callApi("sales.duplicateCheck", payload),
+    receipt: (saleId: string) => callApi<unknown, SaleReceiptEvidence>("sales.receipt", { saleId }),
     confirm: (saleId: string) => callApi("sales.confirm", { saleId }),
     dispute: (payload: { saleId: string; reason: string; note?: string; evidenceFileId?: string }) => callApi("sales.dispute", payload),
   },

@@ -49,3 +49,7 @@ No schema migration is required because D5 uses the existing `Users`, `GardenMem
 ## Limitations and next slice
 
 D5 adds an existing registered Tapper; it does not create a new `Users` account or email an external invitation. A future invite-code/email onboarding flow should use a separate pending-invitation record and explicit acceptance before granting garden access.
+
+## Production evidence
+
+On 24 August 2026, the deployed endpoint reported `release=2026.08.24-phase-d5`, all 22 schemas `ok`, no schema mismatches, and `financialSchemaReady=true`. A user-supplied 76-second Owner mobile recording (`1000020242.mp4`) showed both active members, idempotent re-add without a duplicate row, and the expected guard message when attempting to deactivate a Tapper with an active agreement/open financial lifecycle. D5 is accepted.
