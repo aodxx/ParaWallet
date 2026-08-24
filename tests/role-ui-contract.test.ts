@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const loader = readFileSync(new URL("../src/LoadingAnimation.tsx", import.meta.url), "utf8");
+const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+const loadingAnimation = JSON.parse(readFileSync(new URL("../public/loading/animation.json", import.meta.url), "utf8"));
 
 describe("role-aware UI contract", () => {
   it("only exposes sale, receipt, and settlement creation modals to Tapper", () => {
@@ -64,8 +67,23 @@ describe("role-aware UI contract", () => {
 
   it("does not render an Owner or Tapper dashboard before role verification finishes", () => {
     expect(app).toContain("if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen");
-    expect(app).toContain("กำลังตรวจสอบบัญชี...");
+    expect(app).toContain("กำลังเตรียม ParaWallet");
     expect(app).toContain("ยังไม่แสดงหน้าของ Owner หรือ Tapper จนกว่าจะตรวจสอบสิทธิ์สำเร็จ");
+  });
+
+  it("uses the supplied local Lottie animation for stable loading states", () => {
+    expect(app).toContain('import LoadingAnimation from "./LoadingAnimation"');
+    expect(app).toContain('className="screen-stage" aria-busy={loading}');
+    expect(app).toContain('className="loading-overlay"');
+    expect(app).toContain('LoadingAnimation compact label="กำลังโหลดใบเสร็จ"');
+    expect(app).toContain('LoadingAnimation compact label="กำลังโหลดสลิป"');
+    expect(app).not.toContain("กำลังโหลดข้อมูลจาก Google Apps Script...");
+    expect(loader).toContain("vendor/lottie_light.min.js");
+    expect(loader).toContain("loading/animation.json");
+    expect(styles).toContain(".content.is-loading .screen-content{visibility:hidden;opacity:0}");
+    expect(serviceWorker).toContain("vendor/lottie_light.min.js");
+    expect(serviceWorker).toContain("loading/animation.json");
+    expect(loadingAnimation).toMatchObject({ w: 124, h: 124, ip: 0, op: 31 });
   });
 
   it("makes the dual wallet and direct camera scan Tapper's primary workflow", () => {
