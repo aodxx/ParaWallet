@@ -45,9 +45,15 @@ export default function App() {
     setLoading(true);
     setMessage("");
     try {
-      const dashboard = await api.dashboard();
-      setData(dashboard);
-      setRole(dashboard.role);
+      let dashboard = data;
+      // Navigation uses the dashboard already in memory. Re-fetching the heavy
+      // dashboard read model before every list page made a single tab change take
+      // 8–12 seconds on Apps Script.
+      if (target === "overview" || !dashboard.garden?.id) {
+        dashboard = await api.dashboard();
+        setData(dashboard);
+        setRole(dashboard.role);
+      }
       const garden = dashboard.garden || gardens[0];
       if (garden?.id) {
         if (target === "overview") {
@@ -124,12 +130,12 @@ export default function App() {
         {message && <div className="notice">{message}</div>}
         {loading && <div className="notice">กำลังโหลดข้อมูลจาก Google Apps Script...</div>}
         {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => setShowReceiptForm(true)} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openScreen("sales")} onReports={() => openScreen("reports")} />}
-        {screen === "sales" && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onRefresh={() => refresh("sales")} />}
+        {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onRefresh={() => refresh("sales")} />}
         {screen === "gardens" && <GardensScreen gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} role={role} onCreate={() => setShowGardenForm(true)} />}
-        {screen === "agreements" && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
-        {screen === "settlements" && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
+        {screen === "agreements" && (!loading || agreements.length > 0) && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
+        {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
         {screen === "reports" && <ReportsScreen garden={activeGarden} />}
-        {screen === "notifications" && <NotificationsScreen notifications={notifications} onRead={async (id) => { await api.notifications.read(id); setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item)); }} />}
+        {screen === "notifications" && (!loading || notifications.length > 0) && <NotificationsScreen notifications={notifications} onRead={async (id) => { await api.notifications.read(id); setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item)); }} />}
       </main>
     </div>
     <DeveloperCredit />

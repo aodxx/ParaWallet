@@ -20,4 +20,10 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("onReports");
     expect(app).toContain('role === "tapper" && <button className="primary" onClick={onSale}');
   });
+
+  it("does not refetch the heavy dashboard before every tab", () => {
+    expect(app).toContain('if (target === "overview" || !dashboard.garden?.id)');
+    expect(app).toContain('screen === "settlements" && (!loading || settlements.length > 0)');
+    expect(app).toContain('screen === "notifications" && (!loading || notifications.length > 0)');
+  });
 });
