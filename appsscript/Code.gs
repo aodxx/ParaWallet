@@ -414,6 +414,12 @@ var Services = {
       if (id_(row.gardenId) !== id_(garden.id) || row.status !== "confirmed") return false;
       return user.role !== "tapper" || id_(row.tapperId) === id_(user.id);
     }), monthStart, "", "saleDate");
+    var monthlySalesSeries = [0, 0, 0, 0, 0];
+    monthlySales.forEach(function (row) {
+      var saleDay = new Date(row.saleDate || row.createdAt).getUTCDate();
+      var weekIndex = Math.min(4, Math.max(0, Math.floor((saleDay - 1) / 7)));
+      monthlySalesSeries[weekIndex] += numeric_(row.grossSale);
+    });
     return {
       role: user.role,
       garden: garden,
@@ -424,7 +430,8 @@ var Services = {
         currency: "THB"
       },
       pendingReviews: wallet.tapper.pendingReviews,
-      monthlySales: round_(monthlySales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0))
+      monthlySales: round_(monthlySales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0)),
+      monthlySalesSeries: monthlySalesSeries.map(round_)
     };
   },
   createSale: function (user, payload) {

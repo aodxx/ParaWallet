@@ -55,6 +55,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('"notifications.list"');
     expect(code).toContain("var wallet = Services.wallet(user, { gardenId: garden.id });");
     expect(code).toContain("monthlySales: round_(monthlySales.reduce");
+    expect(code).toContain("monthlySalesSeries: monthlySalesSeries.map(round_)");
   });
 
   it("migrates legacy Agreement values into the correct 16-column positions", () => {
