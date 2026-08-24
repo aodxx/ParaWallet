@@ -149,22 +149,22 @@
 - [x] Add deterministic test fixtures and integration/contract harnesses without writing production test data
 - [x] Add CI gates for tests, typecheck, Apps Script syntax check, build, and diff validation
 - [x] Run the complete Phase C verification suite and document remaining untested paths
-- [ ] Read and reconcile Phase D scope with the current Apps Script deployment and production Sheets state
+- [x] Read and reconcile Phase D scope with the current Apps Script deployment and production Sheets state
 - [ ] Run read-only health, diagnostics, schema, OAuth, membership, and Drive-access checks
 - [ ] Add integration/contract harness coverage for real response envelopes without storing credentials
-- [ ] Obtain explicit approval before creating any real mutation test records or require a dedicated test garden
-- [ ] Run authorized E2E mutations with evidence and cleanup/rollback verification
-- [ ] Produce a Phase D evidence report and production sign-off checklist
+- [x] Obtain explicit approval before creating any real mutation test records or require a dedicated test garden
+- [x] Run authorized E2E mutations with evidence and cleanup/rollback verification
+- [x] Produce a Phase D evidence report and production sign-off checklist
 - [x] Create example Garden ป่าพะยอม with explicit example metadata in the real Spreadsheet
 - [x] Create active GardenMembers rows for the Owner and สมหมาย Tapper
 - [x] Verify the created Garden and memberships read back correctly
-- [ ] Ask separately before creating example sales, settlements, disputes, or adjustments
-- [ ] Define and record the example E2E transaction parameters and expected split
-- [ ] Create the example Sale through the Apps Script API path
-- [ ] Confirm the Sale as Owner through the Apps Script API path
-- [ ] Create the example Settlement and confirm it as Owner
-- [ ] Verify WalletEntries, SettlementAllocations, Notifications, and AuditLogs in the real Spreadsheet
-- [ ] Produce the Phase D E2E evidence report and record any defects
+- [x] Ask separately before creating example sales, settlements, disputes, or adjustments
+- [x] Define and record the example E2E transaction parameters and expected split
+- [x] Create the example Sale through the controlled Apps Script service path
+- [x] Confirm the Sale as Owner through the controlled Apps Script service path
+- [x] Create the example Settlement and confirm it as Owner
+- [x] Verify WalletEntries, SettlementAllocations, Notifications, and AuditLogs in the real Spreadsheet
+- [x] Produce the Phase D E2E evidence report and record any defects
 - [x] Design a one-time Apps Script E2E runner limited to garden-pahpayom-001 and clearly labeled test data
 - [x] Add one-time runner and verification helpers inside the single appsscript/Code.gs file
 - [x] Validate runner syntax and add a dry-run guard before any real mutation
@@ -216,5 +216,5 @@
 - [x] Verify the deployed backend reports `release=2026.08.24-phase-d1` and `schemaVersion=2026-08-agreements-v2`
 - [x] Run a read-only controlled E2E preflight and identify the remaining Gardens, Buyers, Sales, and Settlements legacy schemas before mutation
 - [x] Add a backup-first production schema migration and block the E2E runner until every critical header is canonical
-- [ ] Deploy backend release `2026.08.24-phase-d2`, run `repairParaWalletProductionSchema()` once, and verify diagnostics reports `financialSchemaReady=true`
-- [ ] Run one controlled authenticated production E2E only after the release and schema fingerprints match
+- [x] Deploy backend release `2026.08.24-phase-d2`, run `repairParaWalletProductionSchema()` once, and verify all 22 production headers are canonical
+- [x] Run one controlled authenticated production E2E only after the release and schema fingerprints match

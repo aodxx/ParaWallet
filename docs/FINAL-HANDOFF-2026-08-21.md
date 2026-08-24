@@ -2,7 +2,7 @@
 
 ## Executive conclusion
 
-ParaWallet has a production-oriented PWA and single-file Apps Script backend with server-side financial calculation, Google OAuth validation, Google Sheets repositories, Drive/OCR adapters, LockService boundaries, RequestID idempotency, audit logging, settlement allocation, dispute handling, schema diagnostics, and mutation guards. Repository-side verification is green. The remaining gap is not an untested code path in the sandbox; it is confirmation that the deployed Apps Script Web App has been updated to the latest repository revision and that a real authenticated production E2E transaction can be executed.
+ParaWallet has a production-oriented PWA and single-file Apps Script backend with server-side financial calculation, Google OAuth validation, Google Sheets repositories, Drive/OCR adapters, LockService boundaries, RequestID idempotency, audit logging, settlement allocation, dispute handling, schema diagnostics, and mutation guards. Repository-side verification is green, the D2 production migration is complete, and the controlled production E2E transaction has passed with reconciled Sheet evidence.
 
 ## Verification evidence
 
@@ -21,7 +21,7 @@ ParaWallet has a production-oriented PWA and single-file Apps Script backend wit
 
 ## Production data audit
 
-The approved garden `garden-pahpayom-001` exists with Owner and Tapper membership. The `Agreements` tab contains two test Agreements created by earlier failed runner attempts. The header is still the legacy 12-column shape followed by four blank cells in the live Spreadsheet. `Sales`, `Settlements`, `SettlementAllocations`, and `WalletEntries` contain headers but no successful E2E financial rows. `AuditLogs` contains two `agreement_created` events. No direct cleanup was performed because direct Sheet mutation would bypass Apps Script authorization, locking, and audit boundaries.
+The approved garden `garden-pahpayom-001` exists with active Owner and Tapper membership. All 22 domain sheets now match the canonical headers after backup-first migration. The one-time runner created exactly one tagged confirmed Sale, one tagged confirmed Settlement, one allocation, three confirmed wallet entries, five new audit events, and five new notifications. No direct cleanup was performed because direct Sheet mutation would bypass Apps Script authorization, locking, and audit boundaries.
 
 ## Repository changes in the final pass
 
@@ -31,9 +31,9 @@ The latest repository revision adds read-only schema diagnostics with `schemaMis
 
 The GitHub Pages PWA, frontend API client, Apps Script backend, pure financial calculator, sandbox E2E harness, schema diagnostics, and test/build pipeline are usable as a production-oriented codebase. Test code is isolated under `tests/`; it is not imported into the deployed frontend or Apps Script runtime. The PWA intentionally renders dashes or empty states when it has no live connection rather than presenting fallback financial amounts as real balances.
 
-## What cannot be certified from this environment
+## Operational verification boundary
 
-The repository cannot certify that the Apps Script Web App deployment is running the latest `Code.gs` because Apps Script deployments do not auto-sync from GitHub and the deployment does not expose its source revision through the health response. Google OAuth browser interaction also cannot be completed without a user session or an ID token. Consequently, production E2E on the real Spreadsheet remains unconfirmed even though the sandbox E2E and all repository checks pass.
+The operator confirmed the D2 Web App deployment and executed the D2-only production migration and runner. The connected read-only audit verified their Spreadsheet effects, but this environment could not independently fetch the post-D2 public health JSON. During future deployment checks, require the health endpoint to report `release=2026.08.24-phase-d2` and `schemaVersion=2026-08-production-v3` before accepting traffic.
 
 ## Safe final deployment gate
 
@@ -41,7 +41,7 @@ Before accepting real financial operations, deploy the latest `appsscript/Code.g
 
 ## Final status
 
-The codebase is **repository-verified and sandbox-E2E verified**, but it is **not production-sign-off verified**. This distinction is deliberate and protects the integrity of the real financial ledger.
+The codebase is **repository-verified, sandbox-E2E verified, and controlled production-E2E verified**. The tagged test records and all timestamped migration backups remain part of the audit evidence.
 
 ## Addendum — 24 August 2026
 
@@ -52,3 +52,9 @@ The production gate remains unchanged: deploy this release, confirm the health f
 ## Addendum — Phase D2 production-schema preflight
 
 The live D1 health fingerprint was confirmed, but the authorized E2E preflight stopped before mutation after detecting four additional legacy headers: Gardens, Buyers, Sales, and Settlements. Release `2026.08.24-phase-d2` adds a read-only migration preview, a backup-first semantic migration for every known production legacy shape, and a full critical-schema assertion at the start of the E2E runner. Deploy D2, run `repairParaWalletProductionSchema()` once, and require `financialSchemaReady=true` before rerunning the controlled E2E.
+
+## Production E2E sign-off — 24 August 2026
+
+The operator deployed D2, ran the production-schema migration, approved the controlled transaction, and executed the one-time runner. Read-only verification of the real Spreadsheet found zero schema mismatches across all 22 domain sheets and exactly one tagged Sale plus one tagged Settlement. The Sale is confirmed at 6,000 gross, 150 deductions, 5,850 split base, 3,510 Owner share, and 2,340 Tapper share. The 2,000 cash Settlement is confirmed and allocated once; WalletEntries contain two confirmed Sale credits and one confirmed Settlement debit. Owner outstanding reconciles to 1,510. All five required audit events and five notification event types are present, with no duplicate tagged transaction.
+
+The ParaWallet financial workflow is now **production E2E verified** for the controlled fixture. Preserve the tagged records and timestamped migration backups as audit evidence; do not delete ledger rows directly.
