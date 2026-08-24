@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#123c2b" />
+  <title>ParaWallet — Forest Fintech Prototype</title>
+  <style>
+    :root {
+      font-family: "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+      color: #173c2c;
+      background: #e4eee0;
+      font-synthesis: none;
+      --forest-950: #0e2d21;
+      --forest-900: #123c2b;
+      --forest-800: #184d36;
+      --forest-700: #256047;
+      --leaf-200: #cfe7c4;
+      --leaf-100: #e9f4e3;
+      --cream: #f6f3e9;
+      --surface: #fffef9;
+      --ink: #173c2c;
+      --muted: #617568;
+      --line: #dce7d7;
+      --amber: #f0b94f;
+      --amber-soft: #fff1d0;
+      --terracotta: #bc6247;
+      --shadow: 0 18px 48px rgba(18, 60, 43, .18);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { min-height: 100dvh; background: radial-gradient(circle at 15% 15%, #f4f7ed 0, transparent 28%), linear-gradient(135deg, #dce9d7, #edf2e7); }
+    button { font: inherit; }
+    button:focus-visible { outline: 3px solid #f0b94f; outline-offset: 2px; }
+
+    .prototype-shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 36px; padding: 28px; }
+    .prototype-note { justify-self: end; width: min(330px, 100%); }
+    .prototype-note .eyebrow { color: var(--forest-700); font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .prototype-note h1 { margin: 12px 0 10px; color: var(--forest-950); font-size: clamp(30px, 4vw, 48px); line-height: 1.08; letter-spacing: -.04em; }
+    .prototype-note p { margin: 0; color: #536b5d; font-size: 16px; line-height: 1.7; }
+    .prototype-note ul { margin: 20px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .prototype-note li { display: flex; align-items: center; gap: 10px; color: #315542; font-size: 14px; font-weight: 700; }
+    .prototype-note li::before { width: 8px; height: 8px; border-radius: 50%; background: #6da463; content: ""; }
+
+    .role-switch { align-self: center; justify-self: start; display: grid; gap: 12px; padding: 12px; border: 1px solid rgba(18,60,43,.08); border-radius: 22px; background: rgba(255,255,255,.62); box-shadow: 0 12px 32px rgba(18,60,43,.08); backdrop-filter: blur(18px); }
+    .role-switch strong { padding: 0 7px; color: #456050; font-size: 12px; }
+    .role-switch button { min-width: 126px; min-height: 48px; border: 0; border-radius: 14px; background: transparent; color: #52695b; font-size: 14px; font-weight: 800; cursor: pointer; }
+    .role-switch button.active { background: var(--forest-900); color: white; box-shadow: 0 8px 18px rgba(18,60,43,.22); }
+
+    .phone { position: relative; width: 390px; height: min(844px, calc(100dvh - 32px)); overflow: hidden; display: flex; flex-direction: column; border: 8px solid #17382a; border-radius: 40px; background: var(--cream); box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,.8) inset; }
+    .phone::before { position: absolute; top: 8px; left: 50%; z-index: 20; width: 92px; height: 24px; border-radius: 999px; background: #17382a; content: ""; transform: translateX(-50%); }
+    .app-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+    .app-scroll::-webkit-scrollbar { display: none; }
+
+    .app-header { position: relative; padding: 38px 18px 14px; background: linear-gradient(150deg, var(--forest-950), var(--forest-800)); color: white; }
+    .brand-row, .identity-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 9px; }
+    .brand img { width: 31px; height: 31px; padding: 4px; border-radius: 10px; background: rgba(255,255,255,.92); }
+    .brand strong { display: block; font-size: 16px; line-height: 1.1; }
+    .brand small { display: block; margin-top: 3px; color: #c9ddce; font-size: 10px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .connection { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 9px; border-radius: 999px; background: rgba(255,255,255,.12); color: #e6f1e6; font-size: 10px; font-weight: 800; }
+    .connection::before { width: 7px; height: 7px; border-radius: 50%; background: #90d276; box-shadow: 0 0 0 3px rgba(144,210,118,.15); content: ""; }
+    .icon-button { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border: 0; border-radius: 13px; background: rgba(255,255,255,.12); color: white; cursor: pointer; }
+    .icon-button .badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; display: grid; place-items: center; padding: 0 5px; border: 2px solid var(--forest-900); border-radius: 999px; background: #f2b64b; color: #2e351d; font-size: 11px; font-weight: 900; }
+    .identity-row { align-items: end; margin-top: 18px; }
+    .identity-row small { display: block; color: #bdd2c2; font-size: 11px; }
+    .identity-row strong { display: block; margin-top: 3px; font-size: 18px; }
+    .role-pill { padding: 6px 10px; border-radius: 999px; background: #e9f4e3; color: #23553c; font-size: 11px; font-weight: 900; }
+
+    main { padding: 14px 14px 30px; }
+    .garden-context { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 50px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 5px 14px rgba(30,70,44,.05); }
+    .garden-context span { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .garden-context small, .garden-context strong { display: block; }
+    .garden-context small { color: var(--muted); font-size: 10px; }
+    .garden-context strong { overflow: hidden; margin-top: 2px; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+    .garden-context button { flex: 0 0 auto; min-height: 36px; border: 0; border-radius: 11px; padding: 0 11px; background: var(--leaf-100); color: var(--forest-800); font-size: 11px; font-weight: 900; }
+
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 20px 2px 10px; }
+    .section-head h2 { margin: 0; color: var(--forest-950); font-size: 18px; line-height: 1.25; }
+    .section-head p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .section-head button { min-height: 36px; border: 0; background: transparent; color: var(--forest-700); font-size: 12px; font-weight: 900; }
+
+    .wallet-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .wallet-card { min-width: 0; min-height: 126px; display: flex; flex-direction: column; justify-content: space-between; padding: 14px; border-radius: 20px; background: linear-gradient(145deg, var(--forest-950), var(--forest-700)); color: white; box-shadow: 0 10px 24px rgba(18,60,43,.17); }
+    .wallet-card.secondary { border: 1px solid #e1d79e; background: linear-gradient(145deg, #f6edc8, #eadb9f); color: var(--forest-950); box-shadow: 0 10px 22px rgba(100,84,30,.10); }
+    .wallet-card span { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #cee0d2; font-size: 11px; font-weight: 800; }
+    .wallet-card.secondary span { color: #6a684b; }
+    .wallet-card strong { display: block; overflow-wrap: anywhere; font-size: 25px; line-height: 1; letter-spacing: -.04em; }
+    .wallet-card small { color: #bdd3c2; font-size: 10px; line-height: 1.35; }
+    .wallet-card.secondary small { color: #716f54; }
+
+    .hero-action { width: 100%; min-height: 92px; display: flex; align-items: center; gap: 15px; margin-top: 14px; border: 0; border-radius: 22px; padding: 16px; background: linear-gradient(125deg, #2c6a4b, #174b35); color: white; text-align: left; box-shadow: 0 12px 26px rgba(18,60,43,.18); cursor: pointer; }
+    .hero-action.amber { background: linear-gradient(125deg, #f4c565, #e4a83c); color: #263c2c; box-shadow: 0 12px 24px rgba(172,116,25,.20); }
+    .hero-action .hero-icon { flex: 0 0 auto; width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: rgba(255,255,255,.14); }
+    .hero-action.amber .hero-icon { background: rgba(255,255,255,.38); }
+    .hero-action strong { display: block; font-size: 19px; line-height: 1.25; }
+    .hero-action small { display: block; margin-top: 4px; color: #cee0d2; font-size: 11px; line-height: 1.4; }
+    .hero-action.amber small { color: #5d633f; }
+    .hero-action > svg { margin-left: auto; opacity: .8; }
+
+    .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 10px; }
+    .quick-action { min-height: 86px; display: grid; justify-items: center; align-content: center; gap: 8px; border: 1px solid var(--line); border-radius: 17px; padding: 9px 5px; background: var(--surface); color: var(--forest-800); cursor: pointer; }
+    .quick-action svg { padding: 7px; border-radius: 11px; background: var(--leaf-100); }
+    .quick-action span { font-size: 11px; font-weight: 900; line-height: 1.3; text-align: center; }
+
+    .task-list { display: grid; gap: 9px; }
+    .task { width: 100%; min-height: 72px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 17px; padding: 11px; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
+    .task-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: var(--amber-soft); color: #8b6115; }
+    .task-icon.green { background: var(--leaf-100); color: var(--forest-700); }
+    .task-copy { min-width: 0; }
+    .task-copy strong { display: block; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+    .task-copy span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .task-value { text-align: right; }
+    .task-value strong { display: block; font-size: 13px; }
+    .task-value span { display: inline-flex; margin-top: 4px; border-radius: 999px; padding: 3px 7px; background: var(--amber-soft); color: #825d19; font-size: 9px; font-weight: 900; }
+
+    .bottom-nav { flex: 0 0 auto; position: relative; z-index: 10; min-height: calc(78px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; padding: 7px 7px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #d6e2d4; background: rgba(255,254,249,.97); box-shadow: 0 -10px 30px rgba(18,60,43,.10); backdrop-filter: blur(18px); }
+    .nav-item { position: relative; min-width: 0; min-height: 62px; display: grid; justify-items: center; align-content: center; gap: 3px; border: 0; border-radius: 16px; background: transparent; color: #5b7062; cursor: pointer; }
+    .nav-item .nav-icon { width: 44px; height: 31px; display: grid; place-items: center; border-radius: 999px; transition: background .18s ease, color .18s ease, transform .18s ease; }
+    .nav-item span { font-size: 14px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+    .nav-item.active { color: var(--forest-900); }
+    .nav-item.active .nav-icon { background: var(--leaf-200); color: var(--forest-900); transform: translateY(-1px); }
+    .nav-item .nav-badge { position: absolute; top: 3px; left: calc(50% + 10px); min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 5px; border: 2px solid var(--surface); border-radius: 999px; background: #eeb64b; color: #443413; font-size: 10px; font-weight: 900; }
+
+    .role-panel[hidden] { display: none; }
+    .toast { position: absolute; right: 14px; bottom: 96px; left: 14px; z-index: 30; padding: 12px 15px; border-radius: 14px; background: var(--forest-950); color: white; box-shadow: 0 10px 28px rgba(12,40,27,.25); font-size: 12px; font-weight: 800; text-align: center; opacity: 0; pointer-events: none; transform: translateY(10px); transition: .2s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .hero-icon svg { width: 29px; height: 29px; }
+
+    @media (max-width: 940px) {
+      .prototype-shell { grid-template-columns: 1fr; padding: 0; }
+      .prototype-note { display: none; }
+      .role-switch { position: fixed; top: 8px; right: 8px; z-index: 100; grid-auto-flow: column; gap: 3px; padding: 4px; border-radius: 13px; background: rgba(255,255,255,.88); }
+      .role-switch strong { display: none; }
+      .role-switch button { min-width: 76px; min-height: 36px; border-radius: 10px; font-size: 12px; }
+      .phone { width: min(100%, 440px); height: 100dvh; margin: auto; border: 0; border-radius: 0; box-shadow: none; }
+      .phone::before { display: none; }
+      .app-header { padding-top: calc(16px + env(safe-area-inset-top)); }
+    }
+
+    @media (max-width: 360px) {
+      .nav-item span { font-size: 13px; }
+      .wallet-card strong { font-size: 22px; }
+      .quick-action span { font-size: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <defs>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.3 21h3.4M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/></symbol>
+      <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 18 2 18 2c1 5.8-1 11.5-7 13"/><path d="M2 21c0-3 1.85-5.36 5.08-6.94C9.12 13.06 12 12 16 12"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4 16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l1.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4zM22 2 11 13"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M20 7V6a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v10H5a3 3 0 0 1-3-3V7"/><path d="M16 14h.01"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 10h.01M18 14h.01"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="prototype-shell">
+    <aside class="prototype-note">
+      <span class="eyebrow">Forest Fintech Prototype</span>
+      <h1>ParaWallet<br />อ่านง่าย ใช้งานไว</h1>
+      <p>ต้นแบบมือถือสำหรับคนทำงานกลางแจ้ง เน้นตัวเลขสำคัญ งานที่ต้องทำ และปุ่มสัมผัสขนาดใหญ่</p>
+      <ul>
+        <li>Bottom Navigation ตัวอักษร 14px</li>
+        <li>พื้นที่กดขั้นต่ำ 56×56px</li>
+        <li>กระเป๋าคู่วางซ้าย–ขวา</li>
+        <li>สีสถานะไม่ใช่สัญญาณเพียงอย่างเดียว</li>
+      </ul>
+    </aside>
+
+    <section class="phone" aria-label="ต้นแบบ ParaWallet บนมือถือ">
+      <div class="app-scroll" id="appScroll">
+        <header class="app-header">
+          <div class="brand-row">
+            <div class="brand"><img src="./icon.svg" alt="" /><span><strong>ParaWallet</strong><small>กระเป๋าคู่สวนยาง</small></span></div>
+            <div class="header-actions"><span class="connection">เชื่อมต่อแล้ว</span><button class="icon-button demo-action" aria-label="เปิดการแจ้งเตือน"><svg><use href="#i-bell" /></svg><span class="badge" id="headerBadge">2</span></button></div>
+          </div>
+          <div class="identity-row"><span><small>สวัสดีครับ</small><strong id="userName">สมหมาย</strong></span><span class="role-pill" id="rolePill">Tapper</span></div>
+        </header>
+
+        <main>
+          <div class="garden-context"><span><svg><use href="#i-leaf" /></svg><span><small>สวนที่กำลังใช้งาน</small><strong>สวนป่าพะยอม · พัทลุง</strong></span></span><button class="demo-action">ดูข้อมูล</button></div>
+
+          <div class="role-panel" data-role="tapper">
+            <div class="section-head"><div><h2>กระเป๋าเงินคู่</h2><p>อัปเดตจากรายการที่ยืนยันแล้ว</p></div><button class="demo-action">ดูทั้งหมด</button></div>
+            <div class="wallet-pair">
+              <article class="wallet-card"><span>กระเป๋าของฉัน <svg><use href="#i-wallet" /></svg></span><strong>฿2,340</strong><small>รายได้ของคนกรีดที่ยืนยันแล้ว</small></article>
+              <article class="wallet-card secondary"><span>เงินของเจ้าของ <svg><use href="#i-shield" /></svg></span><strong>฿1,510</strong><small>ยอดที่คุณกำลังถืออยู่</small></article>
+            </div>
+            <button class="hero-action demo-action"><span class="hero-icon"><svg><use href="#i-camera" /></svg></span><span><strong>สแกนใบเสร็จ</strong><small>เปิดกล้องทันที แล้วตรวจข้อมูลก่อนบันทึก</small></span><svg><use href="#i-chevron" /></svg></button>
+            <div class="quick-grid">
+              <button class="quick-action demo-action"><svg><use href="#i-file" /></svg><span>บันทึก<br />รายการขาย</span></button>
+              <button class="quick-action demo-action"><svg><use href="#i-send" /></svg><span>บันทึก<br />ส่งเงิน</span></button>
+              <button class="quick-action demo-action"><svg><use href="#i-download" /></svg><span>รายงาน<br />ส่งออก</span></button>
+            </div>
+            <div class="section-head"><div><h2>งานที่ต้องทำ</h2><p>ติดตามสถานะที่ต้องดำเนินการ</p></div><button class="demo-action">ดูทั้งหมด</button></div>
+            <div class="task-list">
+              <button class="task demo-action"><span class="task-icon"><svg><use href="#i-clock" /></svg></span><span class="task-copy"><strong>รายการขายรอเจ้าของตรวจ</strong><span>ร้านยางศรีพัทลุง · วันนี้ 09:42</span></span><span class="task-value"><strong>฿6,000</strong><span>รอตรวจ</span></span></button>
+              <button class="task demo-action"><span class="task-icon green"><svg><use href="#i-cash" /></svg></span><span class="task-copy"><strong>ส่งเงินสดสำเร็จ</strong><span>เจ้าของยืนยันรับเงินแล้ว</span></span><span class="task-value"><strong>฿2,000</strong><span style="background:#e7f3df;color:#2b673f">ยืนยันแล้ว</span></span></button>
+            </div>
+          </div>
+
+          <div class="role-panel" data-role="owner" hidden>
+            <button class="hero-action amber demo-action"><span class="hero-icon"><svg><use href="#i-shield" /></svg></span><span><strong>มี 2 งานรอตรวจสอบ</strong><small>รายการขาย 1 · รับเงินสด 1</small></span><svg><use href="#i-chevron" /></svg></button>
+            <div class="section-head"><div><h2>ภาพรวมเงินของฉัน</h2><p>ยอดจากรายการที่ยืนยันแล้ว</p></div><button class="demo-action">ดูบัญชี</button></div>
+            <div class="wallet-pair">
+              <article class="wallet-card"><span>สิทธิของฉัน <svg><use href="#i-wallet" /></svg></span><strong>฿3,510</strong><small>ส่วนแบ่ง Owner ที่ยืนยันแล้ว</small></article>
+              <article class="wallet-card secondary"><span>รับเงินแล้ว <svg><use href="#i-shield" /></svg></span><strong>฿2,000</strong><small>ยอดคงเหลือ ฿1,510</small></article>
+            </div>
+            <div class="section-head"><div><h2>รายการรอตรวจสอบ</h2><p>ตรวจหลักฐานก่อนยืนยันทุกครั้ง</p></div><button class="demo-action">ดูทั้งหมด</button></div>
+            <div class="task-list">
+              <button class="task demo-action"><span class="task-icon"><svg><use href="#i-file" /></svg></span><span class="task-copy"><strong>ตรวจรายการขายใหม่</strong><span>มีภาพใบเสร็จ · OCR 94%</span></span><span class="task-value"><strong>฿6,000</strong><span>ตรวจขาย</span></span></button>
+              <button class="task demo-action"><span class="task-icon"><svg><use href="#i-cash" /></svg></span><span class="task-copy"><strong>ยืนยันรับเงินสด</strong><span>จากสมหมาย · จุดรับเงินหน้าสวน</span></span><span class="task-value"><strong>฿1,000</strong><span>ยืนยันรับ</span></span></button>
+            </div>
+            <div class="section-head"><div><h2>กิจกรรมล่าสุด</h2><p>ประวัติที่ตรวจสอบย้อนหลังได้</p></div></div>
+            <div class="task-list"><button class="task demo-action"><span class="task-icon green"><svg><use href="#i-shield" /></svg></span><span class="task-copy"><strong>ยืนยันรับเงินโอนแล้ว</strong><span>อ้างอิง TRX-0824 · วันนี้ 08:15</span></span><span class="task-value"><strong>฿2,000</strong><span style="background:#e7f3df;color:#2b673f">สำเร็จ</span></span></button></div>
+          </div>
+        </main>
+      </div>
+
+      <nav class="bottom-nav" aria-label="เมนูหลัก">
+        <button class="nav-item active" data-label="ภาพรวม"><span class="nav-icon"><svg><use href="#i-home" /></svg></span><span>ภาพรวม</span></button>
+        <button class="nav-item" data-label="รายการ"><span class="nav-icon"><svg><use href="#i-list" /></svg></span><span>รายการ</span><em class="nav-badge" id="workBadge">1</em></button>
+        <button class="nav-item" data-label="กระเป๋า"><span class="nav-icon"><svg><use href="#i-wallet" /></svg></span><span>กระเป๋า</span></button>
+        <button class="nav-item" data-label="เพิ่มเติม"><span class="nav-icon"><svg><use href="#i-menu" /></svg></span><span>เพิ่มเติม</span></button>
+      </nav>
+      <div class="toast" role="status" aria-live="polite" id="toast">ต้นแบบการทำงาน</div>
+    </section>
+
+    <aside class="role-switch" aria-label="สลับบทบาทตัวอย่าง"><strong>ดูหน้าจอในบทบาท</strong><button class="active" data-role-switch="tapper">Tapper</button><button data-role-switch="owner">Owner</button></aside>
+  </div>
+
+  <script>
+    const roleButtons = [...document.querySelectorAll('[data-role-switch]')];
+    const rolePanels = [...document.querySelectorAll('.role-panel')];
+    const navItems = [...document.querySelectorAll('.nav-item')];
+    const toast = document.getElementById('toast');
+    let toastTimer;
+
+    function announce(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 1400);
+    }
+
+    function setRole(role) {
+      roleButtons.forEach(button => button.classList.toggle('active', button.dataset.roleSwitch === role));
+      rolePanels.forEach(panel => panel.hidden = panel.dataset.role !== role);
+      document.getElementById('userName').textContent = role === 'owner' ? 'นิพนธ์' : 'สมหมาย';
+      document.getElementById('rolePill').textContent = role === 'owner' ? 'Owner' : 'Tapper';
+      document.getElementById('headerBadge').textContent = role === 'owner' ? '2' : '1';
+      document.getElementById('workBadge').textContent = role === 'owner' ? '2' : '1';
+      document.getElementById('appScroll').scrollTo({ top: 0, behavior: 'smooth' });
+      announce(`แสดงต้นแบบสำหรับ ${role === 'owner' ? 'Owner' : 'Tapper'}`);
+    }
+
+    roleButtons.forEach(button => button.addEventListener('click', () => setRole(button.dataset.roleSwitch)));
+    navItems.forEach(button => button.addEventListener('click', () => {
+      navItems.forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+      announce(`เมนู ${button.dataset.label} — ต้นแบบยังไม่เปลี่ยนหน้า`);
+    }));
+    document.querySelectorAll('.demo-action').forEach(button => button.addEventListener('click', () => announce('ต้นแบบนี้ใช้ตรวจดีไซน์และขนาดการกด')));
+  </script>
+</body>
+</html>

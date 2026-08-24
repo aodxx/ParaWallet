@@ -24,6 +24,7 @@ Use this page to identify the current source of truth. A release number inside a
 | [`API_CONTRACT.md`](API_CONTRACT.md) | Request/response actions and security contract |
 | [`DATA_MODEL.md`](DATA_MODEL.md) | Canonical Google Sheets tables and columns |
 | [`MOBILE_DESIGN_DIRECTION.md`](MOBILE_DESIGN_DIRECTION.md) | Existing mobile UX and information-architecture rules |
+| [`DESIGN-FOREST-FINTECH-PROTOTYPE.md`](DESIGN-FOREST-FINTECH-PROTOTYPE.md) | Approved Forest Fintech prototype and Bottom Navigation accessibility specification |
 | [`INTEGRATION_VERIFICATION.md`](INTEGRATION_VERIFICATION.md) | Deterministic integration-verification notes |
 
 ## Historical release and audit evidence
