@@ -47,6 +47,7 @@ describe("role-aware UI contract", () => {
   it("collects transfer evidence and explains cash confirmation", () => {
     expect(app).toContain("กรุณาแนบสลิปการโอนเงิน");
     expect(app).toContain("ไฟล์สลิปต้องมีขนาดไม่เกิน 4 MB");
+    expect(app).toContain("สลิปต้องเป็นรูปภาพหรือไฟล์ PDF เท่านั้น");
     expect(app).toContain("Owner ต้องกดยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ตรวจรายละเอียดการส่งเงิน");

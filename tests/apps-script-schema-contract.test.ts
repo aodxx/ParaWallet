@@ -49,6 +49,7 @@ describe("Apps Script schema safety contract", () => {
 
   it("stores settlement evidence in Drive without writing base64 into AuditLogs", () => {
     expect(code).toContain('throw new Error("SETTLEMENT_SLIP_REQUIRED")');
+    expect(code).toContain('throw new Error("SETTLEMENT_SLIP_TYPE_INVALID")');
     expect(code).toContain('DriveStorage.save(payload.slipData');
     expect(code).toContain('"settlements", user.id');
     expect(code).toContain('slipFileId: slipFileId');

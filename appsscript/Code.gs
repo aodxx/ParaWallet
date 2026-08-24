@@ -828,15 +828,18 @@ Services.createSettlement = function (user, payload) {
   if (method === "bank_transfer") {
     if (!slipFileId && !payload.slipData) throw new Error("SETTLEMENT_SLIP_REQUIRED");
     if (payload.slipData) {
+      var slipMimeType = String(payload.slipMimeType || "image/jpeg");
+      if (slipMimeType.indexOf("image/") !== 0 && slipMimeType !== "application/pdf") throw new Error("SETTLEMENT_SLIP_TYPE_INVALID");
       // A 4 MB source file expands to roughly 5.4 MB as a data URL.
       if (String(payload.slipData).length > 6000000) throw new Error("SETTLEMENT_SLIP_TOO_LARGE");
-      var slip = DriveStorage.save(payload.slipData, payload.slipMimeType || "image/jpeg", payload.slipFilename || ("settlement-" + new Date().getTime()), "settlements", user.id);
+      var slip = DriveStorage.save(payload.slipData, slipMimeType, payload.slipFilename || ("settlement-" + new Date().getTime()), "settlements", user.id);
       slipFileId = slip.fileId;
     } else {
       var trustedFile = rows_("Files").filter(function (row) {
         return id_(row.driveFileId) === id_(slipFileId) && row.folderType === "settlements" && id_(row.ownerId) === id_(user.id);
       })[0];
       if (!trustedFile) throw new Error("SETTLEMENT_SLIP_ACCESS_DENIED");
+      if (String(trustedFile.mimeType).indexOf("image/") !== 0 && trustedFile.mimeType !== "application/pdf") throw new Error("SETTLEMENT_SLIP_TYPE_INVALID");
     }
   }
   if (method === "cash" && !String(payload.location || "").trim()) throw new Error("CASH_LOCATION_REQUIRED");

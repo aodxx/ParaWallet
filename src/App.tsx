@@ -320,6 +320,7 @@ function SettlementForm({ garden, role, onClose, onSaved }: { garden?: Garden; r
   const [error, setError] = useState("");
   const selectSlip = (selected: File | null) => {
     setError("");
+    if (selected && !selected.type.startsWith("image/") && selected.type !== "application/pdf") { setSlipFile(null); setError("สลิปต้องเป็นรูปภาพหรือไฟล์ PDF เท่านั้น"); return; }
     if (selected && selected.size > MAX_EVIDENCE_BYTES) { setSlipFile(null); setError("ไฟล์สลิปต้องมีขนาดไม่เกิน 4 MB"); return; }
     setSlipFile(selected);
   };
