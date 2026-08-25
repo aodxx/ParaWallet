@@ -89,7 +89,7 @@ describe("role-aware UI contract", () => {
   it("makes the dual wallet and direct camera scan Tapper's primary workflow", () => {
     expect(app).toContain('className="dual-wallet-priority"');
     expect(app).toContain('className="scan-receipt-cta"');
-    expect(app).toContain('receiptCameraRef.current?.click()');
+    expect(app).toContain('onReceipt={() => { setReceiptInitialFile(null); setShowReceiptForm(true); }}');
     expect(app).toContain('capture="environment"');
     expect(app).toContain('initialFile={receiptInitialFile}');
     expect(app).toContain("formatThaiDateTime(sale.saleDate)");
@@ -128,6 +128,16 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ฐานแบ่งเงิน");
     expect(app).toContain("ยืนยันรายการขาย");
     expect(app).not.toContain("await api.sales.confirm(sale.id); onRefresh();");
+  });
+
+  it("exposes both camera capture and device image selection for OCR", () => {
+    expect(app).toContain('className="receipt-upload-actions"');
+    expect(app).toContain('className="file-action secondary"><Camera');
+    expect(app).toContain("ถ่ายภาพใบเสร็จ");
+    expect(app).toContain("เลือกภาพจากเครื่อง");
+    expect(app).toContain('accept="image/*" capture="environment"');
+    expect(styles).toContain(".receipt-upload-actions");
+    expect(styles).toContain(".receipt-upload-actions .file-action input");
   });
 
   it("links the scanned Receipt record and garden scope into Sale creation", () => {
