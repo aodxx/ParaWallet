@@ -154,4 +154,17 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain("min-height:var(--mobile-dock-height)");
     expect(styles).toContain(".content{padding-bottom:var(--mobile-content-clearance);scroll-padding-bottom:var(--mobile-content-clearance)}");
   });
+
+  it("keeps the login experience branded, secure, and responsive", () => {
+    expect(app).toContain('className="auth-orbit auth-orbit-one"');
+    expect(app).toContain("บัญชีดิจิทัลสำหรับสวนยาง");
+    expect(app).toContain("จัดการยอดขาย ส่วนแบ่ง และการส่งเงินของสวนคุณอย่างเป็นระบบในที่เดียว");
+    expect(app).toContain('role="alert"');
+    expect(app).toContain('role="note"');
+    expect(app).toContain("ข้อมูลของคุณยังเป็นส่วนตัว");
+    expect(styles).toContain(".auth-card-head");
+    expect(styles).toContain(".auth-security-note");
+    expect(styles).toContain("min-height:100svh");
+    expect(styles).toContain("@media(prefers-reduced-motion:reduce)");
+  });
 });
