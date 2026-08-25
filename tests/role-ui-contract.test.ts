@@ -149,6 +149,9 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain(".topbar .brand small{display:none}");
     expect(styles).toContain(".topbar .brand{min-width:0;flex:1}");
     expect(styles).toContain(".topbar .notification-button{width:42px;height:42px;padding:0}");
-    expect(styles).toContain("padding-bottom:calc(140px + env(safe-area-inset-bottom))");
+    expect(styles).toContain("--mobile-dock-height:calc(88px + env(safe-area-inset-bottom))");
+    expect(styles).toContain("--mobile-content-clearance:calc(var(--mobile-dock-height) + 52px)");
+    expect(styles).toContain("min-height:var(--mobile-dock-height)");
+    expect(styles).toContain(".content{padding-bottom:var(--mobile-content-clearance);scroll-padding-bottom:var(--mobile-content-clearance)}");
   });
 });
