@@ -78,3 +78,4 @@ button,input,select,textarea{font-family:inherit}button{min-height:44px;-webkit-
  .developer-credit{margin-bottom:calc(140px + env(safe-area-inset-bottom))}
 }
 .mobile-more-sheet .developer-credit{justify-content:space-between;margin:12px 0 0;padding:12px 2px 0;border-top:1px solid var(--line);font-size:11px}.mobile-more-sheet .developer-credit__label{display:grid;gap:1px}.mobile-more-sheet .developer-credit__label>strong{font-size:12px}.mobile-more-sheet .developer-credit__label small{color:var(--muted);font-size:10px}
+@media(max-width:680px){.topbar .brand{min-width:0;flex:1}.topbar .brand>span:last-child{min-width:0}.topbar .brand small{display:none}.topbar .brand b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.topbar .top-actions{flex-shrink:0}.topbar .notification-button{width:42px;height:42px;padding:0}}

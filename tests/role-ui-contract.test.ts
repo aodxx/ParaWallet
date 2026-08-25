@@ -144,6 +144,9 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain("max-height:82dvh");
     expect(styles).toContain("padding:18px 16px calc(28px + env(safe-area-inset-bottom))");
     expect(styles).toContain(".top-actions .signout-button{display:none");
+    expect(styles).toContain(".topbar .brand small{display:none}");
+    expect(styles).toContain(".topbar .brand{min-width:0;flex:1}");
+    expect(styles).toContain(".topbar .notification-button{width:42px;height:42px;padding:0}");
     expect(styles).toContain("padding-bottom:calc(140px + env(safe-area-inset-bottom))");
   });
 });
