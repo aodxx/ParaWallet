@@ -139,7 +139,9 @@ describe("role-aware UI contract", () => {
 
   it("keeps the D12.2 mobile refinements scoped to layout and navigation UX", () => {
     expect(app).toContain("LogOut");
-    expect(app).toContain('aria-label="เกี่ยวกับแอป"');
+    expect(app).toContain('aria-labelledby="developer-credit-title"');
+    expect(app).toContain('id="developer-credit-title"');
+    expect(app).toContain('rel="noopener noreferrer"');
     expect(app).toContain("setShowMobileMore(false); handleSignOut()");
     expect(styles).toContain("max-height:82dvh");
     expect(styles).toContain("padding:18px 16px calc(28px + env(safe-area-inset-bottom))");

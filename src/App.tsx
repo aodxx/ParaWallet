@@ -277,7 +277,7 @@ function screenDescription(screen: Screen, role: Role) {
 }
 
 function DeveloperCredit() {
-  return <div className="developer-credit" aria-label="เกี่ยวกับแอป"><span className="developer-credit__label"><strong>เกี่ยวกับแอป</strong><small>Developed by <b>aod</b></small></span><a className="developer-credit__link" href="https://www.facebook.com/share/1AWvhjdr44/" target="_blank" rel="noreferrer" aria-label="เปิด Facebook ของ aod"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.6 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a21 21 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.5v3h2.7v8h3.4Z" /></svg><span>Facebook</span></a></div>;
+  return <section className="developer-credit" aria-labelledby="developer-credit-title"><span className="developer-credit__label"><strong id="developer-credit-title">เกี่ยวกับแอป</strong><small>Developed by <b>aod</b></small></span><a className="developer-credit__link" href="https://www.facebook.com/share/1AWvhjdr44/" target="_blank" rel="noopener noreferrer" aria-label="เปิด Facebook ของ aod"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.6 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a21 21 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.5v3h2.7v8h3.4Z" /></svg><span>Facebook</span></a></section>;
 }
 
 function AuthScreen({ clientId, message, onCredential, onError }: { clientId: string; message: string; onCredential: (token: string) => void; onError: (message: string) => void }) {
