@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newRequestId } from "../src/api";
+import { normalizeOcrFields, receiptTypeLabel, validateReceiptMath } from "../src/ocr";
 import { allocateSettlement, assertActiveTapperMember, calculateOcrValidationScore, calculateSale, canCancelSettlement, canConfirmSale, canCreateAdjustment, canDisputeSale, canResolveDispute, classifyOcrScore, isDuplicateSale, isIdempotentReplay, reconcileWallet, resolveDispute, validateAgreementPercentages, validateAgreementWindow } from "../src/financial";
 
 type SplitInput = { grossSale: number; buyerDeductions?: number; sharedExpenses?: number; ownerPercentage: number; tapperPercentage: number };
@@ -65,6 +66,23 @@ describe("ParaWallet core safeguards", () => {
     expect(() => resolveDispute("confirmed", "resolved")).toThrow("DISPUTE_NOT_RESOLVABLE");
     expect(() => resolveDispute("open", "cancelled")).toThrow("DISPUTE_DECISION_INVALID");
   });
+  it("normalizes weigh tickets into the existing Sale fields", () => {
+    const fields = normalizeOcrFields({ receiptType: "weigh_ticket", saleDate: "14/1/69", buyer: "จุดรับซื้อ", grossWeight: "324", price: "29", totalAmount: "9396" });
+    expect(fields.receiptType).toBe("weigh_ticket");
+    expect(fields.weightKg).toBe("324");
+    expect(fields.unitPrice).toBe("29");
+    expect(fields.grossSale).toBe("9396");
+    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: null, amountConsistent: true });
+    expect(receiptTypeLabel(fields.receiptType)).toContain("ใบชั่งน้ำหนัก");
+  });
+
+  it("normalizes rubber forms and flags inconsistent handwritten arithmetic", () => {
+    const fields = normalizeOcrFields({ receiptType: "rubber_form", freshWeightKg: "99", drc: "49", dryWeightKg: "48.51", unitPrice: "99", grossSale: "4802" });
+    expect(fields.weightKg).toBe("48.51");
+    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: true, amountConsistent: true });
+    expect(validateReceiptMath({ ...fields, dryWeightKg: "40" }).weightConsistent).toBe(false);
+  });
+
   it("scores OCR from field completeness and arithmetic validation instead of provider constants", () => {
     const score = calculateOcrValidationScore({ saleDate: "2026-08-21", buyerName: "Buyer", productType: "Latex", weightKg: 100, unitPrice: 50, grossSale: 5000, buyerDeductions: 0 });
     expect(score).toBe(100);

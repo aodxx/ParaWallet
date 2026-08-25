@@ -388,7 +388,7 @@ var DriveStorage = {
 var OCR = {
   extract: function (fileBase64, mimeType) {
     var contentBase64 = String(fileBase64 || "").split(",").pop();
-    var prompt = "Extract rubber sale receipt fields as JSON: saleDate, buyerName, productType, weightKg, unitPrice, grossSale, buyerDeductions. Return only JSON.";
+    var prompt = "Classify this Thai rubber purchase receipt and extract JSON only. Use receiptType exactly as weigh_ticket for a weighing ticket/cash bill, rubber_form for a fresh-latex percentage-dry-rubber form, or unknown. Return these keys: receiptType, saleDate, buyerName, ticketNumber, productType, weightKg, unitPrice, grossSale, buyerDeductions, freshWeightKg, drc, dryWeightKg, needsReview. For weigh_ticket, map total/net weight to weightKg; for rubber_form, extract freshWeightKg, drc as a percentage, dryWeightKg, unitPrice and grossSale. Use null for unreadable fields, never guess handwritten digits, and set needsReview true whenever a financial field is uncertain. Return only JSON.";
     if (Config.geminiKey()) return this.gemini_(contentBase64, mimeType, prompt);
     if (Config.visionKey()) return this.vision_(contentBase64, mimeType);
     return { provider: "none", confidence: 0, score: 0, needsReview: true, reviewLevel: "mandatory", fields: {} };
@@ -401,7 +401,8 @@ var OCR = {
     if (numeric_(fields.weightKg) > 0) score += 15;
     if (numeric_(fields.unitPrice) > 0) score += 15;
     if (numeric_(fields.grossSale) > 0) score += 15;
-    if (numeric_(fields.weightKg) > 0 && numeric_(fields.unitPrice) > 0 && numeric_(fields.grossSale) > 0 && Math.abs(numeric_(fields.weightKg) * numeric_(fields.unitPrice) - numeric_(fields.grossSale)) <= 0.02) score += 20;
+    var amountMatches = numeric_(fields.weightKg) > 0 && numeric_(fields.unitPrice) > 0 && numeric_(fields.grossSale) > 0 && Math.abs(numeric_(fields.weightKg) * numeric_(fields.unitPrice) - numeric_(fields.grossSale)) <= (fields.receiptType === "rubber_form" ? Math.max(1, numeric_(fields.grossSale) * 0.01) : 0.02);
+    if (amountMatches) score += 20;
     if (numeric_(fields.buyerDeductions) >= 0) score += 5;
     return score;
   },
