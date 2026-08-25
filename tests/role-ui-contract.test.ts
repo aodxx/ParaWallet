@@ -92,6 +92,12 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('receiptCameraRef.current?.click()');
     expect(app).toContain('capture="environment"');
     expect(app).toContain('initialFile={receiptInitialFile}');
+    expect(app).toContain("formatThaiDateTime(sale.saleDate)");
+    expect(app).toContain("formatThaiDateTime(item.transferDate)");
+    expect(app).toContain("screenDescription(screen, role)");
+    expect(app).toContain('className="panel-actions settlement-confirm-actions settlement-row-actions"');
+    expect(styles).toContain(".settlement-row-actions{grid-column:1/-1!important");
+    expect(styles).toContain("margin-bottom:calc(140px + env(safe-area-inset-bottom))");
   });
 
   it("collects transfer evidence and explains cash confirmation", () => {

@@ -66,3 +66,14 @@ button,input,select,textarea{font-family:inherit}button{min-height:44px;-webkit-
 @keyframes mobile-dock-pop{0%{transform:translateY(0) scale(.78) rotate(-8deg)}68%{transform:translateY(-18px) scale(1.14) rotate(3deg)}100%{transform:translateY(-15px) scale(1.08) rotate(0)}}
 @media(max-width:360px){.mobile-bottom-nav button{font-size:13px}.owner-wallet-pair strong{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.mobile-more-sheet,.mobile-bottom-nav button.active .mobile-nav-icon{animation:none}.mobile-dock-indicator,.mobile-nav-icon{transition:none}}
+
+/* Phase D12.1 real-device Tapper spacing and readability pass */
+@media(max-width:680px){
+ .content{padding-bottom:44px}
+ .dual-wallet-heading{display:grid;justify-content:start;align-items:start;gap:4px;margin-bottom:12px}.dual-wallet-heading small{max-width:none;color:#5b654c;text-align:left}
+ .page-heading p,.page-heading span,.panel-head p,.data-row span,.metric small,.metric span,.info-card p,.evidence-label{color:#5b654c}
+ .status.confirmed{background:#dcead7;color:#315b37!important;font-weight:800}
+ .settlement-row{grid-template-columns:minmax(0,1fr) auto;align-items:start}.settlement-row-copy{min-width:0}.settlement-row-copy>span{overflow-wrap:anywhere}.settlement-row>.status{justify-self:end}
+ .settlement-row-actions{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr;width:100%;margin-top:0}.settlement-row-actions button{width:100%;min-height:46px}
+ .developer-credit{margin-bottom:calc(140px + env(safe-area-inset-bottom))}
+}

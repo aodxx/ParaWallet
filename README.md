@@ -6,7 +6,7 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 
 | Component | Accepted baseline |
 |---|---|
-| Frontend | Phase D12 Forest Fintech UI on GitHub Pages |
+| Frontend | Phase D12.1 Forest Fintech mobile QA refinement on GitHub Pages |
 | Backend | `2026.08.24-phase-d10` |
 | Schema | `2026-08-production-v3` |
 | Automated verification | 98 tests, TypeScript, Apps Script syntax, and production build |

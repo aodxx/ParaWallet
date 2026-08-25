@@ -2,7 +2,7 @@
 
 Updated: 24 August 2026
 
-The PRD core is implemented through backend D10 and frontend D12. This matrix is a present-tense status record, not authorization to begin optional work.
+The PRD core is implemented through backend D10 and frontend D12.1. This matrix is a present-tense status record, not authorization to begin optional work.
 
 | PRD area | Current production status | Remaining boundary |
 |---|---|---|

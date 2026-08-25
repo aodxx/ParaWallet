@@ -46,6 +46,7 @@ The following files are intentionally retained. Do not use their old release num
 - `PHASE-D10-CONNECTION-RESILIENCE.md`
 - `PHASE-D11-LOADING-UX.md`
 - `PHASE-D12-FOREST-FINTECH-UI.md`
+- `PHASE-D12-1-MOBILE-QA.md`
 
 ## Current status precedence
 
