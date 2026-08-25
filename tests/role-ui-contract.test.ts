@@ -136,4 +136,14 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("agreementId: agreement.id, receiptId");
     expect(app).toContain("!receiptId || !receiptFileId");
   });
+
+  it("keeps the D12.2 mobile refinements scoped to layout and navigation UX", () => {
+    expect(app).toContain("LogOut");
+    expect(app).toContain('aria-label="เกี่ยวกับแอป"');
+    expect(app).toContain("setShowMobileMore(false); handleSignOut()");
+    expect(styles).toContain("max-height:82dvh");
+    expect(styles).toContain("padding:18px 16px calc(28px + env(safe-area-inset-bottom))");
+    expect(styles).toContain(".top-actions .signout-button{display:none");
+    expect(styles).toContain("padding-bottom:calc(140px + env(safe-area-inset-bottom))");
+  });
 });
