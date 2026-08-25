@@ -36,7 +36,9 @@ export function normalizeOcrFields(input: OcrFields): NormalizedOcrFields {
   const weightKg = numericText(input.weightKg ?? input.netWeight) || dryWeightKg || freshWeightKg;
   const unitPrice = numericText(input.unitPrice ?? input.pricePerKg ?? input.price);
   const grossSale = numericText(input.grossSale ?? input.totalAmount ?? input.amount);
-  const receiptType = input.receiptType === "weigh_ticket" || input.receiptType === "rubber_form" ? input.receiptType : "unknown";
+  const explicitType = input.receiptType === "weigh_ticket" || input.receiptType === "rubber_form" ? input.receiptType : "";
+  const inferredType = dryWeightKg || drc ? "rubber_form" : (freshWeightKg || weightKg || unitPrice || grossSale ? "weigh_ticket" : "unknown");
+  const receiptType = (explicitType || inferredType) as ReceiptType;
   return {
     ...input,
     receiptType,
