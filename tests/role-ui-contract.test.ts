@@ -218,3 +218,21 @@ describe("calendar sales receipt workflow", () => {
     expect(app).toContain("hasReceipt = Boolean(sale.receiptFileId || sale.receiptId)");
   });
 });
+
+
+describe("field-use calendar refinement", () => {
+  it("removes the duplicate period control from the page heading", () => {
+    expect(app).not.toContain('<button className="period">เดือนนี้⌄</button>');
+    expect(app).toContain('className="calendar-toolbar-actions"');
+    expect(app).toContain('aria-label="เดือนก่อนหน้า"');
+    expect(app).toContain('aria-label="เดือนถัดไป"');
+  });
+
+  it("places refresh and add actions below the calendar", () => {
+    expect(app).toContain('className="calendar-bottom-actions"');
+    expect(app).toContain('className="calendar-bottom-actions"><button className="secondary"');
+    expect(styles).toContain(".calendar-bottom-actions");
+    expect(styles).toContain(".calendar-day.has-receipt{background:#d7f0c9");
+    expect(styles).toContain(".calendar-day.has-sales{background:#fff4cf");
+  });
+});

@@ -220,7 +220,7 @@ export default function App() {
         <button className="settings"><Settings2 size={18} />ตั้งค่า</button>
       </aside>
       <main className={`content ${loading ? "is-loading" : ""}`}>
-        <div className="page-heading"><div><p>{new Date().toLocaleDateString("th-TH", { dateStyle: "full" })}</p><h1>{screenTitle(screen)}</h1><span>{screenDescription(screen, role)}</span></div><button className="period">เดือนนี้⌄</button></div>
+        <div className="page-heading"><div><p>{new Date().toLocaleDateString("th-TH", { dateStyle: "full" })}</p><h1>{screenTitle(screen)}</h1><span>{screenDescription(screen, role)}</span></div></div>
         {message && <div className="notice">{message}</div>}
         <div className="screen-stage" aria-busy={loading}>
           <div className="screen-content" key={screen}>
@@ -386,12 +386,12 @@ function SalesCalendar({ sales, role, onReview, onSale }: { sales: Sale[]; role:
       <div className="calendar-selected-head"><div><small>วันที่ตัด / วันที่ในใบเสร็จ</small><h3>{selectedDate ? calendarDateLabel(selectedDate) : "เลือกวันที่จากปฏิทิน"}</h3></div><span>{selectedDate ? `${selectedSales.length} รายการ` : "แตะช่องวันที่เพื่อเปิดรายการ"}</span></div>
       {!selectedDate ? <div className="calendar-empty-selection"><CalendarDays size={22} /><span>เลือกวันที่ตัดที่มีสีเขียวเพื่อดูรายการที่มีใบเสร็จและเปิดรายละเอียดเต็ม</span></div> : selectedSales.length === 0 ? <div className="calendar-empty-selection"><span>ไม่มีรายการขายในวันที่เลือก</span></div> : <div className="calendar-sale-list">{selectedSales.map((sale) => { const hasReceipt = saleHasReceipt(sale); const canConfirm = role === "owner" && sale.status === "pending_owner_review"; return <article className={`calendar-sale-card ${hasReceipt ? "with-receipt" : ""}`} key={sale.id}><div className="calendar-sale-card-main"><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span><small>{hasReceipt ? `มีภาพใบเสร็จ · OCR ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "ยังไม่มีภาพใบเสร็จ"}</small></div><strong>{money(sale.grossSale || 0)}</strong></div><div className="calendar-sale-card-actions"><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span><button className={canConfirm ? "primary" : "link-button"} type="button" onClick={() => onReview(sale)}>{canConfirm ? <><ShieldCheck size={15} />ตรวจและยืนยัน</> : <><Eye size={15} />ดูรายละเอียดเต็ม</>}</button></div></article>; })}</div>}
     </section>
-    {sales.length === 0 && <div className="calendar-no-data"><span>ยังไม่มีรายการขายจากสวนที่เลือก</span>{role === "tapper" && <button className="secondary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการขาย</button>}</div>}
+    {sales.length === 0 && <div className="calendar-no-data"><span>ยังไม่มีรายการขายจากสวนที่เลือก</span></div>}
   </div>;
 }
 
 function SalesScreen({ sales, role, onSale, onReview, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onReview: (sale: Sale) => void; onRefresh: () => void }) {
-  return <section className="panel sales-panel"><div className="panel-head"><div><h2>รายการขายตามปฏิทิน</h2><p>ใช้วันที่ตัดในใบเสร็จเป็นวันที่ในปฏิทิน เลือกวันที่เพื่อดูข้อมูลและภาพใบเสร็จ</p></div><div className="panel-actions"><button className="secondary" type="button" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button>}</div></div><SalesCalendar sales={sales} role={role} onReview={onReview} onSale={onSale} /></section>;
+  return <section className="panel sales-panel"><SalesCalendar sales={sales} role={role} onReview={onReview} onSale={onSale} /><div className="calendar-bottom-actions"><button className="secondary" type="button" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button>}</div></section>;
 }
 
 function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role: Role; onClose: () => void; onChanged: () => void }) {
