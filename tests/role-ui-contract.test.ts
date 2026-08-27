@@ -21,10 +21,10 @@ describe("role-aware UI contract", () => {
   });
 
   it("lets Owner manage registered Tapper accounts without typing internal IDs", () => {
-    expect(app).toContain("เพิ่ม Tapper เข้าสวน");
+    expect(app).toContain("เพิ่มคนกรีด (Tapper) เข้าสวน");
     expect(app).toContain("api.members.add");
     expect(app).toContain("api.members.deactivate");
-    expect(app).toContain("เลือก Tapper ในสวน");
+    expect(app).toContain("เลือกคนกรีด (Tapper) ในสวน");
     expect(app).not.toContain("Tapper ID<input");
   });
 
@@ -68,7 +68,7 @@ describe("role-aware UI contract", () => {
   it("does not render an Owner or Tapper dashboard before role verification finishes", () => {
     expect(app).toContain("if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen");
     expect(app).toContain("กำลังเตรียม ParaWallet");
-    expect(app).toContain("ยังไม่แสดงหน้าของ Owner หรือ Tapper จนกว่าจะตรวจสอบสิทธิ์สำเร็จ");
+    expect(app).toContain("เจ้าของสวน (Owner) หรือคนกรีด (Tapper) จนกว่าจะตรวจสอบสิทธิ์สำเร็จ");
   });
 
   it("uses the supplied local Lottie animation for stable loading states", () => {
@@ -104,7 +104,7 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("กรุณาแนบสลิปการโอนเงิน");
     expect(app).toContain("ไฟล์สลิปต้องมีขนาดไม่เกิน 4 MB");
     expect(app).toContain("สลิปต้องเป็นรูปภาพหรือไฟล์ PDF เท่านั้น");
-    expect(app).toContain("Owner ต้องกดยืนยันว่าได้รับเงินสดแล้ว");
+    expect(app).toContain("เจ้าของสวน (Owner) ต้องกดยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ตรวจรายละเอียดการส่งเงิน");
     expect(app).toContain("ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว");
@@ -176,5 +176,21 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain(".auth-security-note");
     expect(styles).toContain("min-height:100svh");
     expect(styles).toContain("@media(prefers-reduced-motion:reduce)");
+  });
+});
+
+
+describe("Thai UI terminology and destination labels", () => {
+  it("uses consistent Thai labels with standard English terms in parentheses", () => {
+    expect(app).toContain('role === "owner" ? "เจ้าของสวน (Owner)" : "คนกรีด (Tapper)"');
+    expect(app).toContain("เวอร์ชัน");
+    expect(app).toContain("ส่งออก CSV");
+    expect(app).not.toContain(">Export CSV<");
+    expect(app).not.toContain("ทุก version");
+  });
+
+  it("labels the mobile settlement destination as ส่งเงิน", () => {
+    expect(app).toContain('onClick={() => openScreen("settlements")}><span className="mobile-nav-icon"><WalletCards size={22} /></span><span>ส่งเงิน</span>');
+    expect(app).not.toContain("<span>กระเป๋า</span>");
   });
 });
