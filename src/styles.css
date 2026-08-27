@@ -98,6 +98,52 @@ button,input,select,textarea{font-family:inherit}button{min-height:44px;-webkit-
 @media(max-width:680px){.calendar-toolbar{align-items:stretch;flex-direction:column;gap:12px}.calendar-toolbar-actions{justify-content:space-between}.calendar-toolbar-actions .icon-button{width:44px;height:44px}.calendar-toolbar-actions .secondary{flex:1}.calendar-grid{gap:4px}.calendar-weekday{padding:2px 0;font-size:9px}.calendar-day,.calendar-day-empty{min-height:70px}.calendar-day{padding:7px 5px;border-radius:9px}.calendar-day-number{font-size:13px}.calendar-day-count{font-size:8px}.calendar-day-receipt{padding:3px 4px;font-size:8px}.calendar-selected-head{align-items:stretch;flex-direction:column;gap:6px}.calendar-selected-head>span{align-self:flex-start}.calendar-sale-card-main{gap:8px}.calendar-sale-card-actions{align-items:stretch;flex-direction:column}.calendar-sale-card-actions button{width:100%}.calendar-no-data{align-items:stretch;flex-direction:column}.calendar-no-data button{width:100%}}
 @media(prefers-reduced-motion:reduce){.calendar-day{transition:none}.calendar-day:not(:disabled):hover{transform:none}}
 
+/* D12.3: Tapper animated receipt action dock */
+.mobile-scan-backdrop{display:none}
+@media(max-width:680px){
+ .desktop-scan-receipt{display:none}
+ .mobile-scan-backdrop{position:fixed;inset:0;z-index:38;display:block;width:100%;height:100%;min-height:0;border:0;border-radius:0;padding:0;background:rgba(22,31,15,.58);backdrop-filter:blur(3px);animation:scan-backdrop-in .18s ease-out}
+ .mobile-bottom-nav.has-scan-action{grid-template-columns:repeat(5,minmax(0,1fr));overflow:visible}
+ .mobile-bottom-nav button.active{background:rgba(254,250,224,.08);color:var(--cream)}
+ .mobile-bottom-nav button.active .mobile-nav-icon{color:var(--amber);transform:none;animation:none}
+ .mobile-bottom-nav button.active>span:last-of-type{color:#f2c17f;transform:none}
+ .mobile-bottom-nav button.active em{top:3px;border-color:var(--forest)}
+ .mobile-scan-action{position:relative;z-index:3;min-width:0;min-height:66px}
+ .mobile-scan-action::before,.mobile-scan-action::after{position:absolute;left:50%;border-radius:50%;pointer-events:none;content:"";transform:translateX(-50%)}
+ .mobile-scan-action::before{top:-42px;z-index:0;width:88px;height:88px;background:var(--cream)}
+ .mobile-scan-action::after{top:-34px;z-index:1;width:72px;height:72px;background:var(--forest);box-shadow:0 -8px 20px rgba(40,54,24,.18)}
+ .mobile-bottom-nav .mobile-scan-trigger{position:absolute;top:-31px;left:50%;z-index:3;display:grid;width:82px;height:101px;min-height:0;grid-template-rows:64px 24px;justify-items:center;align-content:start;gap:6px;border:0;border-radius:0;padding:0;background:transparent;color:var(--cream);transform:translateX(-50%)}
+ .mobile-bottom-nav .mobile-scan-trigger:active{transform:translateX(-50%) scale(.96)}
+ .mobile-scan-trigger-icon{display:grid;width:64px;height:64px;place-items:center;border:4px solid var(--forest);border-radius:50%;background:linear-gradient(145deg,#edbb78,var(--amber));color:var(--forest-deep);box-shadow:0 10px 24px rgba(24,36,14,.36);transition:transform .22s cubic-bezier(.34,1.56,.64,1),background .2s ease}
+ .mobile-scan-trigger-label{font-size:12px;font-weight:900;line-height:1;white-space:nowrap}
+ .mobile-scan-action.is-open .mobile-scan-trigger-icon{background:var(--cream);transform:rotate(90deg) scale(.94)}
+ .mobile-scan-menu{position:absolute;bottom:72px;left:50%;z-index:4;width:min(300px,calc(100vw - 24px));height:132px;pointer-events:none;transform:translateX(-50%)}
+ .mobile-bottom-nav .scan-option{position:absolute;display:grid;width:88px;min-height:76px;justify-items:center;align-content:start;gap:5px;border:0;padding:0;background:transparent;color:var(--cream);font-size:11px;opacity:0;pointer-events:none;transition:opacity .16s ease,transform .23s cubic-bezier(.34,1.56,.64,1)}
+ .mobile-bottom-nav .scan-option>span{display:grid;width:52px;height:52px;place-items:center;border:3px solid rgba(254,250,224,.72);border-radius:50%;background:var(--cream);color:var(--forest);box-shadow:0 9px 24px rgba(12,20,8,.32)}
+ .mobile-bottom-nav .scan-option strong{border-radius:999px;padding:4px 8px;background:rgba(40,54,24,.94);color:var(--cream);font-size:11px;line-height:1;white-space:nowrap;box-shadow:0 4px 12px rgba(12,20,8,.2)}
+ .mobile-bottom-nav .scan-option-camera{top:0;left:50%;transform:translate(-50%,18px) scale(.76)}
+ .mobile-bottom-nav .scan-option-camera>span{background:var(--amber);color:var(--forest-deep)}
+ .mobile-bottom-nav .scan-option-gallery{bottom:0;left:0;transform:translate(20px,12px) scale(.76)}
+ .mobile-bottom-nav .scan-option-manual{right:0;bottom:0;transform:translate(-20px,12px) scale(.76)}
+ .mobile-scan-action.is-open .mobile-scan-menu{pointer-events:auto}
+ .mobile-scan-action.is-open .scan-option{opacity:1;pointer-events:auto}
+ .mobile-scan-action.is-open .scan-option-camera{transform:translate(-50%,0) scale(1);transition-delay:0s}
+ .mobile-scan-action.is-open .scan-option-gallery{transform:translate(0,0) scale(1);transition-delay:.035s}
+ .mobile-scan-action.is-open .scan-option-manual{transform:translate(0,0) scale(1);transition-delay:.07s}
+}
+@keyframes scan-backdrop-in{from{opacity:0}to{opacity:1}}
+@media(max-width:360px){
+ .mobile-bottom-nav.has-scan-action{padding-right:3px;padding-left:3px}
+ .mobile-bottom-nav.has-scan-action>button{font-size:12px}
+ .mobile-scan-menu{width:calc(100vw - 12px)}
+ .mobile-bottom-nav .scan-option{width:82px}
+}
+@media(prefers-reduced-motion:reduce){
+ .mobile-scan-backdrop{animation:none}
+ .mobile-scan-trigger-icon,.mobile-bottom-nav .scan-option{transition:none}
+ .mobile-scan-action.is-open .mobile-scan-trigger-icon{transform:none}
+}
+
 
 /* Field-use calendar refinement */
 .calendar-bottom-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:2px}.calendar-bottom-actions button{min-height:44px}.calendar-day{min-height:90px;border-color:#d8e2cf;background:#fffef9;box-shadow:0 2px 8px rgba(48,83,48,.05)}.calendar-day.has-sales{background:#fff4cf;border-color:#d5bd68}.calendar-day.has-receipt{background:#d7f0c9;border-color:#4f984f;box-shadow:inset 0 0 0 2px rgba(79,152,79,.12),0 3px 9px rgba(79,152,79,.12)}.calendar-day.has-receipt .calendar-day-number{color:#1e6b39}.calendar-day-receipt{background:#4f984f;color:#fff}.calendar-day.is-selected{outline:3px solid rgba(46,105,54,.38);outline-offset:2px}.calendar-day.is-today{border-color:#c58b19;box-shadow:inset 0 0 0 1px rgba(197,139,25,.28)}

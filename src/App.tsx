@@ -49,7 +49,10 @@ export default function App() {
   const [showAgreementForm, setShowAgreementForm] = useState(false);
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
+  const [showScanMenu, setShowScanMenu] = useState(false);
   const receiptCameraRef = useRef<HTMLInputElement>(null);
+  const receiptGalleryRef = useRef<HTMLInputElement>(null);
+  const scanMenuHistoryRef = useRef(false);
   const refreshSequenceRef = useRef(0);
   const hasSuccessfulSyncRef = useRef(false);
   const activeGarden = data.garden || gardens[0];
@@ -57,6 +60,36 @@ export default function App() {
   const pendingSales = data.pendingSales || 0;
   const pendingSettlements = data.pendingSettlements || 0;
   const unreadNotifications = data.unreadNotifications ?? notifications.filter((item) => !item.readAt).length;
+
+  const closeScanMenu = useCallback(() => {
+    if (scanMenuHistoryRef.current && window.history.state?.paraWalletScanMenu) {
+      window.history.back();
+      return;
+    }
+    scanMenuHistoryRef.current = false;
+    setShowScanMenu(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showScanMenu) return;
+    if (!scanMenuHistoryRef.current) {
+      window.history.pushState({ ...(window.history.state || {}), paraWalletScanMenu: true }, "");
+      scanMenuHistoryRef.current = true;
+    }
+    const handlePopState = () => {
+      scanMenuHistoryRef.current = false;
+      setShowScanMenu(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeScanMenu();
+    };
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeScanMenu, showScanMenu]);
 
   const handleSignOut = useCallback((reason = "") => {
     refreshSequenceRef.current += 1;
@@ -179,7 +212,7 @@ export default function App() {
     ["notifications", "แจ้งเตือน", <Bell size={18} />],
   ] as const, []);
 
-  const openScreen = (next: Screen) => { setScreen(next); void refresh(next); };
+  const openScreen = (next: Screen) => { if (showScanMenu) closeScanMenu(); setScreen(next); void refresh(next); };
   const openMobileScreen = (next: Screen) => { setShowMobileMore(false); openScreen(next); };
   const mobileNavIndex = screen === "overview" ? 0 : screen === "sales" ? 1 : screen === "settlements" ? 2 : 3;
 
@@ -237,12 +270,21 @@ export default function App() {
       </main>
     </div>
     <input ref={receiptCameraRef} className="camera-input" type="file" accept="image/*" capture="environment" aria-label="เปิดกล้องสแกนใบเสร็จ" onChange={(event) => { const selected = event.target.files?.[0] || null; event.target.value = ""; if (selected) { setReceiptInitialFile(selected); setShowReceiptForm(true); } }} />
-    <nav className="mobile-bottom-nav" aria-label="เมนูหลักบนมือถือ" data-active={mobileNavIndex}>
-      <span className="mobile-dock-indicator" aria-hidden="true" />
+    <input ref={receiptGalleryRef} className="camera-input" type="file" accept="image/*" aria-label="เลือกภาพใบเสร็จจากเครื่อง" onChange={(event) => { const selected = event.target.files?.[0] || null; event.target.value = ""; if (selected) { setReceiptInitialFile(selected); setShowReceiptForm(true); } }} />
+    {showScanMenu && <button className="mobile-scan-backdrop" type="button" aria-label="ปิดเมนูสแกนบิล" onClick={closeScanMenu} />}
+    <nav className={`mobile-bottom-nav ${role === "tapper" ? "has-scan-action" : ""}`} aria-label="เมนูหลักบนมือถือ" data-active={mobileNavIndex}>
       <button className={screen === "overview" ? "active" : ""} onClick={() => openScreen("overview")}><span className="mobile-nav-icon"><House size={22} /></span><span>ภาพรวม</span></button>
       <button className={screen === "sales" ? "active" : ""} onClick={() => openScreen("sales")}><span className="mobile-nav-icon"><FileText size={22} /></span><span>รายการ</span>{pendingSales > 0 && <em>{pendingSales}</em>}</button>
+      {role === "tapper" && <div className={`mobile-scan-action ${showScanMenu ? "is-open" : ""}`}>
+        <div className="mobile-scan-menu" role="menu" aria-label="วิธีบันทึกใบเสร็จ">
+          <button className="scan-option scan-option-camera" type="button" role="menuitem" onClick={() => { receiptCameraRef.current?.click(); closeScanMenu(); }}><span><Camera size={23} /></span><strong>ถ่ายบิล</strong></button>
+          <button className="scan-option scan-option-gallery" type="button" role="menuitem" onClick={() => { receiptGalleryRef.current?.click(); closeScanMenu(); }}><span><Image size={23} /></span><strong>เลือกรูป</strong></button>
+          <button className="scan-option scan-option-manual" type="button" role="menuitem" onClick={() => { setReceiptInitialFile(null); setShowReceiptForm(true); closeScanMenu(); }}><span><Plus size={24} /></span><strong>กรอกเอง</strong></button>
+        </div>
+        <button className="mobile-scan-trigger" type="button" aria-haspopup="menu" aria-expanded={showScanMenu} aria-label={showScanMenu ? "ปิดเมนูสแกนบิล" : "เปิดเมนูสแกนบิล"} onClick={() => showScanMenu ? closeScanMenu() : setShowScanMenu(true)}><span className="mobile-scan-trigger-icon">{showScanMenu ? <X size={30} /> : <Camera size={29} />}</span><span className="mobile-scan-trigger-label">สแกนบิล</span></button>
+      </div>}
       <button className={screen === "settlements" ? "active" : ""} onClick={() => openScreen("settlements")}><span className="mobile-nav-icon"><WalletCards size={22} /></span><span>ส่งเงิน</span>{pendingSettlements > 0 && <em>{pendingSettlements}</em>}</button>
-      <button className={mobileNavIndex === 3 ? "active" : ""} onClick={() => setShowMobileMore(true)}><span className="mobile-nav-icon"><Menu size={22} /></span><span>เพิ่มเติม</span>{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button>
+      <button className={mobileNavIndex === 3 ? "active" : ""} onClick={() => { if (showScanMenu) closeScanMenu(); setShowMobileMore(true); }}><span className="mobile-nav-icon"><Menu size={22} /></span><span>เพิ่มเติม</span>{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button>
     </nav>
     {showMobileMore && <div className="mobile-more-backdrop" role="presentation" onClick={() => setShowMobileMore(false)}><section className="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title" onClick={(event) => event.stopPropagation()}><div className="mobile-more-head"><div><small>เมนู ParaWallet</small><h2 id="mobile-more-title">เพิ่มเติม</h2></div><button className="icon-button" onClick={() => setShowMobileMore(false)} aria-label="ปิดเมนูเพิ่มเติม"><X size={22} /></button></div><div className="mobile-more-grid"><button onClick={() => openMobileScreen("gardens")}><Sprout size={22} /><span><strong>สวนและสมาชิก</strong><small>ข้อมูลสวนและสิทธิ์คนกรีด (Tapper)</small></span></button><button onClick={() => openMobileScreen("agreements")}><CircleDollarSign size={22} /><span><strong>ข้อตกลง</strong><small>สัดส่วนและเวอร์ชัน</small></span></button><button onClick={() => openMobileScreen("reports")}><FileDown size={22} /><span><strong>รายงาน/ส่งออก</strong><small>เลือกช่วงวันที่และส่งออก CSV</small></span></button><button onClick={() => openMobileScreen("notifications")}><Bell size={22} /><span><strong>การแจ้งเตือน</strong><small>{unreadNotifications > 0 ? `ยังไม่อ่าน ${unreadNotifications} รายการ` : "อ่านครบแล้ว"}</small></span></button><button onClick={() => { setShowMobileMore(false); handleSignOut(); }}><LogOut size={22} /><span><strong>ออกจากระบบ</strong><small>เปลี่ยนบัญชี Google หรือจบการใช้งาน</small></span></button></div><DeveloperCredit /></section></div>}
     {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); void refresh("gardens"); }} />}
@@ -316,7 +358,7 @@ function TapperOverview({ data, wallet, connected, salesSeries, salesSeriesMax, 
       <div className="wallet-transferred"><ShieldCheck size={16} /><span>ส่งให้เจ้าของและยืนยันแล้ว</span><strong>{showMoney(ownerMoneyTransferred)}</strong></div>
     </section>
     <section className="tapper-action-center" aria-label="งานหลักของคนกรีด">
-      <button className="scan-receipt-cta" onClick={onReceipt}><Camera size={31} /><span><strong>สแกนใบเสร็จ</strong><small>แตะเพื่อเปิดกล้องทันที แล้วตรวจข้อมูล OCR</small></span></button>
+      <button className="scan-receipt-cta desktop-scan-receipt" onClick={onReceipt}><Camera size={31} /><span><strong>สแกนใบเสร็จ</strong><small>เปิดกล้องหรือเลือกภาพ แล้วตรวจข้อมูล OCR</small></span></button>
       <div className="tapper-secondary-actions">
         <button onClick={onSale}><FileText size={21} /><span>บันทึกรายการขาย</span></button>
         <button onClick={onSettlement}><Banknote size={21} /><span>บันทึกส่งเงิน</span></button>

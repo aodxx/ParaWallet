@@ -86,11 +86,18 @@ describe("role-aware UI contract", () => {
     expect(loadingAnimation).toMatchObject({ w: 124, h: 124, ip: 0, op: 31 });
   });
 
-  it("makes the dual wallet and direct camera scan Tapper's primary workflow", () => {
+  it("makes the dual wallet and receipt scan dock Tapper's primary workflow", () => {
     expect(app).toContain('className="dual-wallet-priority"');
-    expect(app).toContain('className="scan-receipt-cta"');
+    expect(app).toContain('className="scan-receipt-cta desktop-scan-receipt"');
+    expect(app).toContain('role === "tapper" && <div className={`mobile-scan-action');
+    expect(app).toContain('aria-haspopup="menu"');
+    expect(app).toContain('aria-label="วิธีบันทึกใบเสร็จ"');
+    expect(app).toContain("ถ่ายบิล");
+    expect(app).toContain("เลือกรูป");
+    expect(app).toContain("กรอกเอง");
     expect(app).toContain('onReceipt={() => { setReceiptInitialFile(null); setShowReceiptForm(true); }}');
     expect(app).toContain('capture="environment"');
+    expect(app).toContain('ref={receiptGalleryRef}');
     expect(app).toContain('initialFile={receiptInitialFile}');
     expect(app).toContain("formatThaiDateTime(sale.saleDate)");
     expect(app).toContain("formatThaiDateTime(item.transferDate)");
@@ -98,6 +105,17 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('className="panel-actions settlement-confirm-actions settlement-row-actions"');
     expect(styles).toContain(".settlement-row-actions{grid-column:1/-1!important");
     expect(styles).toContain("margin-bottom:calc(140px + env(safe-area-inset-bottom))");
+  });
+
+  it("animates the Tapper scan actions without trapping Android back or reduced-motion users", () => {
+    expect(app).toContain("window.history.pushState");
+    expect(app).toContain('window.addEventListener("popstate", handlePopState)');
+    expect(app).toContain('event.key === "Escape"');
+    expect(app).toContain('className="mobile-scan-backdrop"');
+    expect(styles).toContain(".mobile-bottom-nav.has-scan-action{grid-template-columns:repeat(5");
+    expect(styles).toContain(".mobile-scan-action.is-open .scan-option");
+    expect(styles).toContain(".desktop-scan-receipt{display:none}");
+    expect(styles).toContain("@media(prefers-reduced-motion:reduce)");
   });
 
   it("collects transfer evidence and explains cash confirmation", () => {
