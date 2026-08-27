@@ -3,7 +3,7 @@ import { api, Agreement, ApiError, DashboardData, Garden, GardenMember, Notifica
 import GoogleSignIn from "./GoogleSignIn";
 import LoadingAnimation from "./LoadingAnimation";
 import { normalizeOcrFields, receiptTypeLabel, validateReceiptMath } from "./ocr";
-import { Banknote, Bell, Camera, CheckCircle2, CircleDollarSign, Eye, FileDown, FileText, House, Image, Leaf, LogOut, Menu, Plus, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
+import { Banknote, Bell, Camera, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Eye, FileDown, FileText, House, Image, Leaf, LogOut, Menu, Plus, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
 type ConnectionState = "connecting" | "connected" | "degraded" | "disconnected";
@@ -328,22 +328,85 @@ function TapperOverview({ data, wallet, connected, salesSeries, salesSeriesMax, 
   </div>;
 }
 
+const weekdayLabels = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+const thaiDateKeyFromDate = (value: Date) => { const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(value); const fields = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value])); return `${fields.year}-${fields.month}-${fields.day}`; };
+const saleDateKey = (value?: string) => { if (!value) return ""; const dateOnly = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || ""; if (!value.includes("T")) return dateOnly; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? dateOnly : thaiDateKeyFromDate(parsed); };
+const calendarMonthLabel = (value: Date) => value.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+const calendarDateLabel = (value: string) => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
+};
+const saleHasReceipt = (sale: Sale) => Boolean(sale.receiptFileId || sale.receiptId);
+
+function SalesCalendar({ sales, role, onReview, onSale }: { sales: Sale[]; role: Role; onReview: (sale: Sale) => void; onSale: () => void }) {
+  const [activeMonth, setActiveMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const salesByDate = useMemo(() => {
+    const grouped = new Map<string, Sale[]>();
+    sales.forEach((sale) => {
+      const key = saleDateKey(sale.saleDate);
+      if (!key) return;
+      grouped.set(key, [...(grouped.get(key) || []), sale]);
+    });
+    return grouped;
+  }, [sales]);
+  const cells = useMemo(() => {
+    const firstWeekday = new Date(activeMonth.getFullYear(), activeMonth.getMonth(), 1).getDay();
+    const daysInMonth = new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 0).getDate();
+    return Array.from({ length: firstWeekday + daysInMonth }, (_, index) => {
+      if (index < firstWeekday) return { key: `empty-${index}`, day: 0, dateKey: "" };
+      const day = index - firstWeekday + 1;
+      return { key: `${activeMonth.getFullYear()}-${activeMonth.getMonth()}-${day}`, day, dateKey: `${activeMonth.getFullYear()}-${String(activeMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}` };
+    });
+  }, [activeMonth]);
+  const selectedSales = selectedDate ? salesByDate.get(selectedDate) || [] : [];
+  const moveMonth = (offset: number) => {
+    setActiveMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+    setSelectedDate(null);
+  };
+
+  return <div className="sales-calendar">
+    <div className="calendar-toolbar">
+      <div><span className="calendar-kicker"><CalendarDays size={16} />ปฏิทินรายการขาย</span><h3>{calendarMonthLabel(activeMonth)}</h3><p>วันที่ตัด (วันที่ในใบเสร็จ) ที่มีภาพใบเสร็จจะเปลี่ยนเป็นสีเขียว และแตะวันที่เพื่อดูรายการ</p></div>
+      <div className="calendar-toolbar-actions"><button className="icon-button" type="button" onClick={() => moveMonth(-1)} aria-label="เดือนก่อนหน้า"><ChevronLeft size={18} /></button><button className="secondary" type="button" onClick={() => { setActiveMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelectedDate(null); }}>วันนี้</button><button className="icon-button" type="button" onClick={() => moveMonth(1)} aria-label="เดือนถัดไป"><ChevronRight size={18} /></button></div>
+    </div>
+    <div className="calendar-legend" aria-label="คำอธิบายสีปฏิทิน"><span><i className="calendar-legend-swatch receipt" />วันที่ตัดที่มีใบเสร็จ</span><span><i className="calendar-legend-swatch sale" />มีรายการแต่ยังไม่มีภาพใบเสร็จ</span></div>
+    <div className="calendar-grid" role="grid" aria-label={`ปฏิทินรายการขาย ${calendarMonthLabel(activeMonth)}`}>
+      {weekdayLabels.map((label) => <span className="calendar-weekday" role="columnheader" key={label}>{label}</span>)}
+      {cells.map((cell) => {
+        if (!cell.day) return <span className="calendar-day-empty" role="gridcell" aria-hidden="true" key={cell.key} />;
+        const entries = salesByDate.get(cell.dateKey) || [];
+        const hasReceipt = entries.some(saleHasReceipt);
+        const isToday = cell.dateKey === thaiDateKeyFromDate(new Date());
+        const isSelected = selectedDate === cell.dateKey;
+        return <button type="button" role="gridcell" className={`calendar-day ${entries.length ? "has-sales" : ""} ${hasReceipt ? "has-receipt" : ""} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`} key={cell.key} onClick={() => setSelectedDate(cell.dateKey)} aria-label={`${calendarDateLabel(cell.dateKey)}${hasReceipt ? ` มีใบเสร็จ ${entries.filter(saleHasReceipt).length} รายการ` : entries.length ? ` มีรายการ ${entries.length} รายการ` : " ไม่มีรายการ"}`} aria-pressed={isSelected}><span className="calendar-day-number">{cell.day}</span>{entries.length > 0 && <span className="calendar-day-count">{entries.length} รายการ</span>}{hasReceipt && <span className="calendar-day-receipt">มีใบเสร็จ</span>}</button>;
+      })}
+    </div>
+    <section className="calendar-selected-day" aria-live="polite">
+      <div className="calendar-selected-head"><div><small>วันที่ตัด / วันที่ในใบเสร็จ</small><h3>{selectedDate ? calendarDateLabel(selectedDate) : "เลือกวันที่จากปฏิทิน"}</h3></div><span>{selectedDate ? `${selectedSales.length} รายการ` : "แตะช่องวันที่เพื่อเปิดรายการ"}</span></div>
+      {!selectedDate ? <div className="calendar-empty-selection"><CalendarDays size={22} /><span>เลือกวันที่ตัดที่มีสีเขียวเพื่อดูรายการที่มีใบเสร็จและเปิดรายละเอียดเต็ม</span></div> : selectedSales.length === 0 ? <div className="calendar-empty-selection"><span>ไม่มีรายการขายในวันที่เลือก</span></div> : <div className="calendar-sale-list">{selectedSales.map((sale) => { const hasReceipt = saleHasReceipt(sale); const canConfirm = role === "owner" && sale.status === "pending_owner_review"; return <article className={`calendar-sale-card ${hasReceipt ? "with-receipt" : ""}`} key={sale.id}><div className="calendar-sale-card-main"><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span><small>{hasReceipt ? `มีภาพใบเสร็จ · OCR ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "ยังไม่มีภาพใบเสร็จ"}</small></div><strong>{money(sale.grossSale || 0)}</strong></div><div className="calendar-sale-card-actions"><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span><button className={canConfirm ? "primary" : "link-button"} type="button" onClick={() => onReview(sale)}>{canConfirm ? <><ShieldCheck size={15} />ตรวจและยืนยัน</> : <><Eye size={15} />ดูรายละเอียดเต็ม</>}</button></div></article>; })}</div>}
+    </section>
+    {sales.length === 0 && <div className="calendar-no-data"><span>ยังไม่มีรายการขายจากสวนที่เลือก</span>{role === "tapper" && <button className="secondary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการขาย</button>}</div>}
+  </div>;
+}
+
 function SalesScreen({ sales, role, onSale, onReview, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onReview: (sale: Sale) => void; onRefresh: () => void }) {
-  return <section className="panel"><div className="panel-head"><div><h2>รายการขายล่าสุด</h2><p>เปิดดูบิลและรายละเอียดการคำนวณก่อนยืนยันทุกครั้ง</p></div><div className="panel-actions"><button className="secondary" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button>}</div></div>{sales.length === 0 ? <Empty text="ยังไม่มีรายการขายจากสวนที่เลือก" /> : <div className="data-list">{sales.map((sale) => <article className="data-row sale-row" key={sale.id}><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{formatThaiDateTime(sale.saleDate)} · {sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span><small className="evidence-label">{sale.receiptFileId ? <><Image size={13} />มีภาพใบเสร็จ · OCR {Math.round(Number(sale.ocrConfidence || 0) * 100)}%</> : <><FileText size={13} />บันทึกด้วยมือ</>}</small></div><div><strong>{money(sale.grossSale || 0)}</strong><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><div className="panel-actions sale-row-actions"><button className={role === "owner" && sale.status === "pending_owner_review" ? "primary" : "link-button"} onClick={() => onReview(sale)}>{role === "owner" && sale.status === "pending_owner_review" ? <><ShieldCheck size={15} />ตรวจและยืนยัน</> : <><Eye size={15} />ดูรายละเอียด</>}</button>{role === "owner" && sale.status === "confirmed" && <button className="link-button" onClick={async () => { const reason = window.prompt("เหตุผลการปรับยอด"); const amount = Number(window.prompt("จำนวนเงินที่ปรับ", "0") || 0); const type = window.prompt("ประเภท: owner_credit / owner_debit / tapper_credit / tapper_debit", "owner_debit") || "owner_debit"; if (reason && amount > 0) { await api.adjustments.create({ saleId: sale.id, adjustmentType: type, amount, reason }); onRefresh(); } }}>ปรับยอด</button>}{role === "owner" && sale.status === "disputed" && <button className="link-button" onClick={async () => { const resolution = window.prompt("ผลการตรวจสอบข้อพิพาท"); if (resolution) { await api.disputes.resolve({ decision: "resolved", resolution, saleId: sale.id }); onRefresh(); } }}>แก้ไขข้อพิพาท</button>}</div></article>)}</div>}</section>;
+  return <section className="panel sales-panel"><div className="panel-head"><div><h2>รายการขายตามปฏิทิน</h2><p>ใช้วันที่ตัดในใบเสร็จเป็นวันที่ในปฏิทิน เลือกวันที่เพื่อดูข้อมูลและภาพใบเสร็จ</p></div><div className="panel-actions"><button className="secondary" type="button" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการ</button>}</div></div><SalesCalendar sales={sales} role={role} onReview={onReview} onSale={onSale} /></section>;
 }
 
 function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role: Role; onClose: () => void; onChanged: () => void }) {
+  const hasReceipt = Boolean(sale.receiptFileId || sale.receiptId);
   const [evidence, setEvidence] = useState<SaleReceiptEvidence | null>(null);
-  const [loadingEvidence, setLoadingEvidence] = useState(Boolean(sale.receiptFileId));
+  const [loadingEvidence, setLoadingEvidence] = useState(hasReceipt);
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    if (!sale.receiptFileId) { setLoadingEvidence(false); return () => { active = false; }; }
+    if (!hasReceipt) { setLoadingEvidence(false); return () => { active = false; }; }
     void api.sales.receipt(sale.id).then((result) => { if (active) setEvidence(result); }).catch((caught) => { if (active) setError(userMessageForApiError(caught)); }).finally(() => { if (active) setLoadingEvidence(false); });
     return () => { active = false; };
-  }, [sale.id, sale.receiptFileId]);
+  }, [sale.id, hasReceipt]);
   const confirmSale = async () => {
     if (!reviewed) return;
     setBusy(true); setError("");
@@ -360,7 +423,7 @@ function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role:
     finally { setBusy(false); }
   };
   const canDispute = ["pending_owner_review", "confirmed"].includes(sale.status);
-  return <Modal title="ตรวจรายละเอียดรายการขาย" onClose={onClose}><div className="sale-review"><div className="sale-review-summary"><div><small>ยอดขายก่อนหัก</small><strong>{money(sale.grossSale || 0)}</strong><span>{formatThaiDateTime(sale.saleDate)} · {sale.buyerName || "ไม่ระบุร้านรับซื้อ"}</span></div><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><section className="receipt-evidence"><div className="receipt-evidence-head"><div><Image size={18} /><span><strong>หลักฐานใบเสร็จ</strong><small>{sale.receiptFileId ? `OCR ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "รายการบันทึกด้วยมือ"}</small></span></div></div>{loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดใบเสร็จ" /></div> : evidence ? <img src={evidence.dataUrl} alt={`ใบเสร็จรายการขาย ${sale.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่มีภาพใบเสร็จ</strong><span>รายการนี้ถูกบันทึกด้วยมือ โปรดตรวจตัวเลขกับหลักฐานภายนอกก่อนยืนยัน</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดและการแบ่งเงิน</h3><div className="sale-detail-grid"><Detail label="ประเภทสินค้า" value={sale.productType || "ไม่ระบุ"} /><Detail label="น้ำหนักสุทธิ" value={`${sale.netWeight || sale.weightKg || 0} กก.`} /><Detail label="ราคาต่อหน่วย" value={money(sale.unitPrice || 0)} /><Detail label="หักหน้าร้าน" value={money(sale.buyerDeductions || 0)} /><Detail label="ค่าใช้จ่ายร่วม" value={money(sale.sharedExpenses || 0)} /><Detail label="ฐานแบ่งเงิน" value={money(sale.splitBase || 0)} /></div><div className="split-review"><div><span>สิทธิของเจ้าของสวน (Owner)</span><strong>{money(sale.ownerShare || 0)}</strong></div><div><span>สิทธิของคนกรีด (Tapper)</span><strong>{money(sale.tapperShare || 0)}</strong></div></div><small className="agreement-reference">ข้อตกลง: {sale.agreementId}</small></section>{role === "owner" && sale.status === "pending_owner_review" && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>ฉันตรวจหลักฐานและตัวเลขแล้ว</strong><small>เมื่อยืนยัน รายการจะเปลี่ยนจากรอตรวจเป็นยืนยันแล้ว</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{canDispute && <button className="danger-button" disabled={busy} onClick={() => void disputeSale()}>คัดค้านรายการ</button>}{role === "owner" && sale.status === "pending_owner_review" && <button className="primary" disabled={busy || !reviewed || loadingEvidence || Boolean(sale.receiptFileId && !evidence)} onClick={() => void confirmSale()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : "ยืนยันรายการขาย"}</button>}</div></div></Modal>;
+  return <Modal title="ตรวจรายละเอียดรายการขาย" onClose={onClose}><div className="sale-review"><div className="sale-review-summary"><div><small>ยอดขายก่อนหัก</small><strong>{money(sale.grossSale || 0)}</strong><span>{formatThaiDateTime(sale.saleDate)} · {sale.buyerName || "ไม่ระบุร้านรับซื้อ"}</span></div><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><section className="receipt-evidence"><div className="receipt-evidence-head"><div><Image size={18} /><span><strong>หลักฐานใบเสร็จ</strong><small>{hasReceipt ? `OCR ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "รายการบันทึกด้วยมือ"}</small></span></div></div>{loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดใบเสร็จ" /></div> : evidence ? <img src={evidence.dataUrl} alt={`ใบเสร็จรายการขาย ${sale.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่มีภาพใบเสร็จ</strong><span>รายการนี้ถูกบันทึกด้วยมือ โปรดตรวจตัวเลขกับหลักฐานภายนอกก่อนยืนยัน</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดและการแบ่งเงิน</h3><div className="sale-detail-grid"><Detail label="ประเภทสินค้า" value={sale.productType || "ไม่ระบุ"} /><Detail label="น้ำหนักสุทธิ" value={`${sale.netWeight || sale.weightKg || 0} กก.`} /><Detail label="ราคาต่อหน่วย" value={money(sale.unitPrice || 0)} /><Detail label="หักหน้าร้าน" value={money(sale.buyerDeductions || 0)} /><Detail label="ค่าใช้จ่ายร่วม" value={money(sale.sharedExpenses || 0)} /><Detail label="ฐานแบ่งเงิน" value={money(sale.splitBase || 0)} /></div><div className="split-review"><div><span>สิทธิของเจ้าของสวน (Owner)</span><strong>{money(sale.ownerShare || 0)}</strong></div><div><span>สิทธิของคนกรีด (Tapper)</span><strong>{money(sale.tapperShare || 0)}</strong></div></div><small className="agreement-reference">ข้อตกลง: {sale.agreementId}</small></section>{role === "owner" && sale.status === "pending_owner_review" && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>ฉันตรวจหลักฐานและตัวเลขแล้ว</strong><small>เมื่อยืนยัน รายการจะเปลี่ยนจากรอตรวจเป็นยืนยันแล้ว</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{canDispute && <button className="danger-button" disabled={busy} onClick={() => void disputeSale()}>คัดค้านรายการ</button>}{role === "owner" && sale.status === "pending_owner_review" && <button className="primary" disabled={busy || !reviewed || loadingEvidence || Boolean(hasReceipt && !evidence)} onClick={() => void confirmSale()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : "ยืนยันรายการขาย"}</button>}</div></div></Modal>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><strong>{value}</strong></div>; }

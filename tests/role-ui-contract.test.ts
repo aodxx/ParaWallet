@@ -32,7 +32,7 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("รายการขายรอตรวจ");
     expect(app).toContain("การส่งเงินรอยืนยัน");
     expect(app).toContain("onReports");
-    expect(app).toContain('role === "tapper" && <button className="primary" onClick={onSale}');
+    expect(app).toContain('role === "tapper" && <button className="primary" type="button" onClick={onSale}');
   });
 
   it("shows separate pending and unread badges and opens notification targets", () => {
@@ -192,5 +192,29 @@ describe("Thai UI terminology and destination labels", () => {
   it("labels the mobile settlement destination as ส่งเงิน", () => {
     expect(app).toContain('onClick={() => openScreen("settlements")}><span className="mobile-nav-icon"><WalletCards size={22} /></span><span>ส่งเงิน</span>');
     expect(app).not.toContain("<span>กระเป๋า</span>");
+  });
+});
+
+
+describe("calendar sales receipt workflow", () => {
+  it("renders sales by receipt date and highlights dates with receipt evidence", () => {
+    expect(app).toContain("function SalesCalendar");
+    expect(app).toContain("const saleDateKey");
+    expect(app).toContain("const saleHasReceipt");
+    expect(app).toContain('className={`calendar-day ${entries.length ? "has-sales" : ""} ${hasReceipt ? "has-receipt"');
+    expect(app).toContain("วันที่ตัด / วันที่ในใบเสร็จ");
+    expect(app).toContain("วันที่ตัดที่มีใบเสร็จ");
+    expect(styles).toContain(".calendar-grid");
+    expect(styles).toContain(".calendar-day.has-receipt");
+    expect(styles).toContain("@media(max-width:680px){.calendar-toolbar");
+  });
+
+  it("opens the existing full sale review with receipt evidence from a selected date", () => {
+    expect(app).toContain("ดูรายละเอียดเต็ม");
+    expect(app).toContain("onReview(sale)");
+    expect(app).toContain("api.sales.receipt");
+    expect(app).toContain("หลักฐานใบเสร็จ");
+    expect(app).toContain("รายละเอียดและการแบ่งเงิน");
+    expect(app).toContain("hasReceipt = Boolean(sale.receiptFileId || sale.receiptId)");
   });
 });
