@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 
 type AnimationInstance = { destroy: () => void; goToAndStop?: (frame: number, isFrame: boolean) => void };
 type LottiePlayer = {
@@ -38,10 +39,11 @@ function loadPlayer() {
   return playerPromise;
 }
 
-export default function LoadingAnimation({ label, detail, compact = false }: { label: string; detail?: string; compact?: boolean }) {
+export default function LoadingAnimation({ label, detail, compact = false, variant = "default" }: { label: string; detail?: string; compact?: boolean; variant?: "default" | "splash" }) {
   const animationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (variant === "splash") return;
     let instance: AnimationInstance | undefined;
     let active = true;
     void loadPlayer().then((player) => {
@@ -61,7 +63,9 @@ export default function LoadingAnimation({ label, detail, compact = false }: { l
       active = false;
       instance?.destroy();
     };
-  }, []);
+  }, [variant]);
+
+  if (variant === "splash") { const splashLogoUrl = `${import.meta.env.BASE_URL}brand/splash-logo.png`; return <div className="loading-state splash-loading" role="status" aria-live="polite"><div className="splash-logo-wrap" aria-hidden="true"><img className="splash-logo" src={splashLogoUrl} alt="" /><span className="splash-shine" style={{ "--splash-logo-mask": `url(${splashLogoUrl})` } as CSSProperties} /></div><div className="loading-copy"><strong>{label}</strong>{detail && <span>{detail}</span>}</div></div>; }
 
   return <div className={`loading-state ${compact ? "compact" : ""}`} role="status" aria-live="polite">
     <div ref={animationRef} className="loading-animation" aria-hidden="true" />

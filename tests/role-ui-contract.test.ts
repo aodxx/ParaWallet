@@ -6,6 +6,25 @@ const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8
 const loader = readFileSync(new URL("../src/LoadingAnimation.tsx", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 const loadingAnimation = JSON.parse(readFileSync(new URL("../public/loading/animation.json", import.meta.url), "utf8"));
+const splashLogo = readFileSync(new URL("../public/brand/splash-logo.png", import.meta.url));
+
+describe("splash screen branding contract", () => {
+  it("uses the supplied logo only for the splash variant and keeps default loading available", () => {
+    expect(app).toContain('<LoadingAnimation variant="splash" label="กำลังเตรียม ParaWallet"');
+    expect(loader).toContain('variant = "default"');
+    expect(loader).toContain('if (variant === "splash") return;');
+    expect(loader).toContain('variant === "splash"');
+    expect(loader).toContain("brand/splash-logo.png");
+    expect(loader).toContain("splash-shine");
+    expect(splashLogo.byteLength).toBeGreaterThan(1000);
+  });
+
+  it("animates a masked shine and disables it for reduced motion", () => {
+    expect(styles).toContain(".splash-shine");
+    expect(styles).toContain("@keyframes splash-shine-sweep");
+    expect(styles).toContain("@media(prefers-reduced-motion:reduce){.splash-shine");
+  });
+});
 
 describe("role-aware UI contract", () => {
   it("only exposes sale, receipt, and settlement creation modals to Tapper", () => {
