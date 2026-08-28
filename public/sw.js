@@ -1,6 +1,19 @@
-const CACHE = "parawallet-shell-v4";
+const CACHE = "parawallet-shell-v5";
 const BASE = "/ParaWallet/";
-const SHELL = [`${BASE}`, `${BASE}index.html`, `${BASE}manifest.webmanifest`, `${BASE}icon.svg`, `${BASE}vendor/lottie_light.min.js`, `${BASE}loading/animation.json`];
+const SHELL = [
+  `${BASE}`,
+  `${BASE}index.html`,
+  `${BASE}manifest.webmanifest`,
+  `${BASE}favicon.ico`,
+  `${BASE}apple-touch-icon.png`,
+  `${BASE}icon.svg`,
+  `${BASE}icons/icon-192.png`,
+  `${BASE}icons/icon-512.png`,
+  `${BASE}icons/icon-maskable-192.png`,
+  `${BASE}icons/icon-maskable-512.png`,
+  `${BASE}vendor/lottie_light.min.js`,
+  `${BASE}loading/animation.json`,
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
