@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.28-hybrid-ocr-v3";
+var PARAWALLET_RELEASE = "2026.08.28-hybrid-ocr-v4";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -444,7 +444,7 @@ var OCR = {
       tableRows: { type: "ARRAY", items: { type: "OBJECT", properties: { label: { type: "STRING" }, value: { type: "STRING" }, unit: { type: "STRING" }, rowText: { type: "STRING" } } } }
     }, required: ["receiptType", "needsReview"] };
     var referenceText = vision && vision.ok && vision.text ? "\\nReference text from a second OCR engine. Use it only to corroborate visible characters; the image remains authoritative:\\n" + String(vision.text).slice(0, 12000) : "";
-    var request = { contents: [{ parts: [{ text: prompt + " Read tables by meaning and not by fixed column positions. Preserve useful row labels and values in tableRows, even when the table layout differs." + referenceText }, { inline_data: { mime_type: mimeType, data: base64 } }] }], generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0 } };
+    var request = { contents: [{ parts: [{ text: prompt + " Read tables by meaning and not by fixed column positions. Preserve useful row labels and values in tableRows, even when the table layout differs." + referenceText }, { inline_data: { mime_type: mimeType, data: base64 } }] }], generationConfig: { responseMimeType: "application/json", responseSchema: schema } };
     var response = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(Config.geminiModel()) + ":generateContent?key=" + encodeURIComponent(Config.geminiKey()), { method: "post", contentType: "application/json", payload: JSON.stringify(request), muteHttpExceptions: true });
     var httpStatus = response.getResponseCode();
     var body = parseJson_(response.getContentText(), null);

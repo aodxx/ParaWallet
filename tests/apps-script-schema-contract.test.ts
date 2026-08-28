@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.28-hybrid-ocr-v3";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.28-hybrid-ocr-v4";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -69,6 +69,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('Reference text from a second OCR engine');
     expect(code).toContain('visionAgreement');
     expect(code).toContain('VISION_HTTP_');
+    expect(code).not.toContain('temperature: 0');
   });
 
   it("does not score empty OCR fields as a successful extraction", () => {
