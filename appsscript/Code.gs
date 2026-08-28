@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.28-gemini-ocr-v2";
+var PARAWALLET_RELEASE = "2026.08.28-hybrid-ocr-v3";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -389,10 +389,11 @@ var DriveStorage = {
 var OCR = {
   extract: function (fileBase64, mimeType) {
     var contentBase64 = String(fileBase64 || "").split(",").pop();
-    var prompt = "Classify this Thai rubber purchase receipt and extract JSON only. Use receiptType exactly as weigh_ticket for a weighing ticket/cash bill, rubber_form for a fresh-latex percentage-dry-rubber form, or unknown. Return these keys: receiptType, saleDate, buyerName, ticketNumber, productType, weightKg, unitPrice, grossSale, buyerDeductions, freshWeightKg, drc, dryWeightKg, needsReview. For weigh_ticket, map total/net weight to weightKg; for rubber_form, extract freshWeightKg, drc as a percentage, dryWeightKg, unitPrice and grossSale. Use null for unreadable fields, never guess handwritten digits, and set needsReview true whenever a financial field is uncertain. Return only JSON.";
-    if (Config.geminiKey()) return this.gemini_(contentBase64, mimeType, prompt);
-    if (Config.visionKey()) return this.vision_(contentBase64, mimeType);
-    return { provider: "none", confidence: 0, score: 0, needsReview: true, reviewLevel: "mandatory", fields: {} };
+    var prompt = "Classify this Thai rubber purchase receipt and extract JSON only. Use receiptType exactly as weigh_ticket for a weighing ticket/cash bill, rubber_form for a fresh-latex percentage-dry-rubber form, or unknown. Return these keys: receiptType, saleDate, buyerName, ticketNumber, productType, weightKg, unitPrice, grossSale, buyerDeductions, freshWeightKg, drc, dryWeightKg, needsReview. For weigh_ticket, map total/net weight to weightKg; for rubber_form, extract freshWeightKg, drc as a percentage, dryWeightKg, unitPrice and grossSale. Read tables semantically by headers and row relationships, not fixed coordinates. Use null for unreadable fields, never guess handwritten digits, and set needsReview true whenever a financial field is uncertain. Return only JSON.";
+    var vision = Config.visionKey() ? this.vision_(contentBase64, mimeType) : { ok: false, text: "", errorCode: "VISION_NOT_CONFIGURED" };
+    if (Config.geminiKey()) return this.gemini_(contentBase64, mimeType, prompt, vision);
+    if (vision.ok) return this.scored_("vision", { ocrText: vision.text, ocrError: "GEMINI_NOT_CONFIGURED", needsReview: true });
+    return this.providerError_("none", "NO_OCR_PROVIDER", 0);
   },
   score_: function (fields) {
     var score = 0;
@@ -434,7 +435,7 @@ var OCR = {
       return null;
     }
   },
-  gemini_: function (base64, mimeType, prompt) {
+  gemini_: function (base64, mimeType, prompt, vision) {
     var schema = { type: "OBJECT", properties: {
       receiptType: { type: "STRING", enum: ["weigh_ticket", "rubber_form", "unknown"] },
       saleDate: { type: "STRING" }, buyerName: { type: "STRING" }, ticketNumber: { type: "STRING" }, productType: { type: "STRING" },
@@ -442,7 +443,8 @@ var OCR = {
       freshWeightKg: { type: "STRING" }, drc: { type: "STRING" }, dryWeightKg: { type: "STRING" }, needsReview: { type: "BOOLEAN" },
       tableRows: { type: "ARRAY", items: { type: "OBJECT", properties: { label: { type: "STRING" }, value: { type: "STRING" }, unit: { type: "STRING" }, rowText: { type: "STRING" } } } }
     }, required: ["receiptType", "needsReview"] };
-    var request = { contents: [{ parts: [{ text: prompt + " Read tables by meaning and not by fixed column positions. Preserve useful row labels and values in tableRows, even when the table layout differs." }, { inline_data: { mime_type: mimeType, data: base64 } }] }], generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0 } };
+    var referenceText = vision && vision.ok && vision.text ? "\\nReference text from a second OCR engine. Use it only to corroborate visible characters; the image remains authoritative:\\n" + String(vision.text).slice(0, 12000) : "";
+    var request = { contents: [{ parts: [{ text: prompt + " Read tables by meaning and not by fixed column positions. Preserve useful row labels and values in tableRows, even when the table layout differs." + referenceText }, { inline_data: { mime_type: mimeType, data: base64 } }] }], generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0 } };
     var response = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(Config.geminiModel()) + ":generateContent?key=" + encodeURIComponent(Config.geminiKey()), { method: "post", contentType: "application/json", payload: JSON.stringify(request), muteHttpExceptions: true });
     var httpStatus = response.getResponseCode();
     var body = parseJson_(response.getContentText(), null);
@@ -452,11 +454,37 @@ var OCR = {
     if (!text) return this.providerError_("gemini", "PROVIDER_NO_CANDIDATE", httpStatus);
     var fields = this.jsonFromText_(text);
     if (!fields) return this.providerError_("gemini", "PROVIDER_INVALID_JSON", httpStatus);
-    return this.scored_("gemini", fields);
+    fields.visionOcrUsed = Boolean(vision && vision.ok && vision.text);
+    fields.visionOcrTextLength = vision && vision.ok ? String(vision.text || "").length : 0;
+    if (vision && !vision.ok) fields.visionOcrError = vision.errorCode || "VISION_UNAVAILABLE";
+    var result = this.scored_("gemini", fields);
+    if (vision && vision.ok && vision.text) {
+      var mismatches = [];
+      ["weightKg", "unitPrice", "grossSale", "freshWeightKg", "drc", "dryWeightKg"].forEach(function (key) {
+        var value = numeric_(fields[key]);
+        if (value > 0 && String(vision.text).indexOf(String(value)) < 0) mismatches.push(key);
+      });
+      result.fields.visionAgreement = mismatches.length === 0;
+      result.fields.visionMismatches = mismatches;
+      if (mismatches.length) {
+        result.confidence = Math.max(0, result.confidence - Math.min(0.25, mismatches.length * 0.05));
+        result.needsReview = true;
+        result.reviewLevel = "mandatory";
+      }
+    }
+    return result;
   },
   vision_: function (base64, mimeType) {
     var response = UrlFetchApp.fetch("https://vision.googleapis.com/v1/images:annotate?key=" + encodeURIComponent(Config.visionKey()), { method: "post", contentType: "application/json", payload: JSON.stringify({ requests: [{ image: { content: base64 }, features: [{ type: "DOCUMENT_TEXT_DETECTION" }] }] }), muteHttpExceptions: true });
-    return this.scored_("vision", { rawText: JSON.parse(response.getContentText()) });
+    var httpStatus = response.getResponseCode();
+    var body = parseJson_(response.getContentText(), null);
+    if (httpStatus < 200 || httpStatus >= 300) return { ok: false, text: "", errorCode: "VISION_HTTP_" + httpStatus, httpStatus: httpStatus };
+    if (!body || !body.responses || !body.responses.length) return { ok: false, text: "", errorCode: "VISION_INVALID_RESPONSE", httpStatus: httpStatus };
+    var first = body.responses[0] || {};
+    if (first.error) return { ok: false, text: "", errorCode: "VISION_PROVIDER_ERROR", httpStatus: httpStatus };
+    var text = first.fullTextAnnotation && first.fullTextAnnotation.text ? first.fullTextAnnotation.text : first.textAnnotations && first.textAnnotations[0] && first.textAnnotations[0].description ? first.textAnnotations[0].description : "";
+    if (!text) return { ok: false, text: "", errorCode: "VISION_NO_TEXT", httpStatus: httpStatus };
+    return { ok: true, text: String(text), httpStatus: httpStatus };
   }
 };
 
