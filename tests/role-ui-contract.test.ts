@@ -10,7 +10,10 @@ const splashLogo = readFileSync(new URL("../public/brand/splash-logo.png", impor
 
 describe("splash screen branding contract", () => {
   it("uses the supplied logo only for the splash variant and keeps default loading available", () => {
-    expect(app).toContain('<LoadingAnimation variant="splash" label="กำลังเตรียม ParaWallet"');
+    expect(app).toContain('<main className="splash-screen"><LoadingAnimation variant="splash" label="กำลังเตรียม ParaWallet"');
+    expect(app).not.toContain('<section className="auth-card loading-card"><LoadingAnimation variant="splash"');
+    expect(styles).toContain(".splash-screen{min-height:100vh");
+    expect(styles).toContain("place-items:center");
     expect(loader).toContain('variant = "default"');
     expect(loader).toContain('if (variant === "splash") return;');
     expect(loader).toContain('variant === "splash"');

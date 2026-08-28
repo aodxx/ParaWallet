@@ -328,7 +328,7 @@ function AuthScreen({ clientId, message, onCredential, onError }: { clientId: st
 }
 
 function InitialSyncScreen({ loading, message, onRetry, onSignOut }: { loading: boolean; message: string; onRetry: () => void; onSignOut: () => void }) {
-  if (loading) return <main className="auth-screen loading-gate"><section className="auth-card loading-card"><LoadingAnimation variant="splash" label="กำลังเตรียม ParaWallet" detail="ตรวจสอบบัญชีและโหลดข้อมูลล่าสุด" /></section></main>;
+  if (loading) return <main className="splash-screen"><LoadingAnimation variant="splash" label="กำลังเตรียม ParaWallet" detail="ตรวจสอบบัญชีและโหลดข้อมูลล่าสุด" /></main>;
   return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE SYNC</p><h1>ยังเชื่อมต่อข้อมูลไม่ได้</h1><p>ระบบยังไม่แสดงหน้าของ เจ้าของสวน (Owner) หรือคนกรีด (Tapper) จนกว่าจะตรวจสอบสิทธิ์สำเร็จ</p>{message && <div className="notice">{message}</div>}<div className="quick-actions"><button className="primary" onClick={onRetry}>ลองใหม่</button><button className="secondary" onClick={onSignOut}>เปลี่ยนบัญชี Google</button></div></section></main>;
 }
 
