@@ -164,3 +164,8 @@ button,input,select,textarea{font-family:inherit}button{min-height:44px;-webkit-
 /* Full-screen transparent splash presentation */
 .splash-screen{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px;background:transparent}.splash-screen .splash-loading{width:min(100%,420px);padding:0;background:transparent}.splash-screen .splash-logo-wrap{margin:0 auto}.splash-screen .loading-copy{text-align:center}.splash-screen .loading-copy strong{color:#184d36}.splash-screen .loading-copy span{color:#5d755d}
 @media(max-width:680px){.splash-screen{min-height:100svh;padding:18px 16px}.splash-screen .splash-loading{width:min(100%,340px)}}
+
+
+/* Splash logo scale: 5x baseline, bounded by the viewport */
+.splash-screen .splash-logo-wrap{width:min(850px,calc(100vw - 48px),48vh);border-radius:0}
+@media(max-width:680px){.splash-screen .splash-logo-wrap{width:min(790px,calc(100vw - 32px),48vh);border-radius:0}}
