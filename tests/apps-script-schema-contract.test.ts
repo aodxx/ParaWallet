@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.26-ocr-receipt-v1";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.28-gemini-ocr-v2";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -53,6 +53,23 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("Object.prototype.hasOwnProperty.call(this.rowsCache_, name)");
     expect(code).toContain("delete this.rowsCache_[name]");
     expect(code).toContain("delete Repositories.rowsCache_[name]");
+  });
+
+  it("uses a current configurable Gemini model and protects OCR provider failures", () => {
+    expect(code).toContain('geminiModel: function () { return this.get("GEMINI_MODEL", false) || "gemini-3.7-flash"; }');
+    expect(code).not.toContain("gemini-1.5-flash");
+    expect(code).toContain("response.getResponseCode()");
+    expect(code).toContain('PROVIDER_HTTP_');
+    expect(code).toContain('PROVIDER_NO_CANDIDATE');
+    expect(code).toContain('PROVIDER_INVALID_JSON');
+    expect(code).toContain('responseMimeType: "application/json"');
+    expect(code).toContain('responseSchema: schema');
+    expect(code).toContain('tableRows');
+  });
+
+  it("does not score empty OCR fields as a successful extraction", () => {
+    expect(code).toContain('fields.buyerDeductions !== undefined && fields.buyerDeductions !== null && fields.buyerDeductions !== ""');
+    expect(code).toContain('fields: { ocrError: code }');
   });
 
   it("stores settlement evidence in Drive without writing base64 into AuditLogs", () => {

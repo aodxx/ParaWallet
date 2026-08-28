@@ -16,6 +16,7 @@ export type NormalizedOcrFields = OcrFields & {
   grossSale: string;
   buyerDeductions: string;
   needsReview: boolean;
+  ocrError: string;
 };
 
 const thaiDigits = (value: string) => value.replace(/[๐-๙]/g, (digit) => String("๐๑๒๓๔๕๖๗๘๙".indexOf(digit)));
@@ -53,7 +54,8 @@ export function normalizeOcrFields(input: OcrFields): NormalizedOcrFields {
     unitPrice,
     grossSale,
     buyerDeductions: numericText(input.buyerDeductions ?? input.deductions ?? 0) || "0",
-    needsReview: input.needsReview !== false
+    needsReview: input.needsReview !== false,
+    ocrError: text(input.ocrError)
   };
 }
 

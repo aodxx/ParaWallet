@@ -14,7 +14,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.26-ocr-receipt-v1";
+var PARAWALLET_RELEASE = "2026.08.28-gemini-ocr-v2";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -170,6 +170,7 @@ var Config = {
   spreadsheetId: function () { return this.get("SHEET_ID", true); },
   driveRootId: function () { return this.get("DRIVE_ROOT_FOLDER_ID", true); },
   geminiKey: function () { return this.get("GEMINI_API_KEY", false); },
+  geminiModel: function () { return this.get("GEMINI_MODEL", false) || "gemini-3.7-flash"; },
   visionKey: function () { return this.get("GOOGLE_CLOUD_VISION_API_KEY", false); },
   allowedOrigins: function () { return this.get("ALLOWED_ORIGINS", false).split(",").filter(Boolean); },
   // OAuth client IDs are public configuration. The Script Property can override this
@@ -403,18 +404,54 @@ var OCR = {
     if (numeric_(fields.grossSale) > 0) score += 15;
     var amountMatches = numeric_(fields.weightKg) > 0 && numeric_(fields.unitPrice) > 0 && numeric_(fields.grossSale) > 0 && Math.abs(numeric_(fields.weightKg) * numeric_(fields.unitPrice) - numeric_(fields.grossSale)) <= (fields.receiptType === "rubber_form" ? Math.max(1, numeric_(fields.grossSale) * 0.01) : 0.02);
     if (amountMatches) score += 20;
-    if (numeric_(fields.buyerDeductions) >= 0) score += 5;
+    if (fields.buyerDeductions !== undefined && fields.buyerDeductions !== null && fields.buyerDeductions !== "" && numeric_(fields.buyerDeductions) >= 0) score += 5;
     return score;
   },
   scored_: function (provider, fields) {
     var score = this.score_(fields || {});
     return { provider: provider, confidence: score / 100, score: score, needsReview: score < 90, reviewLevel: score >= 90 ? "high" : (score >= 80 ? "recommended" : "mandatory"), fields: fields || {} };
   },
+  providerError_: function (provider, code, httpStatus) {
+    return { provider: provider, confidence: 0, score: 0, needsReview: true, reviewLevel: "mandatory", errorCode: code, httpStatus: httpStatus || 0, fields: { ocrError: code } };
+  },
+  responseText_: function (body) {
+    var candidates = body && body.candidates;
+    if (!candidates || !candidates.length) return "";
+    return candidates.map(function (candidate) {
+      var parts = candidate && candidate.content && candidate.content.parts;
+      return parts && parts.map(function (part) { return part && part.text ? String(part.text) : ""; }).join(" ") || "";
+    }).join(" ").trim();
+  },
+  jsonFromText_: function (text) {
+    var cleaned = String(text || "").replace(/^```(?:json)?\\s*/i, "").replace(/\\s*```$/i, "").trim();
+    var start = cleaned.indexOf("{");
+    var end = cleaned.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      var parsed = JSON.parse(cleaned.slice(start, end + 1));
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  },
   gemini_: function (base64, mimeType, prompt) {
-    var response = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + encodeURIComponent(Config.geminiKey()), { method: "post", contentType: "application/json", payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }] }), muteHttpExceptions: true });
-    var body = JSON.parse(response.getContentText());
-    var text = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text || "{}";
-    var fields = JSON.parse(text.replace(/```json|```/g, "").trim());
+    var schema = { type: "OBJECT", properties: {
+      receiptType: { type: "STRING", enum: ["weigh_ticket", "rubber_form", "unknown"] },
+      saleDate: { type: "STRING" }, buyerName: { type: "STRING" }, ticketNumber: { type: "STRING" }, productType: { type: "STRING" },
+      weightKg: { type: "STRING" }, unitPrice: { type: "STRING" }, grossSale: { type: "STRING" }, buyerDeductions: { type: "STRING" },
+      freshWeightKg: { type: "STRING" }, drc: { type: "STRING" }, dryWeightKg: { type: "STRING" }, needsReview: { type: "BOOLEAN" },
+      tableRows: { type: "ARRAY", items: { type: "OBJECT", properties: { label: { type: "STRING" }, value: { type: "STRING" }, unit: { type: "STRING" }, rowText: { type: "STRING" } } } }
+    }, required: ["receiptType", "needsReview"] };
+    var request = { contents: [{ parts: [{ text: prompt + " Read tables by meaning and not by fixed column positions. Preserve useful row labels and values in tableRows, even when the table layout differs." }, { inline_data: { mime_type: mimeType, data: base64 } }] }], generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0 } };
+    var response = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(Config.geminiModel()) + ":generateContent?key=" + encodeURIComponent(Config.geminiKey()), { method: "post", contentType: "application/json", payload: JSON.stringify(request), muteHttpExceptions: true });
+    var httpStatus = response.getResponseCode();
+    var body = parseJson_(response.getContentText(), null);
+    if (httpStatus < 200 || httpStatus >= 300) return this.providerError_("gemini", "PROVIDER_HTTP_" + httpStatus, httpStatus);
+    if (!body) return this.providerError_("gemini", "PROVIDER_INVALID_RESPONSE", httpStatus);
+    var text = this.responseText_(body);
+    if (!text) return this.providerError_("gemini", "PROVIDER_NO_CANDIDATE", httpStatus);
+    var fields = this.jsonFromText_(text);
+    if (!fields) return this.providerError_("gemini", "PROVIDER_INVALID_JSON", httpStatus);
     return this.scored_("gemini", fields);
   },
   vision_: function (base64, mimeType) {
