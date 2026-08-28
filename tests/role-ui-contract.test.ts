@@ -6,7 +6,7 @@ const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8
 const loader = readFileSync(new URL("../src/LoadingAnimation.tsx", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 const loadingAnimation = JSON.parse(readFileSync(new URL("../public/loading/animation.json", import.meta.url), "utf8"));
-const splashLogo = readFileSync(new URL("../public/brand/splash-logo.png", import.meta.url));
+const splashLogo = readFileSync(new URL("../public/brand/splash-logo-transparent.png", import.meta.url));
 
 describe("splash screen branding contract", () => {
   it("uses the supplied logo only for the splash variant and keeps default loading available", () => {
@@ -17,7 +17,7 @@ describe("splash screen branding contract", () => {
     expect(loader).toContain('variant = "default"');
     expect(loader).toContain('if (variant === "splash") return;');
     expect(loader).toContain('variant === "splash"');
-    expect(loader).toContain("brand/splash-logo.png");
+    expect(loader).toContain("brand/splash-logo-transparent.png");
     expect(loader).toContain("splash-shine");
     expect(splashLogo.byteLength).toBeGreaterThan(1000);
   });
@@ -127,6 +127,12 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('className="panel-actions settlement-confirm-actions settlement-row-actions"');
     expect(styles).toContain(".settlement-row-actions{grid-column:1/-1!important");
     expect(styles).toContain("margin-bottom:calc(140px + env(safe-area-inset-bottom))");
+  });
+
+  it("preloads the transparent splash asset and rotates the shell cache", () => {
+    expect(serviceWorker).toContain('const CACHE = "parawallet-shell-v6"');
+    expect(serviceWorker).toContain("brand/splash-logo-transparent.png");
+    expect(serviceWorker).not.toContain("brand/splash-logo.png`");
   });
 
   it("animates the Tapper scan actions without trapping Android back or reduced-motion users", () => {

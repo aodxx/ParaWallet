@@ -65,7 +65,7 @@ export default function LoadingAnimation({ label, detail, compact = false, varia
     };
   }, [variant]);
 
-  if (variant === "splash") { const splashLogoUrl = `${import.meta.env.BASE_URL}brand/splash-logo.png`; return <div className="loading-state splash-loading" role="status" aria-live="polite"><div className="splash-logo-wrap" aria-hidden="true"><img className="splash-logo" src={splashLogoUrl} alt="" /><span className="splash-shine" style={{ "--splash-logo-mask": `url(${splashLogoUrl})` } as CSSProperties} /></div><div className="loading-copy"><strong>{label}</strong>{detail && <span>{detail}</span>}</div></div>; }
+  if (variant === "splash") { const splashLogoUrl = `${import.meta.env.BASE_URL}brand/splash-logo-transparent.png`; return <div className="loading-state splash-loading" role="status" aria-live="polite"><div className="splash-logo-wrap" aria-hidden="true"><img className="splash-logo" src={splashLogoUrl} alt="" /><span className="splash-shine" style={{ "--splash-logo-mask": `url(${splashLogoUrl})` } as CSSProperties} /></div><div className="loading-copy"><strong>{label}</strong>{detail && <span>{detail}</span>}</div></div>; }
 
   return <div className={`loading-state ${compact ? "compact" : ""}`} role="status" aria-live="polite">
     <div ref={animationRef} className="loading-animation" aria-hidden="true" />

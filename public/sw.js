@@ -1,4 +1,4 @@
-const CACHE = "parawallet-shell-v5";
+const CACHE = "parawallet-shell-v6";
 const BASE = "/ParaWallet/";
 const SHELL = [
   `${BASE}`,
@@ -7,6 +7,7 @@ const SHELL = [
   `${BASE}favicon.ico`,
   `${BASE}apple-touch-icon.png`,
   `${BASE}icon.svg`,
+  `${BASE}brand/splash-logo-transparent.png`,
   `${BASE}icons/icon-192.png`,
   `${BASE}icons/icon-512.png`,
   `${BASE}icons/icon-maskable-192.png`,
