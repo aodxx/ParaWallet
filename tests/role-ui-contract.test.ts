@@ -88,6 +88,23 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ดูรายการนี้");
   });
 
+  it("separates page states for each data screen", () => {
+    expect(app).toContain("function PageState");
+    expect(app).toContain('kind="no-garden"');
+    expect(app).toContain('title="ยังไม่มีข้อตกลงที่ใช้งานอยู่"');
+    expect(app).toContain('title="ยังไม่มีรายการส่งเงิน"');
+    expect(app).toContain('title="ยังไม่มีการแจ้งเตือน"');
+    expect(app).toContain('title="ยังไม่ได้สร้างรายงาน"');
+    expect(app).toContain('page-state-${kind}');
+  });
+
+  it("shows agreement version and effective date instead of an internal ID", () => {
+    expect(app).toContain("ข้อตกลง: เวอร์ชัน");
+    expect(app).toContain('agreement?.effectiveFrom || "ไม่ระบุวันที่"');
+    expect(app).not.toContain("sale.agreementId.slice(0, 8)");
+    expect(styles).toContain("@media(max-width:360px)");
+  });
+
   it("opens notification targets as the exact sale or settlement record", () => {
     expect(app).toContain("const target = sales.find((item) => item.id === focusSaleId)");
     expect(app).toContain("setReviewSale(target)");
