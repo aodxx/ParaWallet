@@ -91,6 +91,26 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ดูรายการนี้");
   });
 
+  it("shows persistent record-specific outcomes for every financial mutation", () => {
+    expect(app).toContain('const COMPLETION_STORAGE_KEY = "parawallet.pendingCompletion"');
+    expect(app).toContain("storeCompletion_(receipt)");
+    expect(app).toContain('className="completion-status"');
+    expect(app).toContain('className="completion-summary"');
+    expect(app).toContain("สถานะใหม่");
+    expect(app).toContain("กลับหน้าหลัก");
+    expect(app).toContain("รอเจ้าของตรวจ");
+    expect(app).toContain("รอเจ้าของยืนยันรับเงิน");
+    expect(app).toContain("ยอดคงค้างก่อนยืนยัน");
+    expect(app).toContain("ยอดคงค้างใหม่");
+    expect(app).toContain('entityType: "sale"');
+    expect(app).toContain('entityType: "settlement"');
+    expect(app).toContain("setReviewSale(target)");
+    expect(app).toContain("setFocusedSettlementId(target.id)");
+    expect(app).toContain('impact="สถานะจะเปลี่ยนเป็นอยู่ระหว่างโต้แย้ง');
+    expect(app).toContain('impact="รายการจะถูกปฏิเสธและยอดคงค้างจะไม่ถูกตัด"');
+    expect(app).toContain("onCancel={() => setReasonOpen(false)}");
+  });
+
   it("does not refetch the heavy dashboard before every tab", () => {
     expect(app).toContain('if (target === "overview" || !dashboard.garden?.id)');
     expect(app).toContain('screen === "settlements" && (!loading || settlements.length > 0)');

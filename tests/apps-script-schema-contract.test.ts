@@ -48,6 +48,13 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
   });
 
+  it("replays the same mutation request instead of writing a duplicate record", () => {
+    expect(code).toContain("var cached = Idempotency.get(request.requestId)");
+    expect(code).toContain("if (cached) return cached");
+    expect(code).toContain("Idempotency.put(request.requestId, freshResponse, request.action)");
+    expect(code).toContain('Locking.run("request:" + request.requestId');
+  });
+
   it("caches sheet rows only within one Apps Script request and invalidates writes", () => {
     expect(code).toContain("rowsCache_: {}");
     expect(code).toContain("this.book_ = null; this.rowsCache_ = {};");
