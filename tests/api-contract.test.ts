@@ -97,7 +97,7 @@ describe("Apps Script API contract", () => {
   });
 
   it("explains why a Tapper with open money cannot be removed", () => {
-    expect(userMessageForApiError(new ApiError("MEMBER_HAS_OUTSTANDING_BALANCE", "internal"))).toContain("เงินของ Owner คงค้าง");
+    expect(userMessageForApiError(new ApiError("MEMBER_HAS_OUTSTANDING_BALANCE", "internal"))).toContain("เงินของเจ้าของสวนคงค้าง");
   });
 
   it("requests Sale receipt evidence without exposing a raw Drive URL", async () => {

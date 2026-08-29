@@ -44,17 +44,17 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('showAgreementForm && role === "owner"');
   });
 
-  it("lets Owner manage registered Tapper accounts without typing internal IDs", () => {
-    expect(app).toContain("เพิ่มคนกรีด (Tapper) เข้าสวน");
+  it("lets the garden owner manage registered tapper accounts without typing internal IDs", () => {
+    expect(app).toContain("เพิ่มคนกรีดเข้าสวน");
     expect(app).toContain("api.members.add");
     expect(app).toContain("api.members.deactivate");
-    expect(app).toContain("เลือกคนกรีด (Tapper) ในสวน");
+    expect(app).toContain("เลือกคนกรีดในสวน");
     expect(app).not.toContain("Tapper ID<input");
   });
 
   it("replaces Owner creation actions with review and report navigation", () => {
     expect(app).toContain("รายการขายรอตรวจ");
-    expect(app).toContain("การส่งเงินรอยืนยัน");
+    expect(app).toContain("เงินที่คนกรีดส่งมารอยืนยัน");
     expect(app).toContain("onReports");
     expect(app).toContain('role === "tapper" && <button className="primary" type="button" onClick={onSale}');
   });
@@ -89,10 +89,10 @@ describe("role-aware UI contract", () => {
     expect(app).not.toContain("api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)");
   });
 
-  it("does not render an Owner or Tapper dashboard before role verification finishes", () => {
+  it("does not render either role dashboard before role verification finishes", () => {
     expect(app).toContain("if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen");
     expect(app).toContain("กำลังเตรียม ParaWallet");
-    expect(app).toContain("เจ้าของสวน (Owner) หรือคนกรีด (Tapper) จนกว่าจะตรวจสอบสิทธิ์สำเร็จ");
+    expect(app).toContain("เจ้าของสวนหรือคนกรีด จนกว่าจะตรวจสอบสิทธิ์สำเร็จ");
   });
 
   it("uses the supplied local Lottie animation for stable loading states", () => {
@@ -110,15 +110,16 @@ describe("role-aware UI contract", () => {
     expect(loadingAnimation).toMatchObject({ w: 124, h: 124, ip: 0, op: 31 });
   });
 
-  it("makes the dual wallet and receipt scan dock Tapper's primary workflow", () => {
+  it("makes the dual wallet and sale-entry dock the tapper's primary workflow", () => {
     expect(app).toContain('className="dual-wallet-priority"');
     expect(app).toContain('className="scan-receipt-cta desktop-scan-receipt"');
     expect(app).toContain('role === "tapper" && <div className={`mobile-scan-action');
     expect(app).toContain('aria-haspopup="menu"');
-    expect(app).toContain('aria-label="วิธีบันทึกใบเสร็จ"');
-    expect(app).toContain("ถ่ายบิล");
-    expect(app).toContain("เลือกรูป");
-    expect(app).toContain("กรอกเอง");
+    expect(app).toContain('aria-label="วิธีเพิ่มรายการขาย"');
+    expect(app).toContain("เพิ่มรายการขาย");
+    expect(app).toContain("ถ่ายภาพบิล");
+    expect(app).toContain("เลือกภาพจากเครื่อง");
+    expect(app).toContain("กรอกตัวเลขเอง");
     expect(app).toContain('onReceipt={() => { setReceiptInitialFile(null); setShowReceiptForm(true); }}');
     expect(app).toContain('capture="environment"');
     expect(app).toContain('ref={receiptGalleryRef}');
@@ -152,7 +153,7 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("กรุณาแนบสลิปการโอนเงิน");
     expect(app).toContain("ไฟล์สลิปต้องมีขนาดไม่เกิน 4 MB");
     expect(app).toContain("สลิปต้องเป็นรูปภาพหรือไฟล์ PDF เท่านั้น");
-    expect(app).toContain("เจ้าของสวน (Owner) ต้องกดยืนยันว่าได้รับเงินสดแล้ว");
+    expect(app).toContain("เจ้าของสวนต้องกดยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ยืนยันว่าได้รับเงินสดแล้ว");
     expect(app).toContain("ตรวจรายละเอียดการส่งเงิน");
     expect(app).toContain("ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว");
@@ -178,11 +179,13 @@ describe("role-aware UI contract", () => {
     expect(app).not.toContain("await api.sales.confirm(sale.id); onRefresh();");
   });
 
-  it("exposes both camera capture and device image selection for OCR", () => {
+  it("exposes all three sale-entry methods in one place", () => {
     expect(app).toContain('className="receipt-upload-actions"');
     expect(app).toContain('className="file-action secondary" aria-disabled={scanWorking}><Camera');
-    expect(app).toContain("ถ่ายภาพใหม่");
+    expect(app).toContain("ถ่ายภาพบิล");
     expect(app).toContain("เลือกภาพจากเครื่อง");
+    expect(app).toContain("กรอกตัวเลขเอง");
+    expect(styles).toContain("grid-template-columns:repeat(3,minmax(0,1fr))");
     expect(app).toContain('accept="image/*" capture="environment"');
     expect(styles).toContain(".receipt-upload-actions");
     expect(styles).toContain(".receipt-upload-actions .file-action input");
@@ -198,7 +201,7 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("กำลังอ่านข้อมูลในบิล...");
     expect(app).toContain("ขั้นตอนสุดท้าย: ตรวจตัวเลขกับภาพ");
     expect(app).toContain("ลองอ่านภาพนี้อีกครั้ง");
-    expect(app).toContain("กรอกข้อมูลเองแทน");
+    expect(app).toContain("กรอกตัวเลขเอง");
     expect(app).toContain("ข้อมูลสำหรับผู้ดูแลระบบ");
     expect(app).toContain("showReviewFields &&");
     expect(styles).toContain(".receipt-scan-status");
@@ -245,18 +248,28 @@ describe("role-aware UI contract", () => {
 });
 
 
-describe("Thai UI terminology and destination labels", () => {
-  it("uses consistent Thai labels with standard English terms in parentheses", () => {
-    expect(app).toContain('role === "owner" ? "เจ้าของสวน (Owner)" : "คนกรีด (Tapper)"');
+describe("Thai UI terminology and role-specific destination labels", () => {
+  it("uses plain Thai role labels in normal screens", () => {
+    expect(app).toContain('role === "owner" ? "เจ้าของสวน" : "คนกรีด"');
+    expect(app).not.toContain("เจ้าของสวน (Owner)");
+    expect(app).not.toContain("คนกรีด (Tapper)");
     expect(app).toContain("เวอร์ชัน");
     expect(app).toContain("ส่งออก CSV");
     expect(app).not.toContain(">Export CSV<");
     expect(app).not.toContain("ทุก version");
   });
 
-  it("labels the mobile settlement destination as ส่งเงิน", () => {
-    expect(app).toContain('onClick={() => openScreen("settlements")}><span className="mobile-nav-icon"><WalletCards size={22} /></span><span>ส่งเงิน</span>');
+  it("labels settlement and garden destinations by role", () => {
+    expect(app).toContain('role === "owner" ? "รับเงิน" : "ส่งเงิน"');
+    expect(app).toContain('role === "owner" ? "สวนและสมาชิก" : "ข้อมูลสวน"');
+    expect(app).toContain('role === "owner" ? "เงินที่คนกรีดส่งมา" : "การส่งเงิน"');
     expect(app).not.toContain("<span>กระเป๋า</span>");
+  });
+
+  it("makes owner wallet relationships explicit", () => {
+    expect(app).toContain("ส่วนแบ่งทั้งหมดของฉัน");
+    expect(app).toContain("ได้รับแล้ว");
+    expect(app).toContain("ยังอยู่กับคนกรีด");
   });
 });
 
