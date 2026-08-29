@@ -16,6 +16,7 @@ Use this page to identify the current source of truth. A release number inside a
 | [`PARAWALLET-REAL-USE-MANUAL.md`](PARAWALLET-REAL-USE-MANUAL.md) | Thai installation and Owner/Tapper operating manual |
 | [`SETUP_APPS_SCRIPT.md`](SETUP_APPS_SCRIPT.md) | Apps Script, OAuth, Sheets, Drive, and deployment checklist |
 | [`OCR-GEMINI-CANONICAL.md`](OCR-GEMINI-CANONICAL.md) | Only current OCR/Gemini architecture, reference scenarios, and real-bill rollout gate |
+| [`UX-AUDIT-REMEDIATION-2026-08-29.md`](UX-AUDIT-REMEDIATION-2026-08-29.md) | งานบังคับ 7 ชุด: ข้อบกพร่อง UX ของเจ้าของ/คนกรีด ลำดับแก้ เกณฑ์รับงาน และ Checklist กลาง |
 
 ## Technical contracts — current
 

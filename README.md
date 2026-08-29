@@ -15,6 +15,9 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
 Repository: <https://github.com/aodxx/ParaWallet>
 
+> [!IMPORTANT]
+> **งานสำคัญของทีมตอนนี้:** แก้ทั้ง 7 ชุดใน [รายงานความบกพร่องด้าน UX และแผนแก้ไข](docs/UX-AUDIT-REMEDIATION-2026-08-29.md) ให้ครบก่อนเริ่มฟีเจอร์หรือปรับภาพลักษณ์ใหม่ ภายในมีข้อบกพร่องทั้งหมด วิธีแก้ตามบทบาท ไฟล์ที่เกี่ยวข้อง เกณฑ์รับงาน และ Checklist กลางของทีม
+
 ## Implemented scope
 
 - Google Identity sign-in with backend role and garden-membership authorization
