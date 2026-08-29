@@ -10,7 +10,16 @@ type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | 
 type ConnectionState = "connecting" | "connected" | "degraded" | "disconnected";
 type ReceiptScanPhase = "idle" | "preparing" | "reading" | "complete" | "attention" | "failed";
 type SaleView = "pending" | "latest" | "confirmed" | "all";
-type CompletionReceiptData = { title: string; detail: string; nextScreen?: Screen };
+type CompletionReceiptData = {
+  title: string;
+  detail: string;
+  statusLabel: string;
+  rows: Array<{ label: string; value: string }>;
+  nextScreen?: Screen;
+  entityType?: "sale" | "settlement";
+  entityId?: string;
+  openLabel?: string;
+};
 
 const fallback: DashboardData = { role: "owner", garden: undefined, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, pendingSales: 0, pendingSettlements: 0, unreadNotifications: 0, monthlySales: 0 };
 const money = (value: number) => `฿${Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
@@ -27,7 +36,28 @@ const formatThaiDateTime = (value?: string) => {
 };
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 const AUTH_STORAGE_KEY = "parawallet.googleIdToken";
+const COMPLETION_STORAGE_KEY = "parawallet.pendingCompletion";
 const MAX_EVIDENCE_BYTES = 4 * 1024 * 1024;
+
+function loadStoredCompletion_(): CompletionReceiptData | null {
+  try {
+    const value = window.sessionStorage.getItem(COMPLETION_STORAGE_KEY);
+    if (!value) return null;
+    const parsed = JSON.parse(value) as CompletionReceiptData;
+    return parsed?.title && parsed?.statusLabel && Array.isArray(parsed.rows) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeCompletion_(receipt: CompletionReceiptData | null) {
+  try {
+    if (receipt) window.sessionStorage.setItem(COMPLETION_STORAGE_KEY, JSON.stringify(receipt));
+    else window.sessionStorage.removeItem(COMPLETION_STORAGE_KEY);
+  } catch {
+    // The in-memory receipt still works when session storage is unavailable.
+  }
+}
 
 export default function App() {
   const [role, setRole] = useState<Role>("owner");
@@ -56,7 +86,9 @@ export default function App() {
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [showScanMenu, setShowScanMenu] = useState(false);
-  const [completionReceipt, setCompletionReceipt] = useState<CompletionReceiptData | null>(null);
+  const [completionReceipt, setCompletionReceipt] = useState<CompletionReceiptData | null>(() => loadStoredCompletion_());
+  const [completionOpening, setCompletionOpening] = useState(false);
+  const [completionOpenError, setCompletionOpenError] = useState("");
   const [deactivateTarget, setDeactivateTarget] = useState<GardenMember | null>(null);
   const [deactivateBusy, setDeactivateBusy] = useState(false);
   const [salesInitialView, setSalesInitialView] = useState<SaleView | undefined>(undefined);
@@ -107,6 +139,8 @@ export default function App() {
     refreshSequenceRef.current += 1;
     hasSuccessfulSyncRef.current = false;
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    storeCompletion_(null);
+    setCompletionReceipt(null);
     setAuthToken("");
     setAuthTokenState("");
     setConnectionStatus(idleSystemStatus("connection"));
@@ -229,11 +263,65 @@ export default function App() {
   const openScreen = (next: Screen) => { if (showScanMenu) closeScanMenu(); setScreen(next); void refresh(next); };
   const openSales = (view: SaleView) => { setSalesInitialView(view); openScreen("sales"); };
   const openMobileScreen = (next: Screen) => { setShowMobileMore(false); openScreen(next); };
-  const showCompletion = (title: string, detail: string, nextScreen?: Screen) => setCompletionReceipt({ title, detail, nextScreen });
+  const showCompletion = (receipt: CompletionReceiptData) => {
+    setCompletionOpenError("");
+    storeCompletion_(receipt);
+    setCompletionReceipt(receipt);
+  };
+  const clearCompletion = () => {
+    storeCompletion_(null);
+    setCompletionReceipt(null);
+    setCompletionOpenError("");
+  };
+  const returnCompletionToOverview = () => {
+    clearCompletion();
+    openScreen("overview");
+  };
+  const openCompletionRecord = async () => {
+    const receipt = completionReceipt;
+    if (!receipt || completionOpening) return;
+    if (!receipt.nextScreen) { clearCompletion(); return; }
+    if (!receipt.entityType || !receipt.entityId || !activeGarden) {
+      clearCompletion();
+      openScreen(receipt.nextScreen);
+      return;
+    }
+    setCompletionOpening(true);
+    setCompletionOpenError("");
+    try {
+      if (receipt.entityType === "sale") {
+        const rows = await api.sales.list({ gardenId: activeGarden.id });
+        const target = rows.find((row) => row.id === receipt.entityId);
+        if (!target) throw new ApiError("COMPLETION_TARGET_NOT_FOUND", "Completed sale target was not found");
+        setSales(rows);
+        setSalesInitialView(["pending_owner_review", "ocr_review"].includes(target.status) ? "pending" : "latest");
+        setScreen("sales");
+        setReviewSale(target);
+      } else {
+        const rows = await api.settlements.list(activeGarden.id);
+        const target = rows.find((row) => row.id === receipt.entityId);
+        if (!target) throw new ApiError("COMPLETION_TARGET_NOT_FOUND", "Completed settlement target was not found");
+        setSettlements(rows);
+        setScreen("settlements");
+        setFocusedSettlementId(target.id);
+      }
+      clearCompletion();
+    } catch (caught) {
+      setCompletionOpenError(`${userMessageForApiError(caught)} ใบสรุปนี้ยังไม่ถูกปิด กรุณาลองอีกครั้ง`);
+    } finally {
+      setCompletionOpening(false);
+    }
+  };
   const deactivateMember = async () => {
     if (!activeGarden || !deactivateTarget || deactivateBusy) return;
     setDeactivateBusy(true); setActionRetry(null); setActionStatus(createSystemStatus("action", "working", "กำลังปิดสิทธิ์คนกรีด", "ระบบกำลังตรวจสอบรายการและยอดคงค้าง", { nextAction: "รอสักครู่" }));
-    try { await api.members.deactivate({ gardenId: activeGarden.id, memberId: deactivateTarget.id }); setDeactivateTarget(null); await refresh("gardens"); setActionStatus(createSystemStatus("action", "success", "ปิดสิทธิ์คนกรีดแล้ว", "ประวัติเดิมยังถูกเก็บไว้ครบถ้วน", { dismissible: true })); }
+    try {
+      const targetName = deactivateTarget.name || deactivateTarget.email || "คนกรีด";
+      await api.members.deactivate({ gardenId: activeGarden.id, memberId: deactivateTarget.id });
+      setDeactivateTarget(null);
+      showCompletion({ title: "ปิดสิทธิ์คนกรีดสำเร็จ", detail: "บุคคลนี้เข้าใช้ข้อมูลสวนไม่ได้แล้ว แต่ประวัติเดิมยังอยู่ครบ", statusLabel: "ปิดสิทธิ์แล้ว", rows: [{ label: "คนกรีด", value: targetName }, { label: "ผลต่อข้อมูลเดิม", value: "เก็บประวัติไว้ครบ" }], nextScreen: "gardens", openLabel: "ดูสมาชิกสวน" });
+      void refresh("gardens");
+    }
     catch (caught) { setActionRetry(() => () => void deactivateMember()); setActionStatus(createSystemStatus("action", "api_error", "ปิดสิทธิ์ไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "ตรวจรายการค้างแล้วลองใหม่", retryable: true, dismissible: true })); }
     finally { setDeactivateBusy(false); }
   };
@@ -312,7 +400,7 @@ export default function App() {
         {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} initialView={salesInitialView} onViewApplied={() => setSalesInitialView(undefined)} onSale={() => setShowSaleForm(true)} onReview={setReviewSale} onRefresh={() => refresh("sales")} />}
         {screen === "gardens" && <GardensScreen garden={activeGarden} gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} members={members} role={role} onCreate={() => setShowGardenForm(true)} onAddMember={() => setShowMemberForm(true)} onDeactivate={(member) => setDeactivateTarget(member)} />}
         {screen === "agreements" && (!loading || agreements.length > 0) && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
-        {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} focusedSettlementId={focusedSettlementId} onFocusHandled={() => setFocusedSettlementId("")} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
+        {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} focusedSettlementId={focusedSettlementId} onFocusHandled={() => setFocusedSettlementId("")} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} onCompleted={showCompletion} />}
         {screen === "reports" && <ReportsScreen garden={activeGarden} />}
         {screen === "notifications" && (!loading || notifications.length > 0) && <NotificationsScreen notifications={notifications} onOpen={openNotification} />}
           </div>
@@ -338,19 +426,19 @@ export default function App() {
       <button className={mobileNavIndex === 3 ? "active" : ""} onClick={() => { if (showScanMenu) closeScanMenu(); setShowMobileMore(true); }}><span className="mobile-nav-icon"><Menu size={22} /></span><span>เพิ่มเติม</span>{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button>
     </nav>
     {showMobileMore && <div className="mobile-more-backdrop" role="presentation" onClick={() => setShowMobileMore(false)}><section className="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title" onClick={(event) => event.stopPropagation()}><div className="mobile-more-head"><div><small>เมนู ParaWallet</small><h2 id="mobile-more-title">เพิ่มเติม</h2></div><button className="icon-button" onClick={() => setShowMobileMore(false)} aria-label="ปิดเมนูเพิ่มเติม"><X size={22} /></button></div><div className="mobile-more-grid"><button onClick={() => openMobileScreen("gardens")}><Sprout size={22} /><span><strong>{role === "owner" ? "สวนและสมาชิก" : "ข้อมูลสวน"}</strong><small>{role === "owner" ? "ข้อมูลสวนและสิทธิ์ของคนกรีด" : "ดูข้อมูลสวนที่ได้รับสิทธิ์"}</small></span></button><button onClick={() => openMobileScreen("agreements")}><CircleDollarSign size={22} /><span><strong>ข้อตกลง</strong><small>สัดส่วนและเวอร์ชัน</small></span></button><button onClick={() => openMobileScreen("reports")}><FileDown size={22} /><span><strong>รายงาน/ส่งออก</strong><small>เลือกช่วงวันที่และดาวน์โหลดตาราง</small></span></button><button onClick={() => openMobileScreen("notifications")}><Bell size={22} /><span><strong>การแจ้งเตือน</strong><small>{unreadNotifications > 0 ? `ยังไม่อ่าน ${unreadNotifications} รายการ` : "อ่านครบแล้ว"}</small></span></button><button onClick={() => { setShowMobileMore(false); handleSignOut(); }}><LogOut size={22} /><span><strong>ออกจากระบบ</strong><small>เปลี่ยนบัญชี Google หรือจบการใช้งาน</small></span></button></div><DeveloperCredit /></section></div>}
-    {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); showCompletion("เพิ่มสวนสำเร็จ", "สวนใหม่พร้อมใช้งานแล้ว", "gardens"); void refresh("gardens"); }} />}
-    {showMemberForm && role === "owner" && <MemberForm garden={activeGarden} onClose={() => setShowMemberForm(false)} onSaved={() => { setShowMemberForm(false); showCompletion("เพิ่มคนกรีดสำเร็จ", "คนกรีดเข้าถึงสวนนี้ได้แล้ว", "gardens"); void refresh("gardens"); }} />}
-    {showSaleForm && role === "tapper" && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); showCompletion("บันทึกรายการขายสำเร็จ", "รายการอยู่ในคิวรอเจ้าของสวนตรวจสอบ", "sales"); void refresh("sales"); }} />}
-    {reviewSale && <SaleReviewModal sale={reviewSale} role={role} onClose={() => setReviewSale(null)} onChanged={(detail) => { setReviewSale(null); showCompletion("อัปเดตรายการขายสำเร็จ", detail, "sales"); void refresh("sales"); }} />}
-    {showReceiptForm && role === "tapper" && <ReceiptForm garden={activeGarden} agreement={agreements[0]} initialFile={receiptInitialFile} onClose={() => { setShowReceiptForm(false); setReceiptInitialFile(null); }} onUseManual={() => { setShowReceiptForm(false); setReceiptInitialFile(null); setShowSaleForm(true); }} onSaved={() => { setShowReceiptForm(false); setReceiptInitialFile(null); showCompletion("บันทึกรายการขายสำเร็จ", "ส่งรายการและภาพบิลให้เจ้าของสวนตรวจสอบแล้ว", "sales"); void refresh("sales"); }} />}
-    {showAgreementForm && role === "owner" && <AgreementForm garden={activeGarden} members={members} onClose={() => setShowAgreementForm(false)} onSaved={() => { setShowAgreementForm(false); showCompletion("สร้างข้อตกลงสำเร็จ", "ข้อตกลงเวอร์ชันใหม่พร้อมใช้งานแล้ว", "agreements"); void refresh("agreements"); }} />}
-    {showSettlementForm && role === "tapper" && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={() => { setShowSettlementForm(false); showCompletion("ส่งข้อมูลการส่งเงินสำเร็จ", "รายการอยู่ในคิวรอเจ้าของสวนยืนยันการรับเงิน", "settlements"); void refresh("settlements"); }} />}
-      {completionReceipt && <CompletionReceipt receipt={completionReceipt} onClose={() => setCompletionReceipt(null)} onOpen={() => { const next = completionReceipt.nextScreen; setCompletionReceipt(null); if (next) openScreen(next); }} />}
+    {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={(receipt) => { setShowGardenForm(false); showCompletion(receipt); void refresh("gardens"); }} />}
+    {showMemberForm && role === "owner" && <MemberForm garden={activeGarden} onClose={() => setShowMemberForm(false)} onSaved={(receipt) => { setShowMemberForm(false); showCompletion(receipt); void refresh("gardens"); }} />}
+    {showSaleForm && role === "tapper" && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={(receipt) => { setShowSaleForm(false); showCompletion(receipt); void refresh("sales"); }} />}
+    {reviewSale && <SaleReviewModal sale={reviewSale} role={role} onClose={() => setReviewSale(null)} onChanged={(receipt) => { setReviewSale(null); showCompletion(receipt); void refresh("sales"); }} />}
+    {showReceiptForm && role === "tapper" && <ReceiptForm garden={activeGarden} agreement={agreements[0]} initialFile={receiptInitialFile} onClose={() => { setShowReceiptForm(false); setReceiptInitialFile(null); }} onUseManual={() => { setShowReceiptForm(false); setReceiptInitialFile(null); setShowSaleForm(true); }} onSaved={(receipt) => { setShowReceiptForm(false); setReceiptInitialFile(null); showCompletion(receipt); void refresh("sales"); }} />}
+    {showAgreementForm && role === "owner" && <AgreementForm garden={activeGarden} members={members} onClose={() => setShowAgreementForm(false)} onSaved={(receipt) => { setShowAgreementForm(false); showCompletion(receipt); void refresh("agreements"); }} />}
+    {showSettlementForm && role === "tapper" && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={(receipt) => { setShowSettlementForm(false); showCompletion(receipt); void refresh("settlements"); }} />}
+      {completionReceipt && <CompletionReceipt receipt={completionReceipt} busy={completionOpening} openError={completionOpenError} onClose={returnCompletionToOverview} onOpen={() => void openCompletionRecord()} />}
       {deactivateTarget && <ConfirmDialog title="ปิดสิทธิ์คนกรีด" detail={`ถอด ${deactivateTarget.name || deactivateTarget.email || "คนกรีด"} ออกจากสวนนี้หรือไม่ ระบบจะตรวจสอบข้อตกลง รายการค้าง และยอดเงินคงค้างก่อนดำเนินการ`} busy={deactivateBusy} onCancel={() => setDeactivateTarget(null)} onConfirm={() => void deactivateMember()} />}
   </div>;
 }
-function CompletionReceipt({ receipt, onClose, onOpen }: { receipt: CompletionReceiptData; onClose: () => void; onOpen: () => void }) { return <div className="completion-backdrop" role="presentation"><section className="completion-receipt" role="dialog" aria-modal="true" aria-labelledby="completion-title"><CheckCircle2 size={34} aria-hidden="true" /><h2 id="completion-title">{receipt.title}</h2><p>{receipt.detail}</p><div className="completion-actions"><button className="secondary" type="button" onClick={onClose}>ปิด</button>{receipt.nextScreen && <button className="primary" type="button" onClick={onOpen}>ดูรายการนี้</button>}</div></section></div>; }
-function ReasonDialog({ title, prompt, value, busy, onChange, onCancel, onConfirm, confirmLabel }: { title: string; prompt: string; value: string; busy: boolean; onChange: (value: string) => void; onCancel: () => void; onConfirm: () => void; confirmLabel: string }) { return <div className="completion-backdrop" role="presentation"><section className="reason-dialog" role="dialog" aria-modal="true" aria-labelledby="reason-title"><h2 id="reason-title">{title}</h2><p>กรุณาระบุเหตุผลเพื่อให้ทั้งสองฝ่ายติดตามรายการได้</p><label>{prompt}<textarea autoFocus value={value} onChange={(event) => onChange(event.target.value)} placeholder="กรุณาระบุเหตุผล" required /></label><div className="completion-actions"><button className="secondary" type="button" onClick={onCancel} disabled={busy}>ยกเลิก</button><button className="danger-button" type="button" onClick={onConfirm} disabled={busy || !value.trim()}>{busy ? "กำลังดำเนินการ..." : confirmLabel}</button></div></section></div>; }
+function CompletionReceipt({ receipt, busy, openError, onClose, onOpen }: { receipt: CompletionReceiptData; busy: boolean; openError: string; onClose: () => void; onOpen: () => void }) { return <div className="completion-backdrop" role="presentation"><section className="completion-receipt" role="dialog" aria-modal="true" aria-labelledby="completion-title"><CheckCircle2 size={38} aria-hidden="true" /><h2 id="completion-title">{receipt.title}</h2><p>{receipt.detail}</p><div className="completion-status"><span>สถานะใหม่</span><strong>{receipt.statusLabel}</strong></div><dl className="completion-summary">{receipt.rows.map((row) => <div key={`${row.label}-${row.value}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>{openError && <div className="form-error" role="alert">{openError}</div>}<div className="completion-actions"><button className="secondary" type="button" onClick={onClose} disabled={busy}>กลับหน้าหลัก</button>{receipt.nextScreen && <button className="primary" type="button" onClick={onOpen} disabled={busy}>{busy ? "กำลังเปิดรายการ..." : receipt.openLabel || "ดูรายการนี้"}</button>}</div></section></div>; }
+function ReasonDialog({ title, prompt, impact, value, busy, onChange, onCancel, onConfirm, confirmLabel }: { title: string; prompt: string; impact: string; value: string; busy: boolean; onChange: (value: string) => void; onCancel: () => void; onConfirm: () => void; confirmLabel: string }) { return <div className="completion-backdrop" role="presentation"><section className="reason-dialog" role="dialog" aria-modal="true" aria-labelledby="reason-title"><h2 id="reason-title">{title}</h2><p>กรุณาระบุเหตุผลเพื่อให้ทั้งสองฝ่ายติดตามรายการได้</p><div className="reason-impact"><AlertTriangle size={18} aria-hidden="true" /><span><strong>ผลหลังยืนยัน</strong>{impact}</span></div><label>{prompt}<textarea autoFocus value={value} onChange={(event) => onChange(event.target.value)} placeholder="กรุณาระบุเหตุผล" required /></label><div className="completion-actions"><button className="secondary" type="button" onClick={onCancel} disabled={busy}>ยกเลิก</button><button className="danger-button" type="button" onClick={onConfirm} disabled={busy || !value.trim()}>{busy ? "กำลังดำเนินการ..." : confirmLabel}</button></div></section></div>; }
 function ConfirmDialog({ title, detail, busy, onCancel, onConfirm }: { title: string; detail: string; busy: boolean; onCancel: () => void; onConfirm: () => void }) { return <div className="completion-backdrop" role="presentation"><section className="reason-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">{title}</h2><p>{detail}</p><div className="completion-actions"><button className="secondary" type="button" onClick={onCancel} disabled={busy}>ยกเลิก</button><button className="danger-button" type="button" onClick={onConfirm} disabled={busy}>{busy ? "กำลังยกเลิก..." : "ยืนยันการยกเลิก"}</button></div></section></div>; }
 function notificationTargetScreen(type: string): Screen {
   if (type.startsWith("settlement_")) return "settlements";
@@ -526,7 +614,7 @@ function SalesScreen({ sales, role, initialView, onViewApplied, onSale, onReview
   </section>;
 }
 
-function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role: Role; onClose: () => void; onChanged: (detail: string) => void }) {
+function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role: Role; onClose: () => void; onChanged: (receipt: CompletionReceiptData) => void }) {
   const hasReceipt = Boolean(sale.receiptFileId || sale.receiptId);
   const [evidence, setEvidence] = useState<SaleReceiptEvidence | null>(null);
   const [loadingEvidence, setLoadingEvidence] = useState(hasReceipt);
@@ -542,21 +630,48 @@ function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role:
     return () => { active = false; };
   }, [sale.id, hasReceipt]);
   const confirmSale = async () => {
-    if (!reviewed) return;
+    if (!reviewed || busy) return;
     setBusy(true); setError("");
-    try { await api.sales.confirm(sale.id); onChanged("รายการยืนยันแล้วและยอดกระเป๋าที่เกี่ยวข้องได้รับการปรับปรุง"); }
+    try {
+      await api.sales.confirm(sale.id);
+      onChanged({
+        title: "ยืนยันรายการขายสำเร็จ",
+        detail: "ส่วนแบ่งของทั้งสองฝ่ายย้ายจากยอดรอตรวจเป็นยอดยืนยันแล้ว",
+        statusLabel: "ยืนยันแล้ว",
+        rows: [
+          { label: "ยอดขาย", value: money(sale.grossSale || 0) },
+          { label: "กระเป๋าเจ้าของสวน", value: `เพิ่มยอดยืนยัน ${money(sale.ownerShare || 0)}` },
+          { label: "กระเป๋าคนกรีด", value: `เพิ่มยอดยืนยัน ${money(sale.tapperShare || 0)}` }
+        ],
+        nextScreen: "sales",
+        entityType: "sale",
+        entityId: sale.id
+      });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   const disputeSale = async () => {
-    if (!reason.trim()) return;
+    if (!reason.trim() || busy) return;
     setBusy(true); setError("");
-    try { await api.sales.dispute({ saleId: sale.id, reason: reason.trim() }); setReasonOpen(false); onChanged("รายการถูกส่งเข้ากระบวนการคัดค้านแล้ว ระบบยังคงเก็บประวัติรายการไว้"); }
+    try {
+      await api.sales.dispute({ saleId: sale.id, reason: reason.trim() });
+      setReasonOpen(false);
+      onChanged({
+        title: "คัดค้านรายการขายแล้ว",
+        detail: "ระบบเก็บเหตุผลและประวัติรายการไว้ ยอดกระเป๋าจะยังไม่เปลี่ยนจนกว่าจะจัดการข้อคัดค้าน",
+        statusLabel: "อยู่ระหว่างโต้แย้ง",
+        rows: [{ label: "ยอดขาย", value: money(sale.grossSale || 0) }, { label: "ผลต่อกระเป๋า", value: "ยอดยืนยันยังไม่เปลี่ยน" }],
+        nextScreen: "sales",
+        entityType: "sale",
+        entityId: sale.id
+      });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   const canDispute = ["pending_owner_review", "confirmed"].includes(sale.status);
-  return <Modal title="ตรวจรายละเอียดรายการขาย" onClose={onClose}><div className="sale-review"><div className="sale-review-summary"><div><small>ยอดขายก่อนหัก</small><strong>{money(sale.grossSale || 0)}</strong><span>{formatThaiDateTime(sale.saleDate)} · {sale.buyerName || "ไม่ระบุร้านรับซื้อ"}</span></div><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><section className="receipt-evidence"><div className="receipt-evidence-head"><div><Image size={18} /><span><strong>หลักฐานใบเสร็จ</strong><small>{hasReceipt ? `ระบบอ่านข้อมูลได้ ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "รายการบันทึกด้วยมือ"}</small></span></div></div>{loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดใบเสร็จ" /></div> : evidence ? <img src={evidence.dataUrl} alt={`ใบเสร็จรายการขาย ${sale.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่มีภาพใบเสร็จ</strong><span>รายการนี้ถูกบันทึกด้วยมือ โปรดตรวจตัวเลขกับหลักฐานภายนอกก่อนยืนยัน</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดและการแบ่งเงิน</h3><div className="sale-detail-grid"><Detail label="ประเภทสินค้า" value={sale.productType || "ไม่ระบุ"} /><Detail label="น้ำหนักสุทธิ" value={`${sale.netWeight || sale.weightKg || 0} กก.`} /><Detail label="ราคาต่อหน่วย" value={money(sale.unitPrice || 0)} /><Detail label="หักหน้าร้าน" value={money(sale.buyerDeductions || 0)} /><Detail label="ค่าใช้จ่ายร่วม" value={money(sale.sharedExpenses || 0)} /><Detail label="ฐานแบ่งเงิน" value={money(sale.splitBase || 0)} /></div><div className="split-review"><div><span>ส่วนของเจ้าของสวน</span><strong>{money(sale.ownerShare || 0)}</strong></div><div><span>ส่วนของคนกรีด</span><strong>{money(sale.tapperShare || 0)}</strong></div></div><small className="agreement-reference">ข้อตกลงฉบับที่: {sale.agreementId ? sale.agreementId.slice(0, 8) : "ไม่ระบุ"}</small></section>{role === "owner" && sale.status === "pending_owner_review" && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>ฉันตรวจหลักฐานและตัวเลขแล้ว</strong><small>เมื่อยืนยัน รายการจะเปลี่ยนจากรอตรวจเป็นยืนยันแล้ว</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{canDispute && <button className="danger-button" disabled={busy} onClick={() => { setReason(""); setReasonOpen(true); }}>คัดค้านรายการ</button>}{role === "owner" && sale.status === "pending_owner_review" && <button className="primary" disabled={busy || !reviewed || loadingEvidence || Boolean(hasReceipt && !evidence)} onClick={() => void confirmSale()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : "ยืนยันรายการขาย"}</button>}{reasonOpen && <ReasonDialog title="คัดค้านรายการขาย" prompt="เหตุผลที่คัดค้าน" value={reason} busy={busy} onChange={setReason} onCancel={() => setReasonOpen(false)} onConfirm={() => void disputeSale()} confirmLabel="ส่งเหตุผลและคัดค้าน" />}</div></div></Modal>;
+  return <Modal title="ตรวจรายละเอียดรายการขาย" onClose={onClose}><div className="sale-review"><div className="sale-review-summary"><div><small>ยอดขายก่อนหัก</small><strong>{money(sale.grossSale || 0)}</strong><span>{formatThaiDateTime(sale.saleDate)} · {sale.buyerName || "ไม่ระบุร้านรับซื้อ"}</span></div><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span></div><section className="receipt-evidence"><div className="receipt-evidence-head"><div><Image size={18} /><span><strong>หลักฐานใบเสร็จ</strong><small>{hasReceipt ? `ระบบอ่านข้อมูลได้ ${Math.round(Number(sale.ocrConfidence || 0) * 100)}%` : "รายการบันทึกด้วยมือ"}</small></span></div></div>{loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดใบเสร็จ" /></div> : evidence ? <img src={evidence.dataUrl} alt={`ใบเสร็จรายการขาย ${sale.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่มีภาพใบเสร็จ</strong><span>รายการนี้ถูกบันทึกด้วยมือ โปรดตรวจตัวเลขกับหลักฐานภายนอกก่อนยืนยัน</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดและการแบ่งเงิน</h3><div className="sale-detail-grid"><Detail label="ประเภทสินค้า" value={sale.productType || "ไม่ระบุ"} /><Detail label="น้ำหนักสุทธิ" value={`${sale.netWeight || sale.weightKg || 0} กก.`} /><Detail label="ราคาต่อหน่วย" value={money(sale.unitPrice || 0)} /><Detail label="หักหน้าร้าน" value={money(sale.buyerDeductions || 0)} /><Detail label="ค่าใช้จ่ายร่วม" value={money(sale.sharedExpenses || 0)} /><Detail label="ฐานแบ่งเงิน" value={money(sale.splitBase || 0)} /></div><div className="split-review"><div><span>ส่วนของเจ้าของสวน</span><strong>{money(sale.ownerShare || 0)}</strong></div><div><span>ส่วนของคนกรีด</span><strong>{money(sale.tapperShare || 0)}</strong></div></div><small className="agreement-reference">ข้อตกลงฉบับที่: {sale.agreementId ? sale.agreementId.slice(0, 8) : "ไม่ระบุ"}</small></section>{role === "owner" && sale.status === "pending_owner_review" && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>ฉันตรวจหลักฐานและตัวเลขแล้ว</strong><small>เมื่อยืนยัน รายการจะเปลี่ยนจากรอตรวจเป็นยืนยันแล้ว</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{canDispute && <button className="danger-button" disabled={busy} onClick={() => { setReason(""); setReasonOpen(true); }}>คัดค้านรายการ</button>}{role === "owner" && sale.status === "pending_owner_review" && <button className="primary" disabled={busy || !reviewed || loadingEvidence || Boolean(hasReceipt && !evidence)} onClick={() => void confirmSale()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : "ยืนยันรายการขาย"}</button>}{reasonOpen && <ReasonDialog title="คัดค้านรายการขาย" prompt="เหตุผลที่คัดค้าน" impact="สถานะจะเปลี่ยนเป็นอยู่ระหว่างโต้แย้ง และยอดยืนยันจะยังไม่เปลี่ยน" value={reason} busy={busy} onChange={setReason} onCancel={() => setReasonOpen(false)} onConfirm={() => void disputeSale()} confirmLabel="ส่งเหตุผลและคัดค้าน" />}</div></div></Modal>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><strong>{value}</strong></div>; }
@@ -567,7 +682,7 @@ function GardensScreen({ garden, gardens, members, role, onCreate, onAddMember, 
 
 function AgreementsScreen({ agreements, garden, role, onCreate }: { agreements: Agreement[]; garden?: Garden; role: Role; onCreate: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>ข้อตกลงแบ่งรายได้</h2><p>{garden?.name || "เลือกสวนก่อนสร้างข้อตกลง"} · ทุกเวอร์ชันไม่กระทบรายการย้อนหลัง</p></div>{role === "owner" && <button className="secondary" onClick={onCreate}>สร้างเวอร์ชันใหม่</button>}</div>{agreements.length === 0 ? <Empty text="ยังไม่มีข้อตกลงที่ใช้งานอยู่" /> : <div className="data-list">{agreements.map((agreement) => <article className="data-row" key={agreement.id}><div><strong>เวอร์ชัน {agreement.version}</strong><span>มีผล {agreement.effectiveFrom} · {agreement.status}</span></div><div><strong>{agreement.ownerPercentage}/{agreement.tapperPercentage}</strong><span>เจ้าของสวน / คนกรีด</span></div></article>)}</div>}</section>; }
 
-function SettlementsScreen({ settlements, wallet, role, focusedSettlementId, onFocusHandled, onCreate, onRefresh }: { settlements: Settlement[]; wallet: WalletData | null; role: Role; focusedSettlementId?: string; onFocusHandled: () => void; onCreate: () => void; onRefresh: () => void }) {
+function SettlementsScreen({ settlements, wallet, role, focusedSettlementId, onFocusHandled, onCreate, onRefresh, onCompleted }: { settlements: Settlement[]; wallet: WalletData | null; role: Role; focusedSettlementId?: string; onFocusHandled: () => void; onCreate: () => void; onRefresh: () => void; onCompleted: (receipt: CompletionReceiptData) => void }) {
   const [reviewSettlement, setReviewSettlement] = useState<Settlement | null>(null);
   const [cancelBusyId, setCancelBusyId] = useState("");
   const [error, setError] = useState("");
@@ -581,7 +696,12 @@ function SettlementsScreen({ settlements, wallet, role, focusedSettlementId, onF
   const cancelSettlement = async (item: Settlement) => {
     if (cancelBusyId) return;
     setCancelBusyId(item.id); setError("");
-    try { await api.settlements.cancel(item.id); setCancelTarget(null); onRefresh(); }
+    try {
+      await api.settlements.cancel(item.id);
+      setCancelTarget(null);
+      onCompleted({ title: "ยกเลิกรายการส่งเงินแล้ว", detail: "รายการยังอยู่ในประวัติ และยอดคงค้างของเจ้าของสวนไม่เปลี่ยน", statusLabel: "ยกเลิกแล้ว", rows: [{ label: "จำนวนเงิน", value: money(item.amount) }, { label: "ยอดคงค้าง", value: "ไม่เปลี่ยน" }], nextScreen: "settlements", entityType: "settlement", entityId: item.id });
+      onRefresh();
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setCancelBusyId(""); }
   };
@@ -607,12 +727,12 @@ function SettlementsScreen({ settlements, wallet, role, focusedSettlementId, onF
         </article>
       )}</div>}
     </section>
-    {reviewSettlement && <SettlementReviewModal settlement={reviewSettlement} role={role} onClose={() => setReviewSettlement(null)} onChanged={() => { setReviewSettlement(null); onRefresh(); }} />}
+    {reviewSettlement && <SettlementReviewModal settlement={reviewSettlement} outstandingBefore={wallet?.owner.outstanding} role={role} onClose={() => setReviewSettlement(null)} onChanged={(receipt) => { setReviewSettlement(null); onCompleted(receipt); onRefresh(); }} />}
     {cancelTarget && <ConfirmDialog title="ยกเลิกรายการส่งเงิน" detail={`ยกเลิกรายการจำนวน ${money(cancelTarget.amount)} หรือไม่ รายการที่ยกเลิกจะยังคงอยู่ในประวัติ`} busy={Boolean(cancelBusyId)} onCancel={() => setCancelTarget(null)} onConfirm={() => void cancelSettlement(cancelTarget)} />}
   </>;
 }
 
-function SettlementReviewModal({ settlement, role, onClose, onChanged }: { settlement: Settlement; role: Role; onClose: () => void; onChanged: () => void }) {
+function SettlementReviewModal({ settlement, outstandingBefore, role, onClose, onChanged }: { settlement: Settlement; outstandingBefore?: number; role: Role; onClose: () => void; onChanged: (receipt: CompletionReceiptData) => void }) {
   const [evidence, setEvidence] = useState<SettlementEvidence | null>(null);
   const [loadingEvidence, setLoadingEvidence] = useState(settlement.method === "bank_transfer" && Boolean(settlement.slipFileId));
   const [reviewed, setReviewed] = useState(false);
@@ -627,22 +747,34 @@ function SettlementReviewModal({ settlement, role, onClose, onChanged }: { settl
     return () => { active = false; };
   }, [settlement.id, settlement.method, settlement.slipFileId]);
   const confirmSettlement = async () => {
-    if (!reviewed) return;
+    if (!reviewed || busy) return;
     setBusy(true); setError("");
-    try { await api.settlements.confirm(settlement.id); onChanged(); }
+    try {
+      await api.settlements.confirm(settlement.id);
+      const rows = [{ label: "ยอดที่ได้รับ", value: money(settlement.amount) }];
+      if (outstandingBefore !== undefined) {
+        rows.push({ label: "ยอดคงค้างก่อนยืนยัน", value: money(outstandingBefore) });
+        rows.push({ label: "ยอดคงค้างใหม่", value: money(Math.max(0, outstandingBefore - settlement.amount)) });
+      } else rows.push({ label: "ผลต่อยอดคงค้าง", value: `ลดลง ${money(settlement.amount)}` });
+      onChanged({ title: "ยืนยันการรับเงินสำเร็จ", detail: "บันทึกการรับเงินจริงแล้ว และตัดยอดคงค้างของเจ้าของสวนตามจำนวนที่ยืนยัน", statusLabel: "ยืนยันรับเงินแล้ว", rows, nextScreen: "settlements", entityType: "settlement", entityId: settlement.id });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   const rejectSettlement = async () => {
-    if (!reason.trim()) return;
+    if (!reason.trim() || busy) return;
     setBusy(true); setError("");
-    try { await api.settlements.reject({ settlementId: settlement.id, reason: reason.trim() }); setReasonOpen(false); onChanged(); }
+    try {
+      await api.settlements.reject({ settlementId: settlement.id, reason: reason.trim() });
+      setReasonOpen(false);
+      onChanged({ title: "ปฏิเสธรายการส่งเงินแล้ว", detail: "แจ้งเหตุผลให้คนกรีดแล้ว รายการนี้ไม่ถูกนำไปตัดยอดคงค้าง", statusLabel: "ปฏิเสธแล้ว", rows: [{ label: "จำนวนเงิน", value: money(settlement.amount) }, { label: "ยอดคงค้าง", value: outstandingBefore === undefined ? "ไม่เปลี่ยน" : `${money(outstandingBefore)} (ไม่เปลี่ยน)` }], nextScreen: "settlements", entityType: "settlement", entityId: settlement.id });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   const isPendingOwnerReview = role === "owner" && settlement.status === "pending_owner_confirmation";
   const evidenceReady = settlement.method === "cash" || Boolean(evidence);
-  return <Modal title="ตรวจรายละเอียดการส่งเงิน" onClose={onClose}><div className="sale-review settlement-review"><div className="sale-review-summary"><div><small>ยอดที่คนกรีดส่งให้เจ้าของสวน</small><strong>{money(settlement.amount)}</strong><span>{formatThaiDateTime(settlement.transferDate)} · {settlement.method === "cash" ? "เงินสด" : "โอนธนาคาร"}</span></div><span className={`status ${settlement.status}`}>{labelStatus(settlement.status)}</span></div><section className="receipt-evidence settlement-evidence"><div className="receipt-evidence-head"><div>{settlement.method === "cash" ? <Banknote size={18} /> : <Image size={18} />}<span><strong>{settlement.method === "cash" ? "หลักฐานการรับเงินสด" : "สลิปการโอนเงิน"}</strong><small>{settlement.method === "cash" ? "ยืนยันต่อหน้าบนมือถือของเจ้าของสวน" : "ไฟล์ส่วนตัวจาก Google Drive"}</small></span></div></div>{settlement.method === "cash" ? <div className="receipt-placeholder manual cash-evidence"><Banknote size={28} /><strong>โปรดตรวจนับเงินสดก่อนยืนยัน</strong><span>สถานที่ส่งมอบ: {settlement.location || "ไม่ระบุ"}</span></div> : loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดสลิป" /></div> : evidence?.mimeType === "application/pdf" ? <div className="pdf-evidence"><FileText size={28} /><strong>{evidence.name}</strong><a className="secondary" href={evidence.dataUrl} download={evidence.name}><FileDown size={15} />เปิดไฟล์ PDF</a></div> : evidence ? <img src={evidence.dataUrl} alt={`สลิปการส่งเงิน ${settlement.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่พบสลิป</strong><span>ห้ามยืนยันรายการโอนจนกว่าจะตรวจสอบหลักฐานได้</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดการส่งมอบ</h3><div className="sale-detail-grid"><Detail label="วิธีส่งเงิน" value={settlement.method === "cash" ? "เงินสด" : "โอนธนาคาร"} /><Detail label="วันที่ส่งเงิน" value={formatThaiDateTime(settlement.transferDate)} /><Detail label="ธนาคาร" value={settlement.bank || "—"} /><Detail label="เลขอ้างอิง" value={settlement.referenceNo || "—"} /><Detail label="สถานที่" value={settlement.location || "—"} /><Detail label="หมายเหตุ" value={settlement.note || "—"} /></div></section>{isPendingOwnerReview && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>{settlement.method === "cash" ? "ฉันตรวจนับและได้รับเงินสดจริงแล้ว" : "ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว"}</strong><small>เมื่อยืนยัน ระบบจะตัดยอดคงค้างและบันทึกประวัติของทั้งสองฝ่าย</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{isPendingOwnerReview && <button className="danger-button" disabled={busy} onClick={() => { setReason(""); setReasonOpen(true); }}>ปฏิเสธรายการ</button>}{isPendingOwnerReview && <button className="primary" disabled={busy || !reviewed || loadingEvidence || !evidenceReady} onClick={() => void confirmSettlement()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : settlement.method === "cash" ? "ยืนยันว่าได้รับเงินสดแล้ว" : "ยืนยันยอดโอนแล้ว"}</button>}{reasonOpen && <ReasonDialog title="ปฏิเสธรายการส่งเงิน" prompt="เหตุผลที่ปฏิเสธ" value={reason} busy={busy} onChange={setReason} onCancel={() => setReasonOpen(false)} onConfirm={() => void rejectSettlement()} confirmLabel="ส่งเหตุผลและปฏิเสธ" />}</div></div></Modal>;
+  return <Modal title="ตรวจรายละเอียดการส่งเงิน" onClose={onClose}><div className="sale-review settlement-review"><div className="sale-review-summary"><div><small>ยอดที่คนกรีดส่งให้เจ้าของสวน</small><strong>{money(settlement.amount)}</strong><span>{formatThaiDateTime(settlement.transferDate)} · {settlement.method === "cash" ? "เงินสด" : "โอนธนาคาร"}</span></div><span className={`status ${settlement.status}`}>{labelStatus(settlement.status)}</span></div><section className="receipt-evidence settlement-evidence"><div className="receipt-evidence-head"><div>{settlement.method === "cash" ? <Banknote size={18} /> : <Image size={18} />}<span><strong>{settlement.method === "cash" ? "หลักฐานการรับเงินสด" : "สลิปการโอนเงิน"}</strong><small>{settlement.method === "cash" ? "ยืนยันต่อหน้าบนมือถือของเจ้าของสวน" : "ไฟล์ส่วนตัวจาก Google Drive"}</small></span></div></div>{settlement.method === "cash" ? <div className="receipt-placeholder manual cash-evidence"><Banknote size={28} /><strong>โปรดตรวจนับเงินสดก่อนยืนยัน</strong><span>สถานที่ส่งมอบ: {settlement.location || "ไม่ระบุ"}</span></div> : loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดสลิป" /></div> : evidence?.mimeType === "application/pdf" ? <div className="pdf-evidence"><FileText size={28} /><strong>{evidence.name}</strong><a className="secondary" href={evidence.dataUrl} download={evidence.name}><FileDown size={15} />เปิดไฟล์ PDF</a></div> : evidence ? <img src={evidence.dataUrl} alt={`สลิปการส่งเงิน ${settlement.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่พบสลิป</strong><span>ห้ามยืนยันรายการโอนจนกว่าจะตรวจสอบหลักฐานได้</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดการส่งมอบ</h3><div className="sale-detail-grid"><Detail label="วิธีส่งเงิน" value={settlement.method === "cash" ? "เงินสด" : "โอนธนาคาร"} /><Detail label="วันที่ส่งเงิน" value={formatThaiDateTime(settlement.transferDate)} /><Detail label="ธนาคาร" value={settlement.bank || "—"} /><Detail label="เลขอ้างอิง" value={settlement.referenceNo || "—"} /><Detail label="สถานที่" value={settlement.location || "—"} /><Detail label="หมายเหตุ" value={settlement.note || "—"} /></div></section>{isPendingOwnerReview && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>{settlement.method === "cash" ? "ฉันตรวจนับและได้รับเงินสดจริงแล้ว" : "ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว"}</strong><small>เมื่อยืนยัน ระบบจะตัดยอดคงค้างและบันทึกประวัติของทั้งสองฝ่าย</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{isPendingOwnerReview && <button className="danger-button" disabled={busy} onClick={() => { setReason(""); setReasonOpen(true); }}>ปฏิเสธรายการ</button>}{isPendingOwnerReview && <button className="primary" disabled={busy || !reviewed || loadingEvidence || !evidenceReady} onClick={() => void confirmSettlement()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : settlement.method === "cash" ? "ยืนยันว่าได้รับเงินสดแล้ว" : "ยืนยันยอดโอนแล้ว"}</button>}{reasonOpen && <ReasonDialog title="ปฏิเสธรายการส่งเงิน" prompt="เหตุผลที่ปฏิเสธ" impact="รายการจะถูกปฏิเสธและยอดคงค้างจะไม่ถูกตัด" value={reason} busy={busy} onChange={setReason} onCancel={() => setReasonOpen(false)} onConfirm={() => void rejectSettlement()} confirmLabel="ส่งเหตุผลและปฏิเสธ" />}</div></div></Modal>;
 }
 
 function ReportsScreen({ garden }: { garden?: Garden }) {
@@ -667,7 +799,7 @@ function NotificationsScreen({ notifications, onOpen }: { notifications: Notific
   return <section className="panel"><div className="panel-head"><div><h2>การแจ้งเตือน</h2><p>{unread > 0 ? `ยังไม่อ่าน ${unread} รายการ · แตะเพื่อเปิดงานที่เกี่ยวข้อง` : "อ่านครบแล้ว · รายการใหม่จะปรากฏที่นี่"}</p></div></div>{notifications.length === 0 ? <Empty text="ยังไม่มีการแจ้งเตือน" /> : <div className="data-list">{notifications.map((item) => <button type="button" className={`data-row notification-row ${item.readAt ? "read" : "unread"}`} key={item.id} onClick={() => onOpen(item)}><span className="notification-state" aria-hidden="true" /><span className="notification-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}</small></span><span className="notification-action">เปิดรายการ</span></button>)}</div>}</section>;
 }
 
-function GardenForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function GardenForm({ onClose, onSaved }: { onClose: () => void; onSaved: (receipt: CompletionReceiptData) => void }) {
   const [form, setForm] = useState({ name: "", province: "", district: "", areaRai: "", treeCount: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -675,14 +807,17 @@ function GardenForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
     event.preventDefault();
     if (busy) return;
     setBusy(true); setError("");
-    try { await api.gardens.create({ name: form.name, province: form.province, district: form.district, areaRai: Number(form.areaRai), treeCount: Number(form.treeCount) }); onSaved(); }
+    try {
+      await api.gardens.create({ name: form.name, province: form.province, district: form.district, areaRai: Number(form.areaRai), treeCount: Number(form.treeCount) });
+      onSaved({ title: "เพิ่มสวนสำเร็จ", detail: "สวนใหม่พร้อมใช้และจะแสดงในหน้าสวนและสมาชิก", statusLabel: "พร้อมใช้งาน", rows: [{ label: "ชื่อสวน", value: form.name }, { label: "พื้นที่", value: `${Number(form.areaRai || 0).toLocaleString("th-TH")} ไร่` }], nextScreen: "gardens", openLabel: "ดูสวนใหม่" });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   return <Modal title="เพิ่มสวนใหม่" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>ชื่อสวน<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>จังหวัด<input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} /></label><label>อำเภอ<input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /></label><label>พื้นที่ (ไร่)<input type="number" min="0" value={form.areaRai} onChange={(e) => setForm({ ...form, areaRai: e.target.value })} /></label><label>จำนวนต้นยาง<input type="number" min="0" value={form.treeCount} onChange={(e) => setForm({ ...form, treeCount: e.target.value })} /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy}>{busy ? "กำลังบันทึกสวน..." : "บันทึกสวน"}</button></form></Modal>;
 }
 
-function MemberForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: () => void; onSaved: () => void }) {
+function MemberForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: () => void; onSaved: (receipt: CompletionReceiptData) => void }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -690,14 +825,18 @@ function MemberForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: ()
     event.preventDefault();
     if (!garden || busy) return;
     setBusy(true); setError("");
-    try { await api.members.add({ gardenId: garden.id, email: email.trim().toLowerCase() }); onSaved(); }
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      await api.members.add({ gardenId: garden.id, email: normalizedEmail });
+      onSaved({ title: "เพิ่มคนกรีดสำเร็จ", detail: "บัญชีนี้เข้าใช้ข้อมูลของสวนได้แล้ว", statusLabel: "ใช้งานอยู่", rows: [{ label: "คนกรีด", value: normalizedEmail }, { label: "สวน", value: garden.name }], nextScreen: "gardens", openLabel: "ดูสมาชิกสวน" });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   return <Modal title="เพิ่มคนกรีดเข้าสวน" onClose={onClose}><form className="form-grid member-form" onSubmit={submit}><div className="transparency-note"><ShieldCheck size={19} /><div><strong>เพิ่มได้เฉพาะบัญชีคนกรีดที่ลงทะเบียนแล้ว</strong><span>อีเมลต้องตรงกับบัญชี Google และมีสถานะใช้งานอยู่ในรายชื่อผู้ใช้</span></div></div><label>อีเมล Google ของคนกรีด<input required type="email" inputMode="email" autoCapitalize="none" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@gmail.com" /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy || !garden || !email.trim()}>{busy ? "กำลังตรวจสอบบัญชี..." : "เพิ่มคนกรีดเข้าสวน"}</button></form></Modal>;
 }
 
-function SaleForm({ garden, agreement, role, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; role: Role; onClose: () => void; onSaved: () => void }) {
+function SaleForm({ garden, agreement, role, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; role: Role; onClose: () => void; onSaved: (receipt: CompletionReceiptData) => void }) {
   const [form, setForm] = useState({ saleDate: dateToday(), buyerName: "", productType: "ยางก้อนถ้วย", weightKg: "", unitPrice: "", buyerDeductions: "0", sharedExpenses: "0" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -709,14 +848,17 @@ function SaleForm({ garden, agreement, role, onClose, onSaved }: { garden?: Gard
     event.preventDefault();
     if (!garden || !agreement || busy) return;
     setBusy(true); setError("");
-    try { await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, saleDate: form.saleDate, buyerName: form.buyerName, productType: form.productType, weightKg: Number(form.weightKg), unitPrice: Number(form.unitPrice), buyerDeductions: Number(form.buyerDeductions), sharedExpenses: Number(form.sharedExpenses), manualEntry: true }); onSaved(); }
+    try {
+      const created = await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, saleDate: form.saleDate, buyerName: form.buyerName, productType: form.productType, weightKg: Number(form.weightKg), unitPrice: Number(form.unitPrice), buyerDeductions: Number(form.buyerDeductions), sharedExpenses: Number(form.sharedExpenses), manualEntry: true }) as { id: string; calculation?: { grossSale?: number }; status: string };
+      onSaved({ title: "บันทึกรายการขายสำเร็จ", detail: "ส่งรายการให้เจ้าของสวนตรวจแล้ว ยอดนี้ยังไม่เข้ากระเป๋ายืนยัน", statusLabel: "รอเจ้าของตรวจ", rows: [{ label: "ยอดขาย", value: money(created.calculation?.grossSale ?? total) }, { label: "ประเภทสินค้า", value: form.productType }, { label: "วันที่ขาย", value: formatThaiDateTime(form.saleDate) }], nextScreen: "sales", entityType: "sale", entityId: created.id });
+    }
     catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
   return <Modal title={role === "tapper" ? "บันทึกรายการขาย" : "ทบทวนรายการขาย"} onClose={onClose}><form className="form-grid" onSubmit={submit}><label>วันที่ขาย<input type="date" required value={form.saleDate} onChange={(e) => setForm({ ...form, saleDate: e.target.value })} /></label><label>ร้านรับซื้อ<input value={form.buyerName} onChange={(e) => setForm({ ...form, buyerName: e.target.value })} /></label><label>ประเภทสินค้า<select value={form.productType} onChange={(e) => setForm({ ...form, productType: e.target.value })}><option>น้ำยางสด</option><option>ยางก้อนถ้วย</option><option>ยางแผ่น</option><option>อื่น ๆ</option></select></label><label>น้ำหนัก (กก.)<input type="number" min="0" step="0.01" required value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} /></label><label>ราคา/กก.<input type="number" min="0" step="0.01" required value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} /></label><label>หักหน้าร้าน<input type="number" min="0" step="0.01" value={form.buyerDeductions} onChange={(e) => setForm({ ...form, buyerDeductions: e.target.value })} /></label><label>ค่าใช้จ่ายร่วม<input type="number" min="0" step="0.01" value={form.sharedExpenses} onChange={(e) => setForm({ ...form, sharedExpenses: e.target.value })} /></label><div className="calculation-preview"><span>ฐานแบ่ง {money(splitBase)}</span><strong>เจ้าของสวน {money(owner)} · คนกรีด {money(tapper)}</strong></div>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy || !garden || !agreement}>{busy ? "กำลังบันทึกรายการขาย..." : "ยืนยันรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี ข้อตกลงที่ใช้งานอยู่ ก่อนสร้างรายการขาย</small>}</form></Modal>;
 }
 
-function SettlementForm({ garden, role, onClose, onSaved }: { garden?: Garden; role: Role; onClose: () => void; onSaved: () => void }) {
+function SettlementForm({ garden, role, onClose, onSaved }: { garden?: Garden; role: Role; onClose: () => void; onSaved: (receipt: CompletionReceiptData) => void }) {
   const [form, setForm] = useState({ amount: "", method: "bank_transfer", transferDate: dateToday(), referenceNo: "", bank: "", location: "", note: "" });
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -735,8 +877,8 @@ function SettlementForm({ garden, role, onClose, onSaved }: { garden?: Garden; r
     setBusy(true); setError("");
     try {
       const slipData = slipFile ? await readFileAsDataUrl_(slipFile) : "";
-      await api.settlements.create({ gardenId: garden.id, amount: Number(form.amount), method: form.method, transferDate: form.transferDate, referenceNo: form.referenceNo, bank: form.bank, location: form.location, note: form.note, slipData, slipMimeType: slipFile?.type || "", slipFilename: slipFile?.name || "" });
-      onSaved();
+      const created = await api.settlements.create({ gardenId: garden.id, amount: Number(form.amount), method: form.method, transferDate: form.transferDate, referenceNo: form.referenceNo, bank: form.bank, location: form.location, note: form.note, slipData, slipMimeType: slipFile?.type || "", slipFilename: slipFile?.name || "" });
+      onSaved({ title: "ส่งข้อมูลการส่งเงินสำเร็จ", detail: "เจ้าของสวนได้รับงานตรวจแล้ว ยอดคงค้างจะยังไม่ลดจนกว่าเจ้าของยืนยันรับเงินจริง", statusLabel: "รอเจ้าของยืนยันรับเงิน", rows: [{ label: "จำนวนเงิน", value: money(created.amount) }, { label: "วิธีส่ง", value: created.method === "cash" ? "ส่งมอบเงินสด" : "โอนธนาคาร" }, { label: "หลักฐาน", value: created.method === "cash" ? "รอยืนยันการรับเงินสด" : created.slipFileId ? "แนบสลิปแล้ว" : "ยังไม่พบสลิป" }], nextScreen: "settlements", entityType: "settlement", entityId: created.id });
     } catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
@@ -750,7 +892,7 @@ function WalletLine({ label, amount, percent, color }: { label: string; amount: 
 function labelStatus(status: string) { return ({ pending_owner_review: "รอตรวจ", confirmed: "ยืนยันแล้ว", disputed: "โต้แย้ง", pending_owner_confirmation: "รอเจ้าของยืนยัน", rejected: "ปฏิเสธ", cancelled: "ยกเลิก", partially_confirmed: "ยืนยันบางส่วน", pending: "รอดำเนินการ", created: "สร้างแล้ว" } as Record<string, string>)[status] || "สถานะรอตรวจสอบ"; }
 
 
-function ReceiptForm({ garden, agreement, initialFile, onClose, onUseManual, onSaved }: { garden?: Garden; agreement?: Agreement; initialFile?: File | null; onClose: () => void; onUseManual: () => void; onSaved: () => void }) {
+function ReceiptForm({ garden, agreement, initialFile, onClose, onUseManual, onSaved }: { garden?: Garden; agreement?: Agreement; initialFile?: File | null; onClose: () => void; onUseManual: () => void; onSaved: (receipt: CompletionReceiptData) => void }) {
   const [file, setFile] = useState<File | null>(initialFile || null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({ saleDate: dateToday(), buyerName: "", ticketNumber: "", productType: "", weightEntriesText: "", grossWeightKg: "", tareWeightKg: "", netWeightKg: "", weightKg: "", freshWeightKg: "", drc: "", dryWeightKg: "", unitPrice: "", grossSale: "", buyerDeductions: "0" });
@@ -843,8 +985,8 @@ function ReceiptForm({ garden, agreement, initialFile, onClose, onUseManual, onS
     try {
       const duplicateResult = await checkDuplicate();
       if (duplicateResult?.possibleDuplicate && status !== "duplicate") { setStatus("duplicate"); return; }
-      await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, receiptId, receiptType, saleDate: fields.saleDate, ticketNumber: fields.ticketNumber, buyerName: fields.buyerName, productType: fields.productType, weightEntriesKg: editedWeightEntries, grossWeight: Number(fields.grossWeightKg || fields.weightKg || 0), tareWeight: Number(fields.tareWeightKg || 0), netWeight: Number(fields.weightKg || 0), freshWeightKg: Number(fields.freshWeightKg || 0), drc: Number(fields.drc || 0), dryWeightKg: Number(fields.dryWeightKg || 0), weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), grossSale: Number(fields.grossSale || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId, humanVerified: true, manualEntry: false });
-      onSaved();
+      const created = await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, receiptId, receiptType, saleDate: fields.saleDate, ticketNumber: fields.ticketNumber, buyerName: fields.buyerName, productType: fields.productType, weightEntriesKg: editedWeightEntries, grossWeight: Number(fields.grossWeightKg || fields.weightKg || 0), tareWeight: Number(fields.tareWeightKg || 0), netWeight: Number(fields.weightKg || 0), freshWeightKg: Number(fields.freshWeightKg || 0), drc: Number(fields.drc || 0), dryWeightKg: Number(fields.dryWeightKg || 0), weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), grossSale: Number(fields.grossSale || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId, humanVerified: true, manualEntry: false }) as { id: string; calculation?: { grossSale?: number }; status: string };
+      onSaved({ title: "บันทึกรายการขายพร้อมภาพบิลสำเร็จ", detail: "ส่งตัวเลขและภาพบิลให้เจ้าของสวนตรวจแล้ว ยอดนี้ยังไม่เข้ากระเป๋ายืนยัน", statusLabel: "รอเจ้าของตรวจ", rows: [{ label: "ยอดขาย", value: money(created.calculation?.grossSale ?? Number(fields.grossSale || 0)) }, { label: "ประเภทสินค้า", value: fields.productType || "ไม่ระบุ" }, { label: "วันที่ขาย", value: formatThaiDateTime(fields.saleDate) }], nextScreen: "sales", entityType: "sale", entityId: created.id });
     } catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
@@ -944,12 +1086,12 @@ async function prepareReceiptImage_(file: File): Promise<File> {
 }
 
 
-function AgreementForm({ garden, members, onClose, onSaved }: { garden?: Garden; members: GardenMember[]; onClose: () => void; onSaved: () => void }) {
+function AgreementForm({ garden, members, onClose, onSaved }: { garden?: Garden; members: GardenMember[]; onClose: () => void; onSaved: (receipt: CompletionReceiptData) => void }) {
   const tappers = members.filter((member) => member.role === "tapper" && member.status === "active");
   const [form, setForm] = useState({ tapperId: tappers[0]?.userId || "", ownerPercentage: "60", tapperPercentage: "40", effectiveFrom: dateToday() });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const total = Number(form.ownerPercentage || 0) + Number(form.tapperPercentage || 0);
-  const submit = async (event: FormEvent) => { event.preventDefault(); if (!garden || total !== 100 || busy) return; setBusy(true); setError(""); try { await api.agreements.create({ gardenId: garden.id, tapperId: form.tapperId, ownerPercentage: Number(form.ownerPercentage), tapperPercentage: Number(form.tapperPercentage), effectiveFrom: form.effectiveFrom }); onSaved(); } catch (caught) { setError(userMessageForApiError(caught)); } finally { setBusy(false); } };
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!garden || total !== 100 || busy) return; setBusy(true); setError(""); try { await api.agreements.create({ gardenId: garden.id, tapperId: form.tapperId, ownerPercentage: Number(form.ownerPercentage), tapperPercentage: Number(form.tapperPercentage), effectiveFrom: form.effectiveFrom }); onSaved({ title: "สร้างข้อตกลงสำเร็จ", detail: "ข้อตกลงเวอร์ชันใหม่พร้อมใช้กับรายการขายหลังวันที่มีผล", statusLabel: "พร้อมใช้งาน", rows: [{ label: "วันที่เริ่มมีผล", value: formatThaiDateTime(form.effectiveFrom) }, { label: "ส่วนเจ้าของ / คนกรีด", value: `${form.ownerPercentage}% / ${form.tapperPercentage}%` }], nextScreen: "agreements", openLabel: "ดูข้อตกลง" }); } catch (caught) { setError(userMessageForApiError(caught)); } finally { setBusy(false); } };
   return <Modal title="สร้างข้อตกลงแบ่งรายได้" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>คนกรีด<select required value={form.tapperId} onChange={(e) => setForm({ ...form, tapperId: e.target.value })}><option value="">เลือกคนกรีดในสวน</option>{tappers.map((member) => <option key={member.id} value={member.userId}>{member.name || member.email || member.userId}</option>)}</select></label><label>เริ่มมีผลวันที่<input required type="date" value={form.effectiveFrom} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} /></label><label>สัดส่วนเจ้าของสวน (%)<input type="number" min="0" max="100" value={form.ownerPercentage} onChange={(e) => setForm({ ...form, ownerPercentage: e.target.value })} /></label><label>สัดส่วนคนกรีด (%)<input type="number" min="0" max="100" value={form.tapperPercentage} onChange={(e) => setForm({ ...form, tapperPercentage: e.target.value })} /></label><div className="calculation-preview"><span>รวมสัดส่วน</span><strong className={total === 100 ? "" : "form-hint"}>{total}% {total === 100 ? "พร้อมบันทึก" : "ต้องรวมให้ได้ 100%"}</strong></div>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy || !garden || !form.tapperId || total !== 100}>{busy ? "กำลังบันทึกข้อตกลง..." : "สร้างข้อตกลงเวอร์ชัน"}</button>{tappers.length === 0 && <small className="form-hint">ต้องเพิ่มคนกรีดในหน้า “สวนและแปลง” ก่อนสร้างข้อตกลง</small>}</form></Modal>;
 }
