@@ -6,6 +6,8 @@
 
 The frontend uses `src/api.ts` to send JSON requests to the deployed Apps Script Web App. It never receives spreadsheet identifiers, Drive credentials, or OCR keys. Every mutating request contains a unique `requestId`. Apps Script validates the request, resolves the authenticated user, applies role and garden membership rules, acquires a script lock, writes Sheets/Drive records, and returns a response envelope.
 
+Receipt extraction follows the single current design in [`OCR-GEMINI-CANONICAL.md`](OCR-GEMINI-CANONICAL.md). Historical provider experiments are not alternate runtime architectures.
+
 ```text
 Browser / PWA
     |

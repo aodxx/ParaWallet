@@ -186,10 +186,15 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('accept="image/*" capture="environment"');
     expect(styles).toContain(".receipt-upload-actions");
     expect(styles).toContain(".receipt-upload-actions .file-action input");
+    expect(app).toContain("prepareReceiptImage_(selected)");
+    expect(app).toContain('imageOrientation: "from-image"');
+    expect(app).toContain('canvas.toBlob(resolve, "image/jpeg"');
+    expect(app).toContain('className="receipt-scan-preview"');
+    expect(styles).toContain(".receipt-scan-preview");
   });
 
   it("links the scanned Receipt record and garden scope into Sale creation", () => {
-    expect(app).toContain("gardenId: garden.id, data, mimeType: selected.type");
+    expect(app).toContain("gardenId: garden.id, data, mimeType: prepared.type");
     expect(app).toContain("setReceiptId");
     expect(app).toContain("agreementId: agreement.id, receiptId");
     expect(app).toContain("!receiptId || !receiptFileId");

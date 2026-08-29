@@ -52,6 +52,18 @@ const apiErrorMessages: Record<string, string> = {
   SALE_RECEIPT_ACCESS_DENIED: "ไม่สามารถใช้ใบเสร็จที่ไม่ได้สร้างจากบัญชี Tapper นี้",
   SALE_RECEIPT_NOT_FOUND: "ไม่พบไฟล์ใบเสร็จของรายการนี้",
   SALE_RECEIPT_MISMATCH: "ข้อมูลใบเสร็จกับรายการขายไม่ตรงกัน กรุณาตรวจสอบใหม่",
+  RECEIPT_GARDEN_MISMATCH: "ใบเสร็จนี้ไม่ได้สแกนจากสวนที่กำลังบันทึก กรุณาสแกนใหม่ในสวนที่ถูกต้อง",
+  OCR_HUMAN_VERIFICATION_REQUIRED: "กรุณาตรวจตัวเลขกับภาพบิลและทำเครื่องหมายยืนยันก่อนบันทึก",
+  RECEIPT_NOT_FILLED_SALE: "ภาพนี้ไม่ใช่บิลขายที่กรอกแล้วหรืออ่านหลักฐานไม่ชัดเจน จึงใช้สร้างรายการขายไม่ได้",
+  RECEIPT_TYPE_REQUIRED: "กรุณาเลือกรูปแบบใบเสร็จให้ตรงกับภาพ",
+  SALE_REQUIRED_FIELDS_MISSING: "กรุณาระบุร้านรับซื้อและประเภทสินค้าให้ครบ",
+  SALE_DATE_REQUIRED: "กรุณาตรวจและระบุวันที่ขายให้ถูกต้อง",
+  RECEIPT_WEIGHT_ROWS_MISMATCH: "ผลรวมน้ำหนักรายแถวไม่ตรงกับน้ำหนักรวม กรุณาตรวจภาพอีกครั้ง",
+  RECEIPT_NET_WEIGHT_MISMATCH: "น้ำหนักรวม หักตะกร้า และน้ำหนักสุทธิไม่สัมพันธ์กัน",
+  RECEIPT_DRC_FIELDS_REQUIRED: "กรุณาระบุน้ำหนักยางสด เปอร์เซ็นต์ และน้ำหนักยางแห้งให้ครบ",
+  RECEIPT_DRC_MISMATCH: "น้ำหนักยางสด เปอร์เซ็นต์ และน้ำหนักยางแห้งไม่สัมพันธ์กัน",
+  RECEIPT_TOTAL_REQUIRED: "กรุณาระบุยอดเงินที่เขียนอยู่ในบิล",
+  RECEIPT_MATH_MISMATCH: "น้ำหนัก ราคา รายการหัก และยอดเงินในบิลไม่สัมพันธ์กัน กรุณาตรวจภาพอีกครั้ง",
 };
 
 export function userMessageForApiError(error: unknown) {

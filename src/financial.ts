@@ -75,23 +75,6 @@ export function resolveDispute(status: string, decision: string): "resolved" | "
   return decision as "resolved" | "rejected";
 }
 
-export function calculateOcrValidationScore(fields: Record<string, unknown>): number {
-  let score = 0;
-  if (fields.saleDate) score += 10;
-  if (fields.buyerName) score += 10;
-  if (fields.productType) score += 10;
-  if (Number(fields.weightKg) > 0) score += 15;
-  if (Number(fields.unitPrice) > 0) score += 15;
-  if (Number(fields.grossSale) > 0) score += 15;
-  if (Number(fields.weightKg) > 0 && Number(fields.unitPrice) > 0 && Number(fields.grossSale) > 0 && Math.abs(Number(fields.weightKg) * Number(fields.unitPrice) - Number(fields.grossSale)) <= 0.02) score += 20;
-  if (Number(fields.buyerDeductions ?? 0) >= 0) score += 5;
-  return score;
-}
-
-export function classifyOcrScore(score: number): "high" | "recommended" | "mandatory" {
-  return score >= 90 ? "high" : score >= 80 ? "recommended" : "mandatory";
-}
-
 export function validateAgreementPercentages(ownerPercentage: number, tapperPercentage: number): boolean {
   if (ownerPercentage < 0 || tapperPercentage < 0 || ownerPercentage > 100 || tapperPercentage > 100) throw new Error("PERCENTAGE_OUT_OF_RANGE");
   if (Math.round((ownerPercentage + tapperPercentage) * 100) / 100 !== 100) throw new Error("PERCENTAGES_MUST_SUM_TO_100");
