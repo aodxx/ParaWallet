@@ -69,7 +69,12 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("notificationRows.filter((item) => !item.readAt).length");
     expect(app).toContain("notificationTargetScreen(item.type)");
     expect(app).toContain("await api.notifications.read(item.id)");
-    expect(app).toContain('await refresh(target)');
+    expect(app).toContain("item.entityId");
+    expect(app).toContain("setReviewSale(sale)");
+    expect(app).toContain("setFocusedSettlementId(settlement.id)");
+    expect(app).toContain("การแจ้งเตือนยังไม่ถูกทำเครื่องหมายว่าอ่านแล้ว");
+    expect(app).toContain("setActionRetry(() => () => void openNotification(item))");
+    expect(app).toContain('onRetry={actionRetry || (() => void refresh(screen))}');
     expect(app).toContain('className={`data-row notification-row');
   });
 
@@ -77,6 +82,11 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('role="tablist" aria-label="มุมมองรายการขาย"');
     expect(app).toContain("รอตรวจ");
     expect(app).toContain("ล่าสุด");
+    expect(app).toContain('className="sale-primary-list"');
+    expect(app).toContain("เปิดรายละเอียดได้ทันทีโดยไม่ต้องเลือกวันที่จากปฏิทิน");
+    expect(app).toContain('className="sale-calendar-disclosure"');
+    expect(app).toContain('onReviewSales={() => openSales("pending")}');
+    expect(app).toContain("รอเจ้าของสวนตรวจหลักฐานและยืนยัน");
     expect(app).toContain("CompletionReceipt");
     expect(app).toContain("ดูรายการนี้");
   });

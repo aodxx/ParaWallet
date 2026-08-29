@@ -7,9 +7,9 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 | Component | Accepted baseline |
 |---|---|
 | Frontend | Phase D12.1 Forest Fintech mobile QA refinement on GitHub Pages |
-| Backend target | `2026.08.29-ocr-scan-ux-v6` |
+| Backend target | `2026.08.29-ux-ws3-v7` |
 | Schema | `2026-08-production-v3` |
-| Automated verification | 136 tests, TypeScript, Apps Script syntax, and production build |
+| Automated verification | 137 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
 
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
@@ -59,7 +59,7 @@ For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script We
 
 - Frontend changes are verified and deployed by the GitHub Pages workflow.
 - Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
-- After deploying the canonical OCR release, require health to report `release=2026.08.29-ocr-scan-ux-v6` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
+- After deploying the current Apps Script release, require health to report `release=2026.08.29-ux-ws3-v7` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
 - Run a migration only when its release document explicitly requires it. D10–D12 require no schema migration.
 
 Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).

@@ -65,6 +65,7 @@ const apiErrorMessages: Record<string, string> = {
   RECEIPT_DRC_MISMATCH: "น้ำหนักยางสด เปอร์เซ็นต์ และน้ำหนักยางแห้งไม่สัมพันธ์กัน",
   RECEIPT_TOTAL_REQUIRED: "กรุณาระบุยอดเงินที่เขียนอยู่ในบิล",
   RECEIPT_MATH_MISMATCH: "น้ำหนัก ราคา รายการหัก และยอดเงินในบิลไม่สัมพันธ์กัน กรุณาตรวจภาพอีกครั้ง",
+  NOTIFICATION_TARGET_NOT_FOUND: "ไม่พบรายการที่การแจ้งเตือนอ้างถึง รายการอาจถูกเปลี่ยนสถานะแล้ว กรุณารีเฟรชข้อมูล",
 };
 
 export function userMessageForApiError(error: unknown) {
@@ -80,7 +81,7 @@ export type Sale = { id: string; gardenId: string; agreementId: string; tapperId
 export type SaleReceiptEvidence = { saleId: string; receiptId?: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
 export type SettlementEvidence = { settlementId: string; fileId: string; name: string; mimeType: string; dataUrl: string };
-export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string; targetScreen?: "sales" | "settlements" | "gardens" | "agreements" | "notifications" };
+export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string; targetScreen?: "sales" | "settlements" | "gardens" | "agreements" | "notifications"; entityType?: "sale" | "settlement" | "garden" | "agreement"; entityId?: string };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
 export type WalletData = { gardenId: string; role: Role; owner: { totalEntitlement: number; totalReceived: number; outstanding: number; pending: number; disputed: number }; tapper: { totalIncome: number; ownerMoneyHeld: number; ownerMoneyTransferred: number; pendingReviews: number } };
 export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; walletDetails?: WalletData; pendingReviews: number; pendingSales?: number; pendingSettlements?: number; unreadNotifications?: number; monthlySales: number; monthlySalesSeries?: number[] };

@@ -9,6 +9,7 @@ import { AlertTriangle, Banknote, Bell, Camera, CalendarDays, CheckCircle2, Chev
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
 type ConnectionState = "connecting" | "connected" | "degraded" | "disconnected";
 type ReceiptScanPhase = "idle" | "preparing" | "reading" | "complete" | "attention" | "failed";
+type SaleView = "pending" | "latest" | "confirmed" | "all";
 type CompletionReceiptData = { title: string; detail: string; nextScreen?: Screen };
 
 const fallback: DashboardData = { role: "owner", garden: undefined, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, pendingSales: 0, pendingSettlements: 0, unreadNotifications: 0, monthlySales: 0 };
@@ -44,6 +45,7 @@ export default function App() {
   const [authStatus, setAuthStatus] = useState<SystemStatus>(() => idleSystemStatus("authentication"));
   const [connectionStatus, setConnectionStatus] = useState<SystemStatus>(() => idleSystemStatus("connection"));
   const [actionStatus, setActionStatus] = useState<SystemStatus>(() => idleSystemStatus("action"));
+  const [actionRetry, setActionRetry] = useState<(() => void) | null>(null);
   const [showGardenForm, setShowGardenForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [showSaleForm, setShowSaleForm] = useState(false);
@@ -57,6 +59,8 @@ export default function App() {
   const [completionReceipt, setCompletionReceipt] = useState<CompletionReceiptData | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<GardenMember | null>(null);
   const [deactivateBusy, setDeactivateBusy] = useState(false);
+  const [salesInitialView, setSalesInitialView] = useState<SaleView | undefined>(undefined);
+  const [focusedSettlementId, setFocusedSettlementId] = useState("");
   const receiptCameraRef = useRef<HTMLInputElement>(null);
   const receiptGalleryRef = useRef<HTMLInputElement>(null);
   const scanMenuHistoryRef = useRef(false);
@@ -223,13 +227,14 @@ export default function App() {
   ] as const, [role]);
 
   const openScreen = (next: Screen) => { if (showScanMenu) closeScanMenu(); setScreen(next); void refresh(next); };
+  const openSales = (view: SaleView) => { setSalesInitialView(view); openScreen("sales"); };
   const openMobileScreen = (next: Screen) => { setShowMobileMore(false); openScreen(next); };
   const showCompletion = (title: string, detail: string, nextScreen?: Screen) => setCompletionReceipt({ title, detail, nextScreen });
   const deactivateMember = async () => {
     if (!activeGarden || !deactivateTarget || deactivateBusy) return;
-    setDeactivateBusy(true); setActionStatus(createSystemStatus("action", "working", "กำลังปิดสิทธิ์คนกรีด", "ระบบกำลังตรวจสอบรายการและยอดคงค้าง", { nextAction: "รอสักครู่" }));
+    setDeactivateBusy(true); setActionRetry(null); setActionStatus(createSystemStatus("action", "working", "กำลังปิดสิทธิ์คนกรีด", "ระบบกำลังตรวจสอบรายการและยอดคงค้าง", { nextAction: "รอสักครู่" }));
     try { await api.members.deactivate({ gardenId: activeGarden.id, memberId: deactivateTarget.id }); setDeactivateTarget(null); await refresh("gardens"); setActionStatus(createSystemStatus("action", "success", "ปิดสิทธิ์คนกรีดแล้ว", "ประวัติเดิมยังถูกเก็บไว้ครบถ้วน", { dismissible: true })); }
-    catch (caught) { setActionStatus(createSystemStatus("action", "api_error", "ปิดสิทธิ์ไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "ตรวจรายการค้างแล้วลองใหม่", retryable: true, dismissible: true })); }
+    catch (caught) { setActionRetry(() => () => void deactivateMember()); setActionStatus(createSystemStatus("action", "api_error", "ปิดสิทธิ์ไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "ตรวจรายการค้างแล้วลองใหม่", retryable: true, dismissible: true })); }
     finally { setDeactivateBusy(false); }
   };
   const mobileNavIndex = screen === "overview" ? 0 : screen === "sales" ? 1 : screen === "settlements" ? 2 : 3;
@@ -237,23 +242,45 @@ export default function App() {
   const openNotification = async (item: Notification) => {
     const wasUnread = !item.readAt;
     const target = item.targetScreen || notificationTargetScreen(item.type);
-    if (wasUnread) {
-      const readAt = new Date().toISOString();
-      setNotifications((items) => items.map((row) => row.id === item.id ? { ...row, readAt } : row));
-      setData((current) => ({ ...current, unreadNotifications: Math.max(0, (current.unreadNotifications || 0) - 1) }));
-    }
-    if (target !== "notifications") setScreen(target);
+    setActionRetry(null);
     setActionStatus(createSystemStatus("action", "working", "กำลังเปิดรายการ", "ระบบกำลังโหลดข้อมูลที่เกี่ยวข้อง", { nextAction: "รอสักครู่" }));
     try {
-      if (wasUnread) await api.notifications.read(item.id);
-      if (target !== "notifications") await refresh(target);
-      setActionStatus(createSystemStatus("action", "success", "เปิดรายการแล้ว", "แสดงข้อมูลที่เกี่ยวข้องเรียบร้อย", { dismissible: true }));
-    } catch (caught) {
-      if (wasUnread) {
-        setNotifications((items) => items.map((row) => row.id === item.id ? { ...row, readAt: undefined } : row));
-        setData((current) => ({ ...current, unreadNotifications: (current.unreadNotifications || 0) + 1 }));
+      let openedExactRecord = false;
+      if (target === "sales" && activeGarden) {
+        const rows = await api.sales.list({ gardenId: activeGarden.id });
+        setSales(rows);
+        setSalesInitialView(item.type === "sale_pending_review" ? "pending" : "latest");
+        setScreen("sales");
+        if (item.entityId) {
+          const sale = rows.find((row) => row.id === item.entityId);
+          if (!sale) throw new ApiError("NOTIFICATION_TARGET_NOT_FOUND", "Notification sale target was not found");
+          setReviewSale(sale);
+          openedExactRecord = true;
+        }
+      } else if (target === "settlements" && activeGarden) {
+        const rows = await api.settlements.list(activeGarden.id);
+        setSettlements(rows);
+        setScreen("settlements");
+        if (item.entityId) {
+          const settlement = rows.find((row) => row.id === item.entityId);
+          if (!settlement) throw new ApiError("NOTIFICATION_TARGET_NOT_FOUND", "Notification settlement target was not found");
+          setFocusedSettlementId(settlement.id);
+          openedExactRecord = true;
+        }
+      } else if (target !== "notifications") {
+        setScreen(target);
+        await refresh(target);
       }
-      setActionStatus(createSystemStatus("action", "api_error", "เปิดรายการไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "กดลองเปิดรายการอีกครั้ง", retryable: true, dismissible: true }));
+      if (wasUnread) await api.notifications.read(item.id);
+      if (wasUnread) {
+        const readAt = new Date().toISOString();
+        setNotifications((items) => items.map((row) => row.id === item.id ? { ...row, readAt } : row));
+        setData((current) => ({ ...current, unreadNotifications: Math.max(0, (current.unreadNotifications || 0) - 1) }));
+      }
+      setActionStatus(createSystemStatus("action", "success", openedExactRecord ? "เปิดรายการที่แจ้งเตือนแล้ว" : "เปิดข้อมูลที่เกี่ยวข้องแล้ว", openedExactRecord ? "แสดงรายละเอียดรายการโดยตรงเรียบร้อย" : "การแจ้งเตือนเดิมไม่มีเลขรายการ จึงเปิดหน้ารวมที่เกี่ยวข้อง", { dismissible: true }));
+    } catch (caught) {
+      setActionRetry(() => () => void openNotification(item));
+      setActionStatus(createSystemStatus("action", "api_error", "เปิดรายการไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "การแจ้งเตือนยังไม่ถูกทำเครื่องหมายว่าอ่านแล้ว กดลองเปิดอีกครั้ง", retryable: true, dismissible: true }));
     }
   };
 
@@ -269,7 +296,7 @@ export default function App() {
       <svg className="topbar-wave" viewBox="0 0 390 52" preserveAspectRatio="none" aria-hidden="true"><path d="M0 15 C76 15 93 48 184 48 C278 48 298 7 390 7 L390 52 L0 52 Z" /></svg>
     </header>
     {["partial", "offline", "api_error"].includes(connectionStatus.kind) && <SystemStatusBanner status={connectionStatus} busy={loading} onRetry={() => void refresh()} />}
-    {shouldShowStatus(actionStatus) && <SystemStatusBanner status={actionStatus} onRetry={() => void refresh(screen)} onDismiss={() => setActionStatus(idleSystemStatus("action"))} />}
+    {shouldShowStatus(actionStatus) && <SystemStatusBanner status={actionStatus} onRetry={actionRetry || (() => void refresh(screen))} onDismiss={() => { setActionStatus(idleSystemStatus("action")); setActionRetry(null); }} />}
     <div className="mobile-context"><div><small>กำลังดูข้อมูล</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong></div><button onClick={() => openScreen("gardens")} aria-label="เปลี่ยนสวน"><Sprout size={18} /></button></div>
     <div className="layout">
       <aside className="sidebar">
@@ -281,11 +308,11 @@ export default function App() {
         <div className="page-heading"><div><p>{new Date().toLocaleDateString("th-TH", { dateStyle: "full" })}</p><h1>{screenTitle(screen, role)}</h1><span>{screenDescription(screen, role)}</span></div></div>
         <div className="screen-stage" aria-busy={loading}>
           <div className="screen-content" key={screen}>
-        {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => { setReceiptInitialFile(null); setShowReceiptForm(true); }} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openScreen("sales")} onReviewSettlements={() => openScreen("settlements")} onReports={() => openScreen("reports")} />}
-        {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onReview={setReviewSale} onRefresh={() => refresh("sales")} />}
+        {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => { setReceiptInitialFile(null); setShowReceiptForm(true); }} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openSales("pending")} onReviewSettlements={() => openScreen("settlements")} onReports={() => openScreen("reports")} />}
+        {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} initialView={salesInitialView} onViewApplied={() => setSalesInitialView(undefined)} onSale={() => setShowSaleForm(true)} onReview={setReviewSale} onRefresh={() => refresh("sales")} />}
         {screen === "gardens" && <GardensScreen garden={activeGarden} gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} members={members} role={role} onCreate={() => setShowGardenForm(true)} onAddMember={() => setShowMemberForm(true)} onDeactivate={(member) => setDeactivateTarget(member)} />}
         {screen === "agreements" && (!loading || agreements.length > 0) && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
-        {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
+        {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} focusedSettlementId={focusedSettlementId} onFocusHandled={() => setFocusedSettlementId("")} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
         {screen === "reports" && <ReportsScreen garden={activeGarden} />}
         {screen === "notifications" && (!loading || notifications.length > 0) && <NotificationsScreen notifications={notifications} onOpen={openNotification} />}
           </div>
@@ -468,12 +495,35 @@ function SalesCalendar({ sales, role, onReview, onSale }: { sales: Sale[]; role:
   </div>;
 }
 
-function SalesScreen({ sales, role, onSale, onReview, onRefresh }: { sales: Sale[]; role: Role; onSale: () => void; onReview: (sale: Sale) => void; onRefresh: () => void }) {
-  const [view, setView] = useState<"pending" | "latest" | "confirmed" | "all">(role === "owner" && sales.some((sale) => sale.status === "pending_owner_review") ? "pending" : "latest");
-  const pending = sales.filter((sale) => sale.status === "pending_owner_review");
-  const latest = [...sales].sort((a, b) => String(b.createdAt || b.saleDate).localeCompare(String(a.createdAt || a.saleDate))).slice(0, 20);
-  const visible = view === "pending" ? pending : view === "latest" ? latest : view === "confirmed" ? sales.filter((sale) => sale.status === "confirmed") : sales;
-  return <section className="panel sales-panel"><div className="record-tabs" role="tablist" aria-label="มุมมองรายการขาย">{([["pending", `รอตรวจ${pending.length ? ` (${pending.length})` : ""}`], ["latest", "ล่าสุด"], ["confirmed", "ยืนยันแล้ว"], ["all", "ทั้งหมด"]] as const).map(([key, label]) => <button type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => setView(key)} key={key}>{label}</button>)}</div>{visible.length === 0 ? <Empty text={view === "pending" ? "ตรวจครบแล้ว" : "ยังไม่มีรายการขาย"} nextAction={view === "pending" ? "เปิดแท็บล่าสุดเพื่อดูประวัติ" : role === "tapper" ? "เพิ่มรายการขาย" : "รอคนกรีดบันทึกรายการ"} onAction={view === "pending" ? () => setView("latest") : role === "tapper" ? onSale : undefined} /> : <SalesCalendar sales={visible} role={role} onReview={onReview} onSale={onSale} />}<div className="calendar-bottom-actions"><button className="secondary" type="button" onClick={onRefresh}>รีเฟรชข้อมูล</button>{role === "tapper" && <button className="primary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการขาย</button>}</div></section>;
+const saleWorkflowMessage = (sale: Sale, role: Role) => {
+  if (["pending_owner_review", "ocr_review"].includes(sale.status)) return role === "owner" ? "รอคุณตรวจหลักฐานและยืนยัน" : "รอเจ้าของสวนตรวจหลักฐานและยืนยัน";
+  if (sale.status === "disputed") return "รอทั้งสองฝ่ายตรวจเหตุผลและสรุปข้อคัดค้าน";
+  if (sale.status === "confirmed") return "ยืนยันแล้ว · ยอดถูกนำไปคำนวณในกระเป๋าคู่";
+  return "เปิดรายละเอียดเพื่อตรวจสถานะและขั้นตอนถัดไป";
+};
+const saleSortValue = (sale: Sale) => String(sale.createdAt || sale.saleDate || "");
+const sortSalesForWork = (items: Sale[]) => [...items].sort((a, b) => {
+  const priority = (sale: Sale) => ["pending_owner_review", "ocr_review"].includes(sale.status) ? 0 : sale.status === "disputed" ? 1 : 2;
+  return priority(a) - priority(b) || saleSortValue(b).localeCompare(saleSortValue(a));
+});
+
+function SalesScreen({ sales, role, initialView, onViewApplied, onSale, onReview, onRefresh }: { sales: Sale[]; role: Role; initialView?: SaleView; onViewApplied: () => void; onSale: () => void; onReview: (sale: Sale) => void; onRefresh: () => void }) {
+  const [view, setView] = useState<SaleView>(initialView || (role === "owner" && sales.some((sale) => ["pending_owner_review", "ocr_review"].includes(sale.status)) ? "pending" : "latest"));
+  useEffect(() => { if (initialView) { setView(initialView); onViewApplied(); } }, [initialView, onViewApplied]);
+  const pending = sortSalesForWork(sales.filter((sale) => ["pending_owner_review", "ocr_review"].includes(sale.status)));
+  const latest = sortSalesForWork(sales).slice(0, 20);
+  const visible = view === "pending" ? pending : view === "latest" ? latest : view === "confirmed" ? sortSalesForWork(sales.filter((sale) => sale.status === "confirmed")) : sortSalesForWork(sales);
+  return <section className="panel sales-panel">
+    <div className="record-tabs" role="tablist" aria-label="มุมมองรายการขาย">{([["pending", `รอตรวจ${pending.length ? ` (${pending.length})` : ""}`], ["latest", "ล่าสุด"], ["confirmed", "ยืนยันแล้ว"], ["all", "ทั้งหมด"]] as const).map(([key, label]) => <button type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => setView(key)} key={key}>{label}</button>)}</div>
+    {visible.length === 0 ? <Empty text={view === "pending" ? "ตรวจครบแล้ว" : "ยังไม่มีรายการขาย"} nextAction={view === "pending" ? "เปิดแท็บล่าสุดเพื่อดูประวัติ" : role === "tapper" ? "เพิ่มรายการขาย" : "รอคนกรีดบันทึกรายการ"} onAction={view === "pending" ? () => setView("latest") : role === "tapper" ? onSale : undefined} /> : <>
+      <section className="sale-primary-list" aria-label={view === "pending" ? "รายการขายที่รอตรวจ" : "รายการขายล่าสุด"}>
+        <header><div><strong>{view === "pending" ? "รายการที่ต้องตรวจ" : view === "latest" ? "รายการล่าสุด" : view === "confirmed" ? "รายการที่ยืนยันแล้ว" : "รายการขายทั้งหมด"}</strong><span>เปิดรายละเอียดได้ทันทีโดยไม่ต้องเลือกวันที่จากปฏิทิน</span></div><em>{visible.length} รายการ</em></header>
+        <div className="sale-record-cards">{visible.map((sale) => { const needsOwner = role === "owner" && ["pending_owner_review", "ocr_review"].includes(sale.status); return <article className={`sale-record-card ${needsOwner ? "needs-action" : ""}`} key={sale.id}><div className="sale-record-main"><div><strong>{sale.buyerName || "ร้านรับซื้อไม่ระบุ"}</strong><span>{formatThaiDateTime(sale.saleDate)} · {sale.productType || "ยางพารา"} · {sale.netWeight || sale.weightKg || 0} กก.</span><small>{saleWorkflowMessage(sale, role)}</small></div><strong>{money(sale.grossSale || 0)}</strong></div><div className="sale-record-actions"><span className={`status ${sale.status}`}>{labelStatus(sale.status)}</span><button className={needsOwner ? "primary" : "secondary"} type="button" onClick={() => onReview(sale)}>{needsOwner ? <><ShieldCheck size={15} />ตรวจและยืนยัน</> : <><Eye size={15} />ดูรายละเอียด</>}</button></div></article>; })}</div>
+      </section>
+      <details className="sale-calendar-disclosure"><summary><CalendarDays size={17} />ดูรายการในปฏิทิน</summary><SalesCalendar sales={visible} role={role} onReview={onReview} onSale={onSale} /></details>
+    </>}
+    <div className="calendar-bottom-actions"><button className="secondary" type="button" onClick={onRefresh}>รีเฟรชข้อมูล</button>{role === "tapper" && <button className="primary" type="button" onClick={onSale}><Plus size={16} />เพิ่มรายการขาย</button>}</div>
+  </section>;
 }
 
 function SaleReviewModal({ sale, role, onClose, onChanged }: { sale: Sale; role: Role; onClose: () => void; onChanged: (detail: string) => void }) {
@@ -517,11 +567,17 @@ function GardensScreen({ garden, gardens, members, role, onCreate, onAddMember, 
 
 function AgreementsScreen({ agreements, garden, role, onCreate }: { agreements: Agreement[]; garden?: Garden; role: Role; onCreate: () => void }) { return <section className="panel"><div className="panel-head"><div><h2>ข้อตกลงแบ่งรายได้</h2><p>{garden?.name || "เลือกสวนก่อนสร้างข้อตกลง"} · ทุกเวอร์ชันไม่กระทบรายการย้อนหลัง</p></div>{role === "owner" && <button className="secondary" onClick={onCreate}>สร้างเวอร์ชันใหม่</button>}</div>{agreements.length === 0 ? <Empty text="ยังไม่มีข้อตกลงที่ใช้งานอยู่" /> : <div className="data-list">{agreements.map((agreement) => <article className="data-row" key={agreement.id}><div><strong>เวอร์ชัน {agreement.version}</strong><span>มีผล {agreement.effectiveFrom} · {agreement.status}</span></div><div><strong>{agreement.ownerPercentage}/{agreement.tapperPercentage}</strong><span>เจ้าของสวน / คนกรีด</span></div></article>)}</div>}</section>; }
 
-function SettlementsScreen({ settlements, wallet, role, onCreate, onRefresh }: { settlements: Settlement[]; wallet: WalletData | null; role: Role; onCreate: () => void; onRefresh: () => void }) {
+function SettlementsScreen({ settlements, wallet, role, focusedSettlementId, onFocusHandled, onCreate, onRefresh }: { settlements: Settlement[]; wallet: WalletData | null; role: Role; focusedSettlementId?: string; onFocusHandled: () => void; onCreate: () => void; onRefresh: () => void }) {
   const [reviewSettlement, setReviewSettlement] = useState<Settlement | null>(null);
   const [cancelBusyId, setCancelBusyId] = useState("");
   const [error, setError] = useState("");
   const [cancelTarget, setCancelTarget] = useState<Settlement | null>(null);
+  useEffect(() => {
+    if (!focusedSettlementId) return;
+    const target = settlements.find((item) => item.id === focusedSettlementId);
+    if (target) setReviewSettlement(target);
+    onFocusHandled();
+  }, [focusedSettlementId, settlements, onFocusHandled]);
   const cancelSettlement = async (item: Settlement) => {
     if (cancelBusyId) return;
     setCancelBusyId(item.id); setError("");
