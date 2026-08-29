@@ -117,4 +117,8 @@ describe("Apps Script API contract", () => {
   it("shows a useful message for missing receipt evidence", () => {
     expect(userMessageForApiError(new ApiError("SALE_RECEIPT_NOT_FOUND", "internal"))).toBe("ไม่พบไฟล์ใบเสร็จของรายการนี้");
   });
+
+  it("explains when a notification target no longer exists", () => {
+    expect(userMessageForApiError(new ApiError("NOTIFICATION_TARGET_NOT_FOUND", "internal entity id"))).toBe("ไม่พบรายการที่การแจ้งเตือนอ้างถึง รายการอาจถูกเปลี่ยนสถานะแล้ว กรุณารีเฟรชข้อมูล");
+  });
 });

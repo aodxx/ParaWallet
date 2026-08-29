@@ -15,7 +15,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.29-ocr-scan-ux-v6";
+var PARAWALLET_RELEASE = "2026.08.29-ux-ws3-v7";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -691,9 +691,27 @@ function requireTapper_(user, gardenId) { var access = requireGarden_(user, gard
 function writeAudit_(actor, action, entityType, entityId, beforeValue, afterValue, requestId) {
   Repositories.append("AuditLogs", { id: Utilities.getUuid(), actorId: actor.id, entityType: entityType, entityId: entityId, action: action, beforeJson: jsonOrEmpty_(beforeValue), afterJson: jsonOrEmpty_(afterValue), requestId: requestId || "", createdAt: nowIso_() });
 }
-function notifyUser_(userId, type, title, body) {
+function notificationBody_(body, entityType, entityId) {
+  if (!entityType || !entityId) return String(body || "");
+  return JSON.stringify({ _notificationPayload: 1, text: String(body || ""), entityType: entityType, entityId: entityId });
+}
+function notificationView_(row) {
+  var view = Object.assign({}, row, { targetScreen: notificationTarget_(row.type) });
+  var rawBody = String(row.body || "");
+  if (rawBody.charAt(0) !== "{") return view;
+  try {
+    var payload = JSON.parse(rawBody);
+    if (payload && payload._notificationPayload === 1) {
+      view.body = String(payload.text || "");
+      view.entityType = String(payload.entityType || "");
+      view.entityId = String(payload.entityId || "");
+    }
+  } catch (ignored) {}
+  return view;
+}
+function notifyUser_(userId, type, title, body, entityType, entityId) {
   if (!userId) return;
-  Repositories.append("Notifications", { id: Utilities.getUuid(), userId: userId, type: type, title: title, body: body, readAt: "", createdAt: nowIso_() });
+  Repositories.append("Notifications", { id: Utilities.getUuid(), userId: userId, type: type, title: title, body: notificationBody_(body, entityType, entityId), readAt: "", createdAt: nowIso_() });
 }
 function updateRowById_(name, recordId, patch) {
   var sheet = Repositories.sheet_(name);
@@ -789,7 +807,7 @@ Services.addMember = function (user, payload) {
   else Repositories.append("GardenMembers", membership);
 
   writeAudit_(user, before ? "garden_member_reactivated" : "garden_member_added", "garden_member", membershipId, before, membership, payload.requestId);
-  notifyUser_(target.id, "garden_member_added", "คุณถูกเพิ่มเป็นคนกรีดของสวน", access.garden.name || "สวนของคุณ");
+  notifyUser_(target.id, "garden_member_added", "คุณถูกเพิ่มเป็นคนกรีดของสวน", access.garden.name || "สวนของคุณ", "garden", access.garden.id);
   return memberView_(findById_("GardenMembers", membershipId));
 };
 
@@ -828,7 +846,7 @@ Services.deactivateMember = function (user, payload) {
   updateRowById_("GardenMembers", membership.id, { status: "inactive" });
   var after = findById_("GardenMembers", membership.id);
   writeAudit_(user, "garden_member_deactivated", "garden_member", membership.id, membership, after, payload.requestId);
-  notifyUser_(membership.userId, "garden_member_deactivated", "สิทธิ์คนกรีดของสวนถูกปิด", access.garden.name || "สวนของคุณ");
+  notifyUser_(membership.userId, "garden_member_deactivated", "สิทธิ์คนกรีดของสวนถูกปิด", access.garden.name || "สวนของคุณ", "garden", access.garden.id);
   return memberView_(after);
 };
 
@@ -849,7 +867,7 @@ Services.createAgreement = function (user, payload) {
   existing.filter(function (row) { return row.status === "active"; }).forEach(function (row) { updateRowById_("Agreements", row.id, { status: "superseded", effectiveTo: payload.effectiveFrom || nowIso_() }); });
   Repositories.append("Agreements", { id: agreementId, gardenId: payload.gardenId, ownerId: user.id, tapperId: payload.tapperId, version: version, ownerPercentage: ownerPercentage, tapperPercentage: tapperPercentage, sharedExpenseRulesJson: jsonOrEmpty_(payload.sharedExpenseRules), ownerExpenseRulesJson: jsonOrEmpty_(payload.ownerExpenseRules), tapperExpenseRulesJson: jsonOrEmpty_(payload.tapperExpenseRules), advanceRuleJson: jsonOrEmpty_(payload.advanceRule), effectiveFrom: payload.effectiveFrom, effectiveTo: payload.effectiveTo || "", expenseRules: jsonOrEmpty_(payload.expenseRules), status: "active", createdAt: nowIso_() });
   writeAudit_(user, "agreement_created", "agreement", agreementId, null, payload, payload.requestId);
-  if (payload.tapperId) notifyUser_(payload.tapperId, "agreement_created", "มีข้อตกลงใหม่", "เจ้าของสวนสร้างข้อตกลงเวอร์ชัน " + version);
+  if (payload.tapperId) notifyUser_(payload.tapperId, "agreement_created", "มีข้อตกลงใหม่", "เจ้าของสวนสร้างข้อตกลงเวอร์ชัน " + version, "agreement", agreementId);
   return findById_("Agreements", agreementId);
 };
 Services.listProducts = function () { return rows_("ProductTypes").filter(function (row) { return row.active !== false && row.active !== "false"; }); };
@@ -926,7 +944,7 @@ Services.createSale = function (user, payload) {
     Repositories.append("Sales", { id: saleId, gardenId: payload.gardenId, plotId: payload.plotId || "", agreementId: agreement.id, tapperId: user.id, receiptId: receipt ? receipt.id : "", buyerId: payload.buyerId || "", saleDate: payload.saleDate, ticketNumber: payload.ticketNumber || "", productTypeId: payload.productTypeId || "", buyerName: payload.buyerName || "", productType: payload.productType || "", grossWeight: payload.grossWeight || weight, tareWeight: payload.tareWeight || 0, netWeight: weight, drc: payload.drc || "", weightKg: weight, unitPrice: unitPrice, pricePerUnit: unitPrice, grossSale: calc.grossSale, buyerDeductions: buyerDeductions, sharedExpenses: numeric_(payload.sharedExpenses), splitBase: calc.splitBase, ownerShare: calc.ownerShare, tapperShare: calc.tapperShare, netReceived: calc.splitBase, status: "pending_owner_review", manualEntry: payload.manualEntry === true, receiptFileId: receiptFileId, ocrConfidence: receiptConfidence, createdAt: nowIso_(), updatedAt: nowIso_() });
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: agreement.ownerId, saleId: saleId, settlementId: "", entryType: "sale_entitlement", direction: "credit", amount: calc.ownerShare, status: "pending", createdAt: nowIso_() });
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: user.id, saleId: saleId, settlementId: "", entryType: "tapper_income", direction: "credit", amount: calc.tapperShare, status: "pending", createdAt: nowIso_() });
-    notifyUser_(agreement.ownerId, "sale_pending_review", "มีรายการขายใหม่รอตรวจ", "รายการขาย " + saleId + " รอการยืนยัน");
+    notifyUser_(agreement.ownerId, "sale_pending_review", "มีรายการขายใหม่รอตรวจ", "โปรดตรวจหลักฐานและยืนยันรายการขาย", "sale", saleId);
     writeAudit_(user, "sale_created", "sale", saleId, null, { payload: payload, agreementSnapshot: agreement, calculation: calc }, payload.requestId);
   return { id: saleId, agreementSnapshot: agreement, calculation: calc, status: "pending_owner_review" };
 };
@@ -986,7 +1004,7 @@ Services.confirmSale = function (user, payload) {
   updateRowById_("Sales", sale.id, { status: "confirmed", updatedAt: nowIso_() });
   rows_("WalletEntries").filter(function (row) { return id_(row.saleId) === id_(sale.id); }).forEach(function (entry) { updateRowById_("WalletEntries", entry.id, { status: "confirmed" }); });
   writeAudit_(user, "sale_confirmed", "sale", sale.id, sale, { status: "confirmed" }, payload.requestId);
-  notifyUser_(sale.tapperId, "sale_confirmed", "เจ้าของยืนยันรายการขาย", "รายการขาย " + sale.id + " ได้รับการยืนยันแล้ว");
+  notifyUser_(sale.tapperId, "sale_confirmed", "เจ้าของยืนยันรายการขาย", "รายการขายได้รับการยืนยันแล้ว", "sale", sale.id);
   return findById_("Sales", sale.id);
 };
 
@@ -1000,7 +1018,7 @@ Services.disputeSale = function (user, payload) {
   Repositories.append("Disputes", { id: disputeId, saleId: sale.id, openedBy: user.id, reason: payload.reason, note: payload.note || "", evidenceFileId: payload.evidenceFileId || "", status: "open", resolvedAt: "", createdAt: nowIso_() });
   updateRowById_("Sales", sale.id, { status: "disputed", updatedAt: nowIso_() });
   var recipient = id_(user.id) === id_(sale.tapperId) ? findById_("Agreements", sale.agreementId).ownerId : sale.tapperId;
-  notifyUser_(recipient, "sale_disputed", "มีรายการขายถูกคัดค้าน", payload.reason);
+  notifyUser_(recipient, "sale_disputed", "มีรายการขายถูกคัดค้าน", payload.reason, "sale", sale.id);
   writeAudit_(user, "sale_disputed", "sale", sale.id, sale, { status: "disputed", disputeId: disputeId, reason: payload.reason }, payload.requestId);
   return { disputeId: disputeId, saleId: sale.id, status: "disputed" };
 };
@@ -1080,7 +1098,7 @@ Services.createSettlement = function (user, payload) {
   if (numeric_(payload.amount) > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
   var settlementId = Utilities.getUuid();
   Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || nowIso_(), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_() });
-  notifyUser_(access.garden.ownerId, "settlement_pending", method === "cash" ? "มีรายการเงินสดรอยืนยันรับเงิน" : "มีรายการโอนพร้อมสลิปรอยืนยัน", "ยอด " + payload.amount);
+  notifyUser_(access.garden.ownerId, "settlement_pending", method === "cash" ? "มีรายการเงินสดรอยืนยันรับเงิน" : "มีรายการโอนพร้อมสลิปรอยืนยัน", "ยอด " + payload.amount, "settlement", settlementId);
   writeAudit_(user, "settlement_created", "settlement", settlementId, null, { gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "" }, payload.requestId);
   return findById_("Settlements", settlementId);
 };
@@ -1137,7 +1155,7 @@ Services.confirmSettlement = function (user, payload) {
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: settlement.ownerId, saleId: "", settlementId: settlement.id, entryType: "settlement_owner_received", direction: "debit", amount: amount, status: "confirmed", createdAt: nowIso_() });
     updateRowById_("Settlements", settlement.id, { status: "confirmed" });
     writeAudit_(user, "settlement_confirmed", "settlement", settlement.id, settlement, { status: "confirmed", allocations: allocations }, payload.requestId);
-    notifyUser_(settlement.tapperId, "settlement_confirmed", "เจ้าของยืนยันการรับเงิน", "ยอด " + settlement.amount);
+    notifyUser_(settlement.tapperId, "settlement_confirmed", "เจ้าของยืนยันการรับเงิน", "ยอด " + settlement.amount, "settlement", settlement.id);
   return Object.assign({}, settlement, { status: "confirmed" });
 };
 
@@ -1150,7 +1168,7 @@ Services.rejectSettlement = function (user, payload) {
   if (!payload.reason) throw new Error("SETTLEMENT_REJECTION_REASON_REQUIRED");
   updateRowById_("Settlements", settlement.id, { status: "rejected", note: (settlement.note || "") + "\nเหตุผล: " + payload.reason });
   writeAudit_(user, "settlement_rejected", "settlement", settlement.id, settlement, { status: "rejected", reason: payload.reason }, payload.requestId);
-  notifyUser_(settlement.tapperId, "settlement_rejected", "เจ้าของปฏิเสธรายการส่งเงิน", payload.reason);
+  notifyUser_(settlement.tapperId, "settlement_rejected", "เจ้าของปฏิเสธรายการส่งเงิน", payload.reason, "settlement", settlement.id);
   return findById_("Settlements", settlement.id);
 };
 
@@ -1163,7 +1181,7 @@ Services.cancelSettlement = function (user, payload) {
   if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_CANCELLABLE");
   updateRowById_("Settlements", settlement.id, { status: "cancelled", note: (settlement.note || "") + "\nยกเลิกโดย: " + user.id });
   writeAudit_(user, "settlement_cancelled", "settlement", settlement.id, settlement, { status: "cancelled" }, payload.requestId);
-  notifyUser_(settlement.ownerId, "settlement_cancelled", "คนกรีดยกเลิกรายการส่งเงิน", "รายการ " + settlement.id);
+  notifyUser_(settlement.ownerId, "settlement_cancelled", "คนกรีดยกเลิกรายการส่งเงิน", "รายการส่งเงินถูกยกเลิกแล้ว", "settlement", settlement.id);
   return findById_("Settlements", settlement.id);
 };
 
@@ -1182,7 +1200,7 @@ Services.resolveDispute = function (user, payload) {
   updateRowById_("Disputes", dispute.id, { status: decision, note: JSON.stringify(resolution), resolvedAt: resolution.resolvedAt });
   if (decision === "rejected" && sale.status === "disputed") updateRowById_("Sales", sale.id, { status: "confirmed", updatedAt: nowIso_() });
   writeAudit_(user, "dispute_resolved", "dispute", dispute.id, dispute, resolution, payload.requestId);
-  notifyUser_(id_(user.id) === id_(sale.tapperId) ? findById_("Agreements", sale.agreementId).ownerId : sale.tapperId, "dispute_resolved", "มีการสรุปข้อพิพาท", resolution.note || decision);
+  notifyUser_(id_(user.id) === id_(sale.tapperId) ? findById_("Agreements", sale.agreementId).ownerId : sale.tapperId, "dispute_resolved", "มีการสรุปข้อพิพาท", resolution.note || decision, "sale", sale.id);
   return { disputeId: dispute.id, saleId: sale.id, status: decision, resolution: resolution };
 };
 
@@ -1216,16 +1234,16 @@ function notificationTarget_(type) {
 }
 Services.listNotifications = function (user) {
   return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); }).map(function (row) {
-    return Object.assign({}, row, { targetScreen: notificationTarget_(row.type) });
+    return notificationView_(row);
   });
 };
 Services.readNotification = function (user, payload) {
   var notification = rows_("Notifications").filter(function (row) { return id_(row.id) === id_(payload.notificationId) && id_(row.userId) === id_(user.id); })[0];
   if (!notification) throw new Error("NOTIFICATION_NOT_FOUND");
-  if (notification.readAt) return Object.assign({}, notification, { targetScreen: notificationTarget_(notification.type) });
+  if (notification.readAt) return notificationView_(notification);
   var readAt = nowIso_();
   updateRowById_("Notifications", notification.id, { readAt: readAt });
-  return Object.assign({}, notification, { readAt: readAt, targetScreen: notificationTarget_(notification.type) });
+  return notificationView_(Object.assign({}, notification, { readAt: readAt }));
 };
 
 Services.report = function (user, payload) {

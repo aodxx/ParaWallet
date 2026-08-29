@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.29-ocr-scan-ux-v6";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.29-ux-ws3-v7";');
     expect(code).toContain("automaticReadingReady: Boolean(Config.geminiKey())");
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
@@ -128,10 +128,16 @@ describe("Apps Script schema safety contract", () => {
 
   it("returns actionable notification targets and makes read idempotent", () => {
     expect(code).toContain("function notificationTarget_(type)");
+    expect(code).toContain("function notificationBody_(body, entityType, entityId)");
+    expect(code).toContain("function notificationView_(row)");
+    expect(code).toContain("_notificationPayload: 1");
+    expect(code).toContain('view.entityId = String(payload.entityId || "")');
     expect(code).toContain('if (value.indexOf("settlement_") === 0) return "settlements"');
     expect(code).toContain('if (value.indexOf("sale_") === 0 || value.indexOf("dispute_") === 0) return "sales"');
     expect(code).toContain('targetScreen: notificationTarget_(row.type)');
-    expect(code).toContain('if (notification.readAt) return Object.assign');
+    expect(code).toContain('if (notification.readAt) return notificationView_(notification)');
+    expect(code).toContain('"sale", saleId');
+    expect(code).toContain('"settlement", settlementId');
   });
 
   it("enforces owner-controlled, auditable garden membership", () => {
