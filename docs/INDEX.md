@@ -1,6 +1,6 @@
 # ParaWallet Documentation Index
 
-Updated: 24 August 2026
+Updated: 29 August 2026
 
 Use this page to identify the current source of truth. A release number inside a historical report describes that report's point in time; it does not override the current baseline.
 
@@ -15,6 +15,7 @@ Use this page to identify the current source of truth. A release number inside a
 | [`ROADMAP_AND_ACCEPTANCE.md`](ROADMAP_AND_ACCEPTANCE.md) | Current acceptance gates and release discipline |
 | [`PARAWALLET-REAL-USE-MANUAL.md`](PARAWALLET-REAL-USE-MANUAL.md) | Thai installation and Owner/Tapper operating manual |
 | [`SETUP_APPS_SCRIPT.md`](SETUP_APPS_SCRIPT.md) | Apps Script, OAuth, Sheets, Drive, and deployment checklist |
+| [`OCR-GEMINI-CANONICAL.md`](OCR-GEMINI-CANONICAL.md) | Only current OCR/Gemini architecture, reference scenarios, and real-bill rollout gate |
 
 ## Technical contracts — current
 

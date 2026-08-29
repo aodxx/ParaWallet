@@ -89,6 +89,7 @@ button,input,select,textarea{font-family:inherit}button{min-height:44px;-webkit-
 .receipt-upload-actions .file-action:hover{background:#eef5e9;border-color:#bdd5b4}
 .receipt-upload-actions .file-action:focus-within{outline:3px solid rgba(53,108,65,.28);outline-offset:2px}
 .receipt-upload-actions .file-action input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.receipt-scan-preview{display:block;width:100%;max-height:360px;object-fit:contain;background:#f4f0e7;border:1px solid rgba(43,62,38,.16);border-radius:18px;padding:8px}
 @media(max-width:680px){.receipt-upload-actions{grid-template-columns:1fr}.receipt-upload-actions .file-action{min-height:52px}}
 @media(prefers-reduced-motion:reduce){.receipt-upload-actions .file-action{transition:none}}
 

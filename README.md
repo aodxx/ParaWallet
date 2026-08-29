@@ -2,14 +2,14 @@
 
 ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharing between a garden Owner and Tapper. The React PWA is hosted on GitHub Pages; Google Apps Script is the authenticated API and financial source of truth; Google Sheets stores domain records; and Google Drive stores receipt and settlement evidence.
 
-## Current production baseline
+## Current repository baseline
 
 | Component | Accepted baseline |
 |---|---|
 | Frontend | Phase D12.1 Forest Fintech mobile QA refinement on GitHub Pages |
-| Backend | `2026.08.24-phase-d10` |
+| Backend target | `2026.08.29-ocr-canonical-v5` |
 | Schema | `2026-08-production-v3` |
-| Automated verification | 98 tests, TypeScript, Apps Script syntax, and production build |
+| Automated verification | 125 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
 
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
@@ -54,13 +54,13 @@ For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script We
 
 - Frontend changes are verified and deployed by the GitHub Pages workflow.
 - Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
-- After a backend deployment, require health to report `release=2026.08.24-phase-d10` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true`.
+- After deploying the canonical OCR release, require health to report `release=2026.08.29-ocr-canonical-v5` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true`. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
 - Run a migration only when its release document explicitly requires it. D10–D12 require no schema migration.
 
 Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).
 
 ## Architectural invariants
 
-The frontend never writes Google Sheets directly. Financial writes happen in Apps Script under authorization and LockService. Every client mutation supplies a unique RequestID; repeated RequestIDs replay the original result. Sale calculations snapshot their Agreement. Evidence bytes remain in Drive while Sheets stores references. Confirmed financial history is corrected through audited state transitions, not direct row deletion.
+The frontend never writes Google Sheets directly. Financial writes happen in Apps Script under authorization and LockService. Every client mutation supplies a unique RequestID; repeated RequestIDs replay the original result. Sale calculations snapshot their Agreement. Evidence bytes remain in Drive while Sheets stores references. Confirmed financial history is corrected through audited state transitions, not direct row deletion. Receipt work follows the single contributor contract in [AGENTS.md](AGENTS.md).
 
 Never commit OAuth secrets, API keys, Spreadsheet IDs, Drive folder IDs, user passwords, or production evidence.

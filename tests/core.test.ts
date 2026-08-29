@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { newRequestId } from "../src/api";
-import { normalizeOcrFields, receiptTypeLabel, validateReceiptMath } from "../src/ocr";
-import { allocateSettlement, assertActiveTapperMember, calculateOcrValidationScore, calculateSale, canCancelSettlement, canConfirmSale, canCreateAdjustment, canDisputeSale, canResolveDispute, classifyOcrScore, isDuplicateSale, isIdempotentReplay, reconcileWallet, resolveDispute, validateAgreementPercentages, validateAgreementWindow } from "../src/financial";
+import { normalizeOcrFields, normalizeReceiptDate, receiptReviewGate, receiptTypeLabel, validateReceiptMath } from "../src/ocr";
+import { allocateSettlement, assertActiveTapperMember, calculateSale, canCancelSettlement, canConfirmSale, canCreateAdjustment, canDisputeSale, canResolveDispute, isDuplicateSale, isIdempotentReplay, reconcileWallet, resolveDispute, validateAgreementPercentages, validateAgreementWindow } from "../src/financial";
 
 type SplitInput = { grossSale: number; buyerDeductions?: number; sharedExpenses?: number; ownerPercentage: number; tapperPercentage: number };
 function calculate(input: SplitInput) {
@@ -67,30 +67,53 @@ describe("ParaWallet core safeguards", () => {
     expect(() => resolveDispute("open", "cancelled")).toThrow("DISPUTE_DECISION_INVALID");
   });
   it("normalizes weigh tickets into the existing Sale fields", () => {
-    const fields = normalizeOcrFields({ receiptType: "weigh_ticket", saleDate: "14/1/69", buyer: "จุดรับซื้อ", grossWeight: "324", price: "29", totalAmount: "9396" });
+    const fields = normalizeOcrFields({ documentClass: "rubber_receipt", receiptType: "weigh_ticket", saleDate: "14/1/69", buyer: "จุดรับซื้อ", productType: "ขี้ยาง", weightEntriesKg: [175, 149], grossWeight: "324", price: "29", totalAmount: "9396", needsReview: false });
     expect(fields.receiptType).toBe("weigh_ticket");
+    expect(fields.saleDate).toBe("2026-01-14");
+    expect(fields.grossWeightKg).toBe("324");
+    expect(fields.netWeightKg).toBe("324");
     expect(fields.weightKg).toBe("324");
     expect(fields.unitPrice).toBe("29");
     expect(fields.grossSale).toBe("9396");
-    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: null, amountConsistent: true });
+    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: null, entrySumConsistent: true, netWeightConsistent: true, amountConsistent: true });
+    expect(receiptReviewGate(fields, true)).toEqual({ canSubmit: true, reasons: [] });
     expect(receiptTypeLabel(fields.receiptType)).toContain("ใบชั่งน้ำหนัก");
   });
 
+  it("supports a multi-row cash bill with basket tare and one-baht shop rounding", () => {
+    const fields = normalizeOcrFields({ documentClass: "rubber_receipt", receiptType: "weigh_ticket", saleDate: "15/1/69", buyerName: "ร้านรับซื้อยางพารา", productType: "ขี้ยาง", weightEntriesKg: [36, 41, 42, 35, 38, 43, 51, 49, 39, 39, 35.5], tareWeightKg: 17, netWeightKg: 431.5, unitPrice: 27, grossSale: 11650, needsReview: false });
+    expect(fields.saleDate).toBe("2026-01-15");
+    expect(fields.grossWeightKg).toBe("448.5");
+    expect(fields.tareWeightKg).toBe("17");
+    expect(fields.weightKg).toBe("431.5");
+    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: null, entrySumConsistent: true, netWeightConsistent: true, amountConsistent: true });
+  });
+
   it("normalizes rubber forms and flags inconsistent handwritten arithmetic", () => {
-    const fields = normalizeOcrFields({ receiptType: "rubber_form", freshWeightKg: "99", drc: "49", dryWeightKg: "48.51", unitPrice: "99", grossSale: "4802" });
+    const fields = normalizeOcrFields({ documentClass: "rubber_receipt", receiptType: "rubber_form", saleDate: "2026-01-15", buyerName: "ร้านน้ำยาง", productType: "น้ำยางสด", freshWeightKg: "99", drc: "49", dryWeightKg: "48.51", unitPrice: "99", grossSale: "4802", needsReview: false });
     expect(fields.weightKg).toBe("48.51");
-    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: true, amountConsistent: true });
+    expect(validateReceiptMath(fields)).toEqual({ weightConsistent: true, entrySumConsistent: null, netWeightConsistent: null, amountConsistent: true });
     expect(validateReceiptMath({ ...fields, dryWeightKg: "40" }).weightConsistent).toBe(false);
   });
 
-  it("scores OCR from field completeness and arithmetic validation instead of provider constants", () => {
-    const score = calculateOcrValidationScore({ saleDate: "2026-08-21", buyerName: "Buyer", productType: "Latex", weightKg: 100, unitPrice: 50, grossSale: 5000, buyerDeductions: 0 });
-    expect(score).toBe(100);
-    expect(calculateOcrValidationScore({ weightKg: 100, unitPrice: 50, grossSale: 5200 })).toBe(50);
+  it("rejects blank templates and promotional sample collages as sale evidence", () => {
+    const template = normalizeOcrFields({ documentClass: "blank_template", receiptType: "rubber_form", needsReview: true });
+    const promotion = normalizeOcrFields({ documentClass: "promotional_example", receiptType: "weigh_ticket", weightKg: 99, unitPrice: 99, grossSale: 9801, needsReview: true });
+    expect(receiptReviewGate(template, true).canSubmit).toBe(false);
+    expect(receiptReviewGate(promotion, true).reasons[0]).toContain("ไม่ใช่บิลขาย");
+    expect(receiptReviewGate(normalizeOcrFields({ documentClass: "unreadable", receiptType: "weigh_ticket", saleDate: "2026-01-15", buyerName: "ร้าน", productType: "ขี้ยาง", weightKg: 100, unitPrice: 30, grossSale: 3000 }), true).canSubmit).toBe(false);
   });
-  it.each([[100, "high"], [90, "high"], [89, "recommended"], [80, "recommended"], [79, "mandatory"], [0, "mandatory"]] as const)("classifies OCR score %s as %s", (score, expected) => {
-    expect(classifyOcrScore(score)).toBe(expected);
+
+  it("requires a human image check even when OCR arithmetic is complete", () => {
+    const fields = normalizeOcrFields({ documentClass: "rubber_receipt", receiptType: "weigh_ticket", saleDate: "2026-01-15", buyerName: "ร้าน", productType: "ขี้ยาง", weightKg: 100, unitPrice: 30, grossSale: 3000, needsReview: false });
+    expect(receiptReviewGate(fields, false).reasons).toContain("กรุณายืนยันว่าได้ตรวจตัวเลขกับภาพบิลแล้ว");
+    expect(receiptReviewGate(fields, true).canSubmit).toBe(true);
   });
+
+  it.each([["15/1/69", "2026-01-15"], ["15/1/2569", "2026-01-15"], ["2026-01-15", "2026-01-15"], ["31/2/69", ""]] as const)("normalizes Thai receipt date %s", (input, expected) => {
+    expect(normalizeReceiptDate(input)).toBe(expected);
+  });
+
   it.each([[60, 40], [100, 0], [0, 100]] as const)("accepts agreement percentages %s/%s", (owner, tapper) => {
     expect(validateAgreementPercentages(owner, tapper)).toBe(true);
   });

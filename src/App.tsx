@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { api, Agreement, ApiError, DashboardData, Garden, GardenMember, Notification, Role, Sale, SaleReceiptEvidence, Settlement, SettlementEvidence, WalletData, onAuthFailure, setAuthToken, userMessageForApiError } from "./api";
 import GoogleSignIn from "./GoogleSignIn";
 import LoadingAnimation from "./LoadingAnimation";
-import { normalizeOcrFields, receiptTypeLabel, validateReceiptMath } from "./ocr";
+import { normalizeOcrFields, receiptReviewGate, receiptTypeLabel, validateReceiptMath } from "./ocr";
 import { Banknote, Bell, Camera, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Eye, FileDown, FileText, House, Image, Leaf, LogOut, Menu, Plus, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
@@ -597,27 +597,52 @@ function labelStatus(status: string) { return ({ pending_owner_review: "รอ�
 
 function ReceiptForm({ garden, agreement, initialFile, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; initialFile?: File | null; onClose: () => void; onSaved: () => void }) {
   const [file, setFile] = useState<File | null>(initialFile || null);
-  const [fields, setFields] = useState<Record<string, string>>({ saleDate: dateToday(), buyerName: "", productType: "", weightKg: "", unitPrice: "", grossSale: "", buyerDeductions: "0" });
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [fields, setFields] = useState<Record<string, string>>({ saleDate: dateToday(), buyerName: "", ticketNumber: "", productType: "", weightEntriesText: "", grossWeightKg: "", tareWeightKg: "", netWeightKg: "", weightKg: "", freshWeightKg: "", drc: "", dryWeightKg: "", unitPrice: "", grossSale: "", buyerDeductions: "0" });
+  const [ocrMeta, setOcrMeta] = useState<{ documentClass: string; provider: string; warnings: string[]; uncertainFields: string[]; weightEntriesKg: number[] }>({ documentClass: "unreadable", provider: "", warnings: [], uncertainFields: [], weightEntriesKg: [] });
   const [receiptId, setReceiptId] = useState("");
   const [receiptFileId, setReceiptFileId] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [receiptType, setReceiptType] = useState<"weigh_ticket" | "rubber_form" | "unknown">("unknown");
+  const [humanReviewed, setHumanReviewed] = useState(false);
   const [status, setStatus] = useState("upload");
   const [duplicate, setDuplicate] = useState<{ possibleDuplicate: boolean; matches?: Sale[] }>({ possibleDuplicate: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const initialFileProcessed = useRef(false);
+
   const handleFile = async (selected: File | null) => {
     if (!selected || !garden) return;
-    if (selected.size > MAX_EVIDENCE_BYTES) { setError("ภาพใบเสร็จต้องมีขนาดไม่เกิน 4 MB"); return; }
-    setFile(selected);
+    setHumanReviewed(false);
+    setDuplicate({ possibleDuplicate: false });
     setBusy(true); setError(""); setReceiptId(""); setReceiptFileId("");
     try {
-      const data = await readFileAsDataUrl_(selected);
-      const result = await api.receipts.extract({ gardenId: garden.id, data, mimeType: selected.type, filename: selected.name });
-      const extracted = (result as { ocr?: { fields?: Record<string, unknown>; confidence?: number; score?: number; needsReview?: boolean; reviewLevel?: string }; file?: { fileId?: string } }).ocr;
+      const prepared = await prepareReceiptImage_(selected);
+      if (prepared.size > MAX_EVIDENCE_BYTES) { setError("ภาพใบเสร็จต้องมีขนาดไม่เกิน 4 MB และอุปกรณ์นี้ย่อภาพให้อัตโนมัติไม่ได้"); setStatus("error"); return; }
+      setFile(prepared);
+      const data = await readFileAsDataUrl_(prepared);
+      setPreviewUrl(data);
+      const result = await api.receipts.extract({ gardenId: garden.id, data, mimeType: prepared.type, filename: prepared.name });
+      const extracted = (result as { ocr?: { provider?: string; warnings?: string[]; fields?: Record<string, unknown>; confidence?: number; score?: number; needsReview?: boolean; reviewLevel?: string }; file?: { fileId?: string } }).ocr;
       const next = normalizeOcrFields(extracted?.fields || {});
-      setFields((current) => ({ ...current, ...Object.fromEntries(Object.entries(next).filter(([key]) => !["receiptType", "needsReview"].includes(key)).map(([key, value]) => [key, String(value ?? "")])) }));
+      setFields({
+        saleDate: next.saleDate,
+        buyerName: next.buyerName,
+        ticketNumber: next.ticketNumber,
+        productType: next.productType,
+        weightEntriesText: next.weightEntriesKg.join(", "),
+        grossWeightKg: next.grossWeightKg,
+        tareWeightKg: next.tareWeightKg,
+        netWeightKg: next.netWeightKg,
+        weightKg: next.weightKg,
+        freshWeightKg: next.freshWeightKg,
+        drc: next.drc,
+        dryWeightKg: next.dryWeightKg,
+        unitPrice: next.unitPrice,
+        grossSale: next.grossSale,
+        buyerDeductions: next.buyerDeductions
+      });
+      setOcrMeta({ documentClass: next.documentClass, provider: String(extracted?.provider || ""), warnings: [...next.warnings, ...(extracted?.warnings || [])], uncertainFields: next.uncertainFields, weightEntriesKg: next.weightEntriesKg });
       setReceiptType(next.receiptType);
       setReceiptId(String((result as { receiptId?: string }).receiptId || ""));
       setReceiptFileId(String((result as { file?: { fileId?: string } }).file?.fileId || ""));
@@ -629,37 +654,121 @@ function ReceiptForm({ garden, agreement, initialFile, onClose, onSaved }: { gar
       setBusy(false);
     }
   };
+
   useEffect(() => {
     if (initialFile && !initialFileProcessed.current) {
       initialFileProcessed.current = true;
       void handleFile(initialFile);
     }
   }, [initialFile]);
+
   const checkDuplicate = async () => {
     if (!garden) return;
     const result = await api.sales.duplicateCheck({ gardenId: garden.id, saleDate: fields.saleDate, buyerName: fields.buyerName, grossSale: Number(fields.grossSale || 0), weightKg: Number(fields.weightKg || 0) });
     setDuplicate(result as { possibleDuplicate: boolean; matches?: Sale[] });
     return result as { possibleDuplicate: boolean; matches?: Sale[] };
   };
+
+  const editedWeightEntries = parseWeightEntries_(fields.weightEntriesText);
+  const normalizedPreview = normalizeOcrFields({ ...fields, receiptType, documentClass: ocrMeta.documentClass, weightEntriesKg: editedWeightEntries, uncertainFields: ocrMeta.uncertainFields, warnings: ocrMeta.warnings });
+  const mathCheck = validateReceiptMath(normalizedPreview);
+  const reviewGate = receiptReviewGate(normalizedPreview, humanReviewed);
+
   const submit = async () => {
     if (!garden || !agreement) return;
-    setBusy(true);
+    if (!reviewGate.canSubmit) { setError(reviewGate.reasons[0]); return; }
+    setBusy(true); setError("");
     try {
       const duplicateResult = await checkDuplicate();
       if (duplicateResult?.possibleDuplicate && status !== "duplicate") { setStatus("duplicate"); return; }
-      await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, receiptId, saleDate: fields.saleDate, buyerName: fields.buyerName, productType: fields.productType, weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId, manualEntry: false });
+      await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, receiptId, receiptType, saleDate: fields.saleDate, ticketNumber: fields.ticketNumber, buyerName: fields.buyerName, productType: fields.productType, weightEntriesKg: editedWeightEntries, grossWeight: Number(fields.grossWeightKg || fields.weightKg || 0), tareWeight: Number(fields.tareWeightKg || 0), netWeight: Number(fields.weightKg || 0), freshWeightKg: Number(fields.freshWeightKg || 0), drc: Number(fields.drc || 0), dryWeightKg: Number(fields.dryWeightKg || 0), weightKg: Number(fields.weightKg || 0), unitPrice: Number(fields.unitPrice || 0), grossSale: Number(fields.grossSale || 0), buyerDeductions: Number(fields.buyerDeductions || 0), receiptFileId, humanVerified: true, manualEntry: false });
       onSaved();
     } catch (caught) { setError(userMessageForApiError(caught)); }
     finally { setBusy(false); }
   };
-  const setField = (key: string, value: string) => setFields((current) => ({ ...current, [key]: value }));
-  const normalizedPreview = normalizeOcrFields({ ...fields, receiptType });
-  const mathCheck = validateReceiptMath(normalizedPreview);
-  const setReceiptTypeFromUser = (value: string) => setReceiptType(value as "weigh_ticket" | "rubber_form" | "unknown");
-  return <Modal title="สแกนบิลและตรวจสอบ OCR" onClose={onClose}><div className="form-grid"><div className="receipt-upload-actions"><label className="file-action secondary"><Camera size={18} />ถ่ายภาพใบเสร็จ<input type="file" accept="image/*" capture="environment" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label><label className="file-action secondary"><Upload size={18} />เลือกภาพจากเครื่อง<input type="file" accept="image/*" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label></div>{file && <div className="calculation-preview"><span>ไฟล์: {file.name}</span><strong>{busy ? "กำลังอ่าน OCR..." : `สถานะ ${status}`}</strong><small>รูปแบบ: {receiptTypeLabel(receiptType)}</small></div>}<label>รูปแบบใบเสร็จ<select value={receiptType} onChange={(event) => setReceiptTypeFromUser(event.target.value)}><option value="unknown">ยังไม่ทราบรูปแบบ — เลือกเองได้</option><option value="weigh_ticket">ใบชั่งน้ำหนัก / บิลเงินสด</option><option value="rubber_form">แบบฟอร์มน้ำยาง–เปอร์เซ็นต์–ยางแห้ง</option></select><small className="form-hint">หากระบบจำแนกไม่ได้ ให้เลือกประเภทที่ตรงกับภาพเพื่อแสดงช่องข้อมูลที่ถูกต้อง</small></label><label>วันที่ขาย<input type="date" value={fields.saleDate} onChange={(e) => setField("saleDate", e.target.value)} /></label><label>ร้านรับซื้อ<input value={fields.buyerName} onChange={(e) => setField("buyerName", e.target.value)} /></label><label>ประเภทสินค้า<input value={fields.productType} onChange={(e) => setField("productType", e.target.value)} /></label><label>น้ำหนักสุทธิ (กก.)<input type="number" step="0.01" value={fields.weightKg} onChange={(e) => setField("weightKg", e.target.value)} /></label>{receiptType === "rubber_form" && <><label>น้ำหนักยางสด (กก.)<input type="number" step="0.01" value={fields.freshWeightKg || ""} onChange={(e) => setField("freshWeightKg", e.target.value)} /></label><label>เปอร์เซ็นต์เนื้อยาง (%)<input type="number" step="0.01" value={fields.drc || ""} onChange={(e) => setField("drc", e.target.value)} /></label><label>น้ำหนักยางแห้ง (กก.)<input type="number" step="0.01" value={fields.dryWeightKg || ""} onChange={(e) => setField("dryWeightKg", e.target.value)} /></label></>}<label>ราคา/กก.<input type="number" step="0.01" value={fields.unitPrice} onChange={(e) => setField("unitPrice", e.target.value)} /></label><label>ยอดก่อนหัก<input type="number" step="0.01" value={fields.grossSale} onChange={(e) => setField("grossSale", e.target.value)} /></label><label>รายการหัก<input type="number" step="0.01" value={fields.buyerDeductions} onChange={(e) => setField("buyerDeductions", e.target.value)} /></label>{fields.ocrError && <div className="calculation-preview low-confidence" role="alert"><span>สถานะผู้ให้บริการ OCR</span><strong>{fields.ocrError === "PROVIDER_NO_CANDIDATE" ? "ผู้ให้บริการไม่ส่งผลอ่านกลับมา กรุณาลองภาพใหม่" : fields.ocrError === "PROVIDER_INVALID_JSON" ? "ผู้ให้บริการส่งผลลัพธ์ที่อ่านไม่ได้ กรุณาตรวจข้อมูลด้วยตนเอง" : fields.ocrError.indexOf("PROVIDER_HTTP_") === 0 ? "ผู้ให้บริการ OCR ตอบข้อผิดพลาด กรุณาตรวจการตั้งค่ารุ่นและสิทธิ์ API" : "ระบบ OCR ต้องตรวจสอบเพิ่มเติม"}</strong></div>}{confidence !== null && <div className={`calculation-preview ${confidence < 0.9 || mathCheck.amountConsistent === false || mathCheck.weightConsistent === false ? "low-confidence" : ""}`}><span>OCR validation score: {(confidence * 100).toFixed(0)}%</span><strong>{mathCheck.weightConsistent === false ? "น้ำหนักยางสดและเปอร์เซ็นต์ไม่ตรงกับน้ำหนักยางแห้ง" : mathCheck.amountConsistent === false ? "น้ำหนักและราคาไม่ตรงกับยอดเงิน" : confidence < 0.8 ? "ต้องตรวจสอบข้อมูลก่อนสร้างรายการ" : confidence < 0.9 ? "แนะนำให้ตรวจสอบข้อมูลที่อ่านได้" : "คะแนนสูง แต่ควรตรวจสอบก่อนยืนยัน"}</strong></div>}{duplicate.possibleDuplicate && <div className="calculation-preview low-confidence"><span>พบรายการที่อาจซ้ำ {duplicate.matches?.length || 0} รายการ</span><strong>ตรวจสอบก่อนกดยืนยันอีกครั้ง</strong></div>}{error && <div className="form-error" role="alert">{error}</div>}<button className="secondary" onClick={() => void checkDuplicate()} disabled={!garden || busy}>ตรวจรายการซ้ำ</button><button className="primary" onClick={() => void submit()} disabled={!garden || !agreement || !receiptId || !receiptFileId || busy || !fields.saleDate}>{status === "duplicate" ? "ยืนยันว่าเป็นบิลคนละรายการ" : busy ? "กำลังบันทึก..." : "ยืนยันข้อมูลและสร้างรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี ข้อตกลงที่ใช้งานอยู่ ก่อนสร้างรายการขาย</small>}</div></Modal>;
+  const setField = (key: string, value: string) => {
+    setFields((current) => {
+      const next = { ...current, [key]: value };
+      if (receiptType === "weigh_ticket") {
+        if (key === "weightEntriesText") {
+          const entries = parseWeightEntries_(value);
+          if (entries.length) next.grossWeightKg = String(Math.round((entries.reduce((sum, item) => sum + item, 0) + Number.EPSILON) * 100) / 100);
+        }
+        if (["weightEntriesText", "grossWeightKg", "tareWeightKg"].includes(key)) {
+          const net = Number(next.grossWeightKg || 0) - Number(next.tareWeightKg || 0);
+          next.netWeightKg = net > 0 ? String(Math.round((net + Number.EPSILON) * 100) / 100) : "";
+          next.weightKg = next.netWeightKg;
+        } else if (key === "weightKg") next.netWeightKg = value;
+      } else if (receiptType === "rubber_form" && key === "dryWeightKg") next.weightKg = value;
+      return next;
+    });
+    setHumanReviewed(false); setDuplicate({ possibleDuplicate: false }); setError("");
+  };
+  const setReceiptTypeFromUser = (value: string) => { setReceiptType(value as "weigh_ticket" | "rubber_form" | "unknown"); setHumanReviewed(false); };
+  const mathFailed = Object.values(mathCheck).some((value) => value === false);
+  const nonReceipt = ocrMeta.documentClass !== "rubber_receipt";
+
+  return <Modal title="สแกนบิลและตรวจสอบ OCR" onClose={onClose}><div className="form-grid">
+    <div className="transparency-note"><Camera size={19} /><div><strong>ถ่ายบิลจริงเพียง 1 ใบให้เต็มกรอบ</strong><span>ให้เห็นวันที่ น้ำหนัก ราคา และยอดเงินชัดเจน หลีกเลี่ยงเงา นิ้วบัง และภาพตัวอย่างหลายใบรวมกัน</span></div></div>
+    <div className="receipt-upload-actions"><label className="file-action secondary"><Camera size={18} />ถ่ายภาพใบเสร็จ<input type="file" accept="image/*" capture="environment" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label><label className="file-action secondary"><Upload size={18} />เลือกภาพจากเครื่อง<input type="file" accept="image/*" onChange={(event) => void handleFile(event.target.files?.[0] || null)} /></label></div>
+    {previewUrl && <img className="receipt-scan-preview" src={previewUrl} alt="ภาพบิลที่กำลังตรวจสอบ" />}
+    {file && <div className={`calculation-preview ${nonReceipt ? "low-confidence" : ""}`}><span>ไฟล์: {file.name}</span><strong>{busy ? "กำลังอ่าน OCR..." : nonReceipt ? "ไม่ใช่บิลขายที่กรอกข้อมูลแล้ว" : `สถานะ ${status}`}</strong><small>รูปแบบ: {receiptTypeLabel(receiptType)}{ocrMeta.provider ? ` · ${ocrMeta.provider}` : ""}</small>{ocrMeta.weightEntriesKg.length > 1 && <small>อ่านพบน้ำหนัก {ocrMeta.weightEntriesKg.length} แถว รวม {normalizedPreview.grossWeightKg} กก.</small>}</div>}
+    <label>รูปแบบใบเสร็จ<select value={receiptType} onChange={(event) => setReceiptTypeFromUser(event.target.value)}><option value="unknown">ยังไม่ทราบรูปแบบ — เลือกเองได้</option><option value="weigh_ticket">ใบชั่งน้ำหนัก / บิลเงินสด</option><option value="rubber_form">แบบฟอร์มน้ำยาง–เปอร์เซ็นต์–ยางแห้ง</option></select><small className="form-hint">ระบบอ่านจากความหมายของหัวข้อและตัวเลข จึงรองรับตำแหน่งตารางที่ต่างกัน</small></label>
+    <label>วันที่ขาย<input type="date" value={fields.saleDate} onChange={(e) => setField("saleDate", e.target.value)} /></label>
+    <label>ร้านรับซื้อ<input value={fields.buyerName} onChange={(e) => setField("buyerName", e.target.value)} /></label>
+    <label>เลขที่บิล (ถ้ามี)<input value={fields.ticketNumber} onChange={(e) => setField("ticketNumber", e.target.value)} /></label>
+    <label>ประเภทสินค้า<select value={fields.productType} onChange={(e) => setField("productType", e.target.value)}><option value="">เลือกประเภทสินค้า</option><option value="น้ำยางสด">น้ำยางสด</option><option value="ขี้ยาง">ขี้ยาง / ยางก้อนถ้วย</option><option value="ยางแผ่น">ยางแผ่น</option><option value="อื่น ๆ">อื่น ๆ</option></select></label>
+    {receiptType === "weigh_ticket" && <><label>น้ำหนักรายแถว (คั่นด้วยจุลภาค)<textarea value={fields.weightEntriesText} onChange={(e) => setField("weightEntriesText", e.target.value)} placeholder="เช่น 36, 41, 42, 35.5" /><small className="form-hint">แก้ได้หาก OCR อ่านลายมือบางแถวผิด ระบบจะรวมให้อัตโนมัติ</small></label><label>น้ำหนักรวม (กก.)<input type="number" min="0" step="0.01" value={fields.grossWeightKg} onChange={(e) => setField("grossWeightKg", e.target.value)} /></label><label>หักตะกร้า/ภาชนะ (กก.)<input type="number" min="0" step="0.01" value={fields.tareWeightKg} onChange={(e) => setField("tareWeightKg", e.target.value)} /></label></>}
+    <label>น้ำหนักที่ใช้คิดเงิน (กก.)<input type="number" min="0" step="0.01" value={fields.weightKg} onChange={(e) => setField("weightKg", e.target.value)} /></label>
+    {receiptType === "rubber_form" && <><label>น้ำหนักยางสด (กก.)<input type="number" min="0" step="0.01" value={fields.freshWeightKg} onChange={(e) => setField("freshWeightKg", e.target.value)} /></label><label>เปอร์เซ็นต์เนื้อยาง (%)<input type="number" min="0" step="0.01" value={fields.drc} onChange={(e) => setField("drc", e.target.value)} /></label><label>น้ำหนักยางแห้ง (กก.)<input type="number" min="0" step="0.01" value={fields.dryWeightKg} onChange={(e) => setField("dryWeightKg", e.target.value)} /></label></>}
+    <label>ราคา/กก.<input type="number" min="0" step="0.01" value={fields.unitPrice} onChange={(e) => setField("unitPrice", e.target.value)} /></label>
+    <label>ยอดเงินที่เขียนในบิล<input type="number" min="0" step="0.01" value={fields.grossSale} onChange={(e) => setField("grossSale", e.target.value)} /></label>
+    <label>รายการหักที่ระบุในบิล<input type="number" min="0" step="0.01" value={fields.buyerDeductions} onChange={(e) => setField("buyerDeductions", e.target.value)} /></label>
+    {confidence !== null && <div className={`calculation-preview ${confidence < 0.9 || mathFailed ? "low-confidence" : ""}`}><span>คะแนนตรวจความครบถ้วน: {(confidence * 100).toFixed(0)}%</span><strong>{mathCheck.entrySumConsistent === false ? "ผลรวมน้ำหนักรายแถวไม่ตรงกับยอดรวม" : mathCheck.netWeightConsistent === false ? "น้ำหนักรวม หักตะกร้า และสุทธิไม่ตรงกัน" : mathCheck.weightConsistent === false ? "น้ำหนักยางสดและเปอร์เซ็นต์ไม่ตรงกับน้ำหนักยางแห้ง" : mathCheck.amountConsistent === false ? "น้ำหนักและราคาไม่ตรงกับยอดเงิน" : confidence < 0.9 ? "ต้องตรวจตัวเลขกับภาพก่อนบันทึก" : "สมการถูกต้อง — ยังต้องตรวจภาพจริงหนึ่งครั้ง"}</strong></div>}
+    {ocrMeta.uncertainFields.length > 0 && <div className="calculation-preview low-confidence"><span>ช่องที่ระบบไม่มั่นใจ</span><strong>{ocrMeta.uncertainFields.join(", ")}</strong></div>}
+    {duplicate.possibleDuplicate && <div className="calculation-preview low-confidence"><span>พบรายการที่อาจซ้ำ {duplicate.matches?.length || 0} รายการ</span><strong>ตรวจสอบก่อนกดยืนยันอีกครั้ง</strong></div>}
+    <label className="review-confirmation"><input type="checkbox" checked={humanReviewed} onChange={(event) => setHumanReviewed(event.target.checked)} /><span><strong>ฉันตรวจวันที่ น้ำหนัก ราคา และยอดเงินกับภาพบิลแล้ว</strong><small>OCR ช่วยกรอกข้อมูล แต่จะไม่บันทึกเงินจนกว่าคุณยืนยัน</small></span></label>
+    {!reviewGate.canSubmit && receiptId && <div className="calculation-preview low-confidence"><span>ยังบันทึกไม่ได้</span><strong>{reviewGate.reasons[0]}</strong></div>}
+    {error && <div className="form-error" role="alert">{error}</div>}
+    <button className="secondary" onClick={() => void checkDuplicate()} disabled={!garden || busy || !fields.saleDate}>ตรวจรายการซ้ำ</button>
+    <button className="primary" onClick={() => void submit()} disabled={!garden || !agreement || !receiptId || !receiptFileId || busy || !reviewGate.canSubmit}>{status === "duplicate" ? "ยืนยันว่าเป็นบิลคนละรายการ" : busy ? "กำลังบันทึก..." : "ยืนยันข้อมูลและสร้างรายการ"}</button>
+    {!agreement && <small className="form-hint">ต้องมี ข้อตกลงที่ใช้งานอยู่ ก่อนสร้างรายการขาย</small>}
+  </div></Modal>;
 }
 
 function readFileAsDataUrl_(file: File) { return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = reject; reader.readAsDataURL(file); }); }
+
+function parseWeightEntries_(value: string): number[] { return String(value || "").split(/[\s,;]+/).map(Number).filter((item) => Number.isFinite(item) && item > 0); }
+
+async function prepareReceiptImage_(file: File): Promise<File> {
+  if (typeof createImageBitmap !== "function") return file;
+  let bitmap: ImageBitmap | undefined;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const render = async (maxSide: number, quality: number) => {
+      const scale = Math.min(1, maxSide / Math.max(bitmap!.width, bitmap!.height));
+      const width = Math.max(1, Math.round(bitmap!.width * scale));
+      const height = Math.max(1, Math.round(bitmap!.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(bitmap!, 0, 0, width, height);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      return blob ? new File([blob], file.name.replace(/\.[^.]+$/, "") + "-ocr.jpg", { type: "image/jpeg", lastModified: file.lastModified }) : null;
+    };
+    const first = await render(2200, 0.9);
+    if (first && first.size <= MAX_EVIDENCE_BYTES) return first;
+    const second = await render(1600, 0.78);
+    return second || file;
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close();
+  }
+}
 
 
 function AgreementForm({ garden, members, onClose, onSaved }: { garden?: Garden; members: GardenMember[]; onClose: () => void; onSaved: () => void }) {

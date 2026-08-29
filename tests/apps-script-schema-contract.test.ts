@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.28-hybrid-ocr-v4";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.29-ocr-canonical-v5";');
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -55,26 +55,24 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("delete Repositories.rowsCache_[name]");
   });
 
-  it("uses a current configurable Gemini model and protects OCR provider failures", () => {
+  it("uses the canonical stateless Gemini Interactions adapter with Vision evidence", () => {
     expect(code).toContain('geminiModel: function () { return this.get("GEMINI_MODEL", false) || "gemini-3.7-flash"; }');
     expect(code).not.toContain("gemini-1.5-flash");
     expect(code).toContain("response.getResponseCode()");
-    expect(code).toContain('PROVIDER_HTTP_');
-    expect(code).toContain('PROVIDER_NO_CANDIDATE');
-    expect(code).toContain('PROVIDER_INVALID_JSON');
-    expect(code).toContain('responseMimeType: "application/json"');
-    expect(code).toContain('responseSchema: schema');
-    expect(code).toContain('tableRows');
-    expect(code).toContain('var vision = Config.visionKey() ? this.vision_');
-    expect(code).toContain('Reference text from a second OCR engine');
-    expect(code).toContain('visionAgreement');
-    expect(code).toContain('VISION_HTTP_');
-    expect(code).not.toContain('temperature: 0');
+    expect(code).toContain('"https://generativelanguage.googleapis.com/v1/interactions"');
+    expect(code).toContain('store: false');
+    expect(code).toContain('response_format: { type: "text", mime_type: "application/json", schema: this.responseSchema_() }');
+    expect(code).toContain('headers: { "x-goog-api-key": Config.geminiKey() }');
+    expect(code).toContain('DOCUMENT_TEXT_DETECTION');
+    expect(code).toContain('untrusted transcript');
+    expect(code).toContain('visionOcrUsed');
+    expect(code).toContain('fetchJsonWithRetry_');
+    expect(code).toContain('OCR_PROVIDER_HTTP_');
   });
 
   it("does not score empty OCR fields as a successful extraction", () => {
-    expect(code).toContain('fields.buyerDeductions !== undefined && fields.buyerDeductions !== null && fields.buyerDeductions !== ""');
-    expect(code).toContain('fields: { ocrError: code }');
+    expect(code).toContain('if (fields.documentClass !== "rubber_receipt") return 0;');
+    expect(code).toContain('["OCR_PROVIDER_UNAVAILABLE"]');
   });
 
   it("stores settlement evidence in Drive without writing base64 into AuditLogs", () => {
@@ -195,6 +193,35 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('throw new Error("RECEIPT_IMAGE_TYPE_INVALID")');
     expect(code).toContain('throw new Error("RECEIPT_IMAGE_TOO_LARGE")');
     expect(code).toContain('OCR.extract(contentBase64, mimeType)');
+  });
+
+  it("extracts layout-independent receipt data with a pinned current model and structured schema", () => {
+    expect(code).toContain('geminiModel: function ()');
+    expect(code).toContain('"gemini-3.7-flash"');
+    expect(code).toContain('response_format');
+    expect(code).toContain('schema: this.responseSchema_()');
+    expect(code).toContain('weightEntriesKg');
+    expect(code).toContain('tareWeightKg');
+    expect(code).toContain('documentClass');
+    expect(code).toContain('never depend on fixed x/y coordinates');
+    expect(code).toContain('fetchJsonWithRetry_');
+    expect(code).toContain('OCR_PROVIDER_HTTP_');
+  });
+
+  it("blocks unsafe scanned sales and reconciles normal shop rounding", () => {
+    const service = code.match(/Services\.createSale = function[\s\S]*?\n};/)?.[0] || "";
+    expect(service).toContain('throw new Error("OCR_HUMAN_VERIFICATION_REQUIRED")');
+    expect(service).toContain('throw new Error("RECEIPT_NOT_FILLED_SALE")');
+    expect(service).toContain('throw new Error("RECEIPT_GARDEN_MISMATCH")');
+    expect(service).toContain('throw new Error("RECEIPT_TYPE_REQUIRED")');
+    expect(service).toContain('throw new Error("RECEIPT_WEIGHT_ROWS_MISMATCH")');
+    expect(service).toContain('throw new Error("RECEIPT_NET_WEIGHT_MISMATCH")');
+    expect(service).toContain('throw new Error("RECEIPT_DRC_FIELDS_REQUIRED")');
+    expect(service).toContain('throw new Error("RECEIPT_DRC_MISMATCH")');
+    expect(service).toContain('throw new Error("RECEIPT_MATH_MISMATCH")');
+    expect(service).toContain('roundingDifference > 0');
+    expect(service).toContain('buyerDeductions = round_(buyerDeductions + roundingDifference)');
+    expect(code).toContain('result.fields.sourceGardenId = payload.gardenId');
   });
 
   it("migrates legacy Agreement values into the correct 16-column positions", () => {

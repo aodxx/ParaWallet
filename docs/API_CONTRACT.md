@@ -48,7 +48,7 @@ Every mutation must include a unique `requestId`. A repeated RequestID returns t
 | `products.list` | none | Authenticated user | No |
 | `buyers.list` | gardenId | Garden member | No |
 | `receipts.extract` | gardenId, base64 image data, mimeType, filename | Active Tapper in garden | Yes: Drive/Receipt/OCR/audit |
-| `sales.create` | gardenId, agreementId, saleDate, product, weight, price | Tapper | Yes: sale/wallet/audit/notification |
+| `sales.create` | gardenId, agreementId, saleDate, product, weight, price; scanned Sales also require the same-garden receiptId, receiptType, grossSale, humanVerified=true, plus weight rows/gross/tare or freshWeight/drc/dryWeight as applicable | Tapper | Yes: sale/wallet/audit/notification |
 | `sales.list` | gardenId, optional filters | Garden member | No |
 | `sales.duplicateCheck` | gardenId plus Sale identity fields | Active Tapper in garden | No |
 | `sales.receipt` | saleId | Authorized garden member | No: reads Sale-bound private Drive image |
