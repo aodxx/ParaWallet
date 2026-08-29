@@ -68,6 +68,9 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("const openNotification = async (item: Notification)");
     expect(app).toContain("notificationRows.filter((item) => !item.readAt).length");
     expect(app).toContain("notificationTargetScreen(item.type)");
+    expect(app).toContain("item.targetId");
+    expect(app).toContain("setFocusSaleId(item.targetId)");
+    expect(app).toContain("setFocusSettlementId(item.targetId)");
     expect(app).toContain("await api.notifications.read(item.id)");
     expect(app).toContain('await refresh(target)');
     expect(app).toContain('className={`data-row notification-row');
@@ -78,7 +81,19 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("รอตรวจ");
     expect(app).toContain("ล่าสุด");
     expect(app).toContain("CompletionReceipt");
+    expect(app).toContain("recordType?: \"sale\" | \"settlement\"");
+    expect(app).toContain("recordId?: string");
+    expect(app).toContain("onCompleted(detail, id)");
+    expect(app).toContain("อัปเดตรายการส่งเงินสำเร็จ");
     expect(app).toContain("ดูรายการนี้");
+  });
+
+  it("opens notification targets as the exact sale or settlement record", () => {
+    expect(app).toContain("const target = sales.find((item) => item.id === focusSaleId)");
+    expect(app).toContain("setReviewSale(target)");
+    expect(app).toContain("focusId={focusSettlementId}");
+    expect(app).toContain("const target = settlements.find((item) => item.id === focusId)");
+    expect(app).toContain("setReviewSettlement(target)");
   });
 
   it("does not refetch the heavy dashboard before every tab", () => {

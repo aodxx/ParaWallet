@@ -64,9 +64,11 @@ Every mutation must include a unique `requestId`. A repeated RequestID returns t
 | `adjustments.create` | saleId, adjustmentType, amount, reason | Garden Owner | Yes: audited adjustment/ledger effect |
 | `payments.create` | gardenId, amount, method, recipient fields | Garden member | Yes |
 | `payments.confirm` | paymentId | Garden Owner | Yes |
-| `notifications.list` | none | Current user | No |
-| `notifications.read` | notificationId | Notification owner | Yes |
+| `notifications.list` | none | Current user | No; returns `targetScreen` and `targetId` for Sale/Settlement deep link |
+| `notifications.read` | notificationId | Notification owner | Yes; returns the same cleaned body, `targetScreen`, and `targetId` |
 | `reports.summary` | gardenId, from, to | Garden member | No |
+
+Notification records keep the existing seven-column Sheets schema. For Sale and Settlement events, Apps Script carries the target record ID in an internal body marker, strips that marker before returning the user-facing `body`, and exposes it as `targetId`. The frontend loads the target list and opens the exact Sale or Settlement review record.
 
 ## Apps Script setup actions
 

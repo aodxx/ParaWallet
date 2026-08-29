@@ -131,7 +131,21 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('if (value.indexOf("settlement_") === 0) return "settlements"');
     expect(code).toContain('if (value.indexOf("sale_") === 0 || value.indexOf("dispute_") === 0) return "sales"');
     expect(code).toContain('targetScreen: notificationTarget_(row.type)');
+    expect(code).toContain('function notificationTargetId_(row)');
+    expect(code).toContain('function notificationCleanBody_(row)');
+    expect(code).toContain('targetId: notificationTargetId_(row) || undefined');
+    expect(code).toContain('sale_pending_review');
+    expect(code).toContain('settlement_pending');
+    expect(code).toContain('notificationCleanBody_(notification)');
     expect(code).toContain('if (notification.readAt) return Object.assign');
+  });
+
+  it("attaches stable entity IDs to sale and settlement notifications", () => {
+    expect(code).toContain('"รายการขาย " + saleId + " รอการยืนยัน", saleId');
+    expect(code).toContain('"รายการขาย " + sale.id + " ได้รับการยืนยันแล้ว", sale.id');
+    expect(code).toContain('"ยอด " + payload.amount, settlementId');
+    expect(code).toContain('"ยอด " + settlement.amount, settlement.id');
+    expect(code).toContain('payload.reason, settlement.id');
   });
 
   it("enforces owner-controlled, auditable garden membership", () => {
