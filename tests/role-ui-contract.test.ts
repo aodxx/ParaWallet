@@ -73,6 +73,14 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('className={`data-row notification-row');
   });
 
+  it("prioritizes pending/latest sales and provides a completion receipt", () => {
+    expect(app).toContain('role="tablist" aria-label="มุมมองรายการขาย"');
+    expect(app).toContain("รอตรวจ");
+    expect(app).toContain("ล่าสุด");
+    expect(app).toContain("CompletionReceipt");
+    expect(app).toContain("ดูรายการนี้");
+  });
+
   it("does not refetch the heavy dashboard before every tab", () => {
     expect(app).toContain('if (target === "overview" || !dashboard.garden?.id)');
     expect(app).toContain('screen === "settlements" && (!loading || settlements.length > 0)');
@@ -109,7 +117,11 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("กำลังบันทึกรายการขาย...");
     expect(app).toContain("กำลังบันทึกหลักฐาน...");
     expect(app).toContain("กำลังยกเลิก...");
-    expect(app).toContain("if (cancelBusyId || !window.confirm");
+    expect(app).toContain("ReasonDialog");
+    expect(app).not.toContain("window.prompt");
+    expect(app).toContain('const [cancelTarget, setCancelTarget] = useState<Settlement | null>(null);');
+    expect(app).toContain('<ConfirmDialog title="ยกเลิกรายการส่งเงิน"');
+    expect(app).not.toContain('window.confirm("ยกเลิกรายการส่งเงินนี้หรือไม่")');
   });
 
   it("does not render either role dashboard before role verification finishes", () => {
@@ -277,7 +289,7 @@ describe("Thai UI terminology and role-specific destination labels", () => {
     expect(app).not.toContain("เจ้าของสวน (Owner)");
     expect(app).not.toContain("คนกรีด (Tapper)");
     expect(app).toContain("เวอร์ชัน");
-    expect(app).toContain("ส่งออก CSV");
+    expect(app).toContain("ดาวน์โหลดตาราง");
     expect(app).not.toContain(">Export CSV<");
     expect(app).not.toContain("ทุก version");
   });
@@ -285,6 +297,7 @@ describe("Thai UI terminology and role-specific destination labels", () => {
   it("labels settlement and garden destinations by role", () => {
     expect(app).toContain('role === "owner" ? "รับเงิน" : "ส่งเงิน"');
     expect(app).toContain('role === "owner" ? "สวนและสมาชิก" : "ข้อมูลสวน"');
+    expect(app).toContain("รายงานและดาวน์โหลดตาราง");
     expect(app).toContain('role === "owner" ? "เงินที่คนกรีดส่งมา" : "การส่งเงิน"');
     expect(app).not.toContain("<span>กระเป๋า</span>");
   });

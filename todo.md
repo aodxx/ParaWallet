@@ -10,11 +10,11 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 
 - [x] Correct terminology and role-specific navigation
 - [x] Introduce one explicit system-status model
-- [ ] Make pending work and latest records primary
-- [ ] Add a completion receipt to every mutation
-- [ ] Remove or connect inert controls
-- [ ] Separate loading, empty, error, offline, and unauthorized states
-- [ ] Remove technical vocabulary and improve field readability
+- [x] Make pending work and latest records primary
+- [x] Add a completion receipt to every mutation
+- [x] Remove or connect inert controls
+- [x] Separate loading, empty, error, offline, and unauthorized states
+- [x] Remove technical vocabulary and improve field readability
 
 ## Accepted production baseline
 
@@ -30,7 +30,7 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 - [x] D11 Lottie loading, typography hierarchy, grid alignment, and non-overlapping state transitions deployed
 - [x] D12 Earthy Harmony palette, curved mobile header, prioritized dual wallets, and accessible Animated Circle Dock implemented
 - [x] D12.1 Tapper date formatting, settlement-card spacing, outdoor text contrast, screen-specific descriptions, wallet-heading alignment, and dock clearance implemented
-- [x] Automated verification passes 98 tests, TypeScript, Apps Script syntax, and production build
+- [x] Automated verification passes 136 tests, TypeScript, Apps Script syntax, and production build
 - [x] Current README, operating manual, roadmap, gap matrix, and document index synchronized
 
 ## Release closure — validation only
