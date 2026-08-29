@@ -9,7 +9,7 @@ This file is the current work queue. Phase reports under `docs/PHASE-D*.md` are 
 Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](docs/UX-AUDIT-REMEDIATION-2026-08-29.md) before beginning any new feature or visual redesign:
 
 - [x] Correct terminology and role-specific navigation
-- [ ] Introduce one explicit system-status model
+- [x] Introduce one explicit system-status model
 - [ ] Make pending work and latest records primary
 - [ ] Add a completion receipt to every mutation
 - [ ] Remove or connect inert controls

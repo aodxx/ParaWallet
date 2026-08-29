@@ -81,12 +81,35 @@ describe("role-aware UI contract", () => {
 
   it("keeps last successful data visible when an optional read model fails", () => {
     expect(app).toContain("Promise.allSettled");
-    expect(app).toContain('type ConnectionState = "connecting" | "connected" | "degraded" | "disconnected"');
-    expect(app).toContain('setConnectionState("degraded")');
-    expect(app).toContain("ข้อมูลหลักเชื่อมต่อแล้ว แต่ข้อมูลบางส่วนยังไม่อัปเดต");
+    expect(app).toContain("const [authStatus, setAuthStatus]");
+    expect(app).toContain("const [connectionStatus, setConnectionStatus]");
+    expect(app).toContain("const [actionStatus, setActionStatus]");
+    expect(app).toContain('createSystemStatus("connection", "partial"');
+    expect(app).toContain("ข้อมูลบางส่วนยังไม่อัปเดต");
+    expect(app).toContain("กำลังแสดงข้อมูลที่โหลดล่าสุด");
     expect(app).toContain("refreshSequenceRef");
     expect(app).toContain("if (dashboard.walletDetails) setWallet(dashboard.walletDetails)");
     expect(app).not.toContain("api.gardens.list(), api.agreements.list(garden.id), api.wallets.me(garden.id)");
+  });
+
+  it("uses one typed status contract without false signed-out or duplicate global alerts", () => {
+    expect(app).toContain("SystemStatusBanner");
+    expect(app).toContain("status.retryable && onRetry");
+    expect(app).toContain("status.dismissible && onDismiss");
+    expect(app).not.toContain("const [message, setMessage]");
+    expect(app).not.toContain("setConnectionState");
+    expect(app).not.toContain("กรุณาเข้าสู่ระบบด้วย Google ก่อนเชื่อมต่อฐานข้อมูล");
+    expect(app).not.toContain('className="sync-banner"');
+  });
+
+  it("shows actionable async failures and blocks duplicate submissions", () => {
+    expect(app).toContain("โหลดรายงานไม่สำเร็จ");
+    expect(app).not.toContain("catch { setReport(null); }");
+    expect(app).toContain("กำลังบันทึกสวน...");
+    expect(app).toContain("กำลังบันทึกรายการขาย...");
+    expect(app).toContain("กำลังบันทึกหลักฐาน...");
+    expect(app).toContain("กำลังยกเลิก...");
+    expect(app).toContain("if (cancelBusyId || !window.confirm");
   });
 
   it("does not render either role dashboard before role verification finishes", () => {

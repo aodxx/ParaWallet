@@ -83,6 +83,8 @@
 
 ### ชุดที่ 2 — สร้างระบบสถานะกลางเพียงแบบเดียว
 
+สถานะ: ✅ ดำเนินการแล้ว พร้อม typed status contract, action/connection/authentication scopes และ regression tests
+
 สิ่งที่ต้องทำ:
 
 - เปลี่ยน `message` แบบข้อความอิสระเป็น Typed state: `idle`, `working`, `success`, `partial`, `empty`, `offline`, `auth_error`, `api_error`
@@ -224,7 +226,7 @@
 ## 7. Checklist กลางของทีม
 
 - [x] ชุด 1 คำศัพท์และเมนูตามบทบาท Merge แล้ว
-- [ ] ชุด 2 ระบบสถานะกลาง Merge แล้ว
+- [x] ชุด 2 ระบบสถานะกลาง Merge แล้ว
 - [ ] ชุด 3 งานรอตรวจ/ล่าสุดและ Notification deep link Merge แล้ว
 - [ ] ชุด 4 ใบสรุปผลและ Dialog ในแอป Merge แล้ว
 - [ ] ชุด 5 ปุ่มเงียบถูกลบหรือเชื่อมครบแล้ว

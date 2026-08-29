@@ -3,6 +3,7 @@ import { api, Agreement, ApiError, DashboardData, Garden, GardenMember, Notifica
 import GoogleSignIn from "./GoogleSignIn";
 import LoadingAnimation from "./LoadingAnimation";
 import { normalizeOcrFields, receiptFieldLabel, receiptReviewGate, receiptScanFeedback, validateReceiptMath } from "./ocr";
+import { createSystemStatus, idleSystemStatus, isErrorStatus, shouldShowStatus, SystemStatus } from "./systemStatus";
 import { AlertTriangle, Banknote, Bell, Camera, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Eye, FileDown, FileText, House, Image, Leaf, LoaderCircle, LogOut, Menu, Plus, RefreshCw, Settings2, ShieldCheck, Sprout, Upload, UserMinus, UserPlus, Users, WalletCards, X } from "lucide-react";
 
 type Screen = "overview" | "sales" | "gardens" | "agreements" | "settlements" | "reports" | "notifications";
@@ -39,8 +40,9 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
+  const [authStatus, setAuthStatus] = useState<SystemStatus>(() => idleSystemStatus("authentication"));
+  const [connectionStatus, setConnectionStatus] = useState<SystemStatus>(() => idleSystemStatus("connection"));
+  const [actionStatus, setActionStatus] = useState<SystemStatus>(() => idleSystemStatus("action"));
   const [showGardenForm, setShowGardenForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [showSaleForm, setShowSaleForm] = useState(false);
@@ -57,7 +59,8 @@ export default function App() {
   const refreshSequenceRef = useRef(0);
   const hasSuccessfulSyncRef = useRef(false);
   const activeGarden = data.garden || gardens[0];
-  const connected = connectionState === "connected" || connectionState === "degraded";
+  const connectionState: ConnectionState = connectionStatus.kind === "working" ? "connecting" : connectionStatus.kind === "success" ? "connected" : ["partial", "offline"].includes(connectionStatus.kind) ? "degraded" : "disconnected";
+  const connected = hasSuccessfulSyncRef.current || ["success", "partial", "offline"].includes(connectionStatus.kind);
   const pendingSales = data.pendingSales || 0;
   const pendingSettlements = data.pendingSettlements || 0;
   const unreadNotifications = data.unreadNotifications ?? notifications.filter((item) => !item.readAt).length;
@@ -98,8 +101,11 @@ export default function App() {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setAuthToken("");
     setAuthTokenState("");
-    setConnectionState("disconnected");
-    if (reason) setMessage(reason);
+    setConnectionStatus(idleSystemStatus("connection"));
+    setActionStatus(idleSystemStatus("action"));
+    setAuthStatus(reason
+      ? createSystemStatus("authentication", "auth_error", "เข้าสู่ระบบใหม่อีกครั้ง", reason, { nextAction: "เลือกบัญชี Google ที่ลงทะเบียนกับ ParaWallet", retryable: true })
+      : idleSystemStatus("authentication"));
     window.google?.accounts?.id?.disableAutoSelect?.();
   }, []);
 
@@ -107,8 +113,7 @@ export default function App() {
     const refreshSequence = ++refreshSequenceRef.current;
     const isCurrent = () => refreshSequence === refreshSequenceRef.current;
     setLoading(true);
-    setMessage("");
-    setConnectionState((current) => hasSuccessfulSyncRef.current ? current : "connecting");
+    setConnectionStatus(createSystemStatus("connection", "working", "กำลังอัปเดตข้อมูล", "ระบบกำลังโหลดข้อมูลล่าสุดจาก ParaWallet", { nextAction: "รอสักครู่" }));
     try {
       let dashboard = data;
       let partialFailure = false;
@@ -122,7 +127,6 @@ export default function App() {
         setRole(dashboard.role);
         if (dashboard.walletDetails) setWallet(dashboard.walletDetails);
         hasSuccessfulSyncRef.current = true;
-        setConnectionState("connected");
       }
       const garden = dashboard.garden || gardens[0];
       if (garden?.id) {
@@ -166,12 +170,11 @@ export default function App() {
       }
       if (!isCurrent()) return;
       hasSuccessfulSyncRef.current = true;
+      const syncedAt = new Date().toISOString();
       if (partialFailure) {
-        setConnectionState("degraded");
-        setMessage("ข้อมูลหลักเชื่อมต่อแล้ว แต่ข้อมูลบางส่วนยังไม่อัปเดต กด “ลองใหม่” เพื่อซิงก์อีกครั้ง");
+        setConnectionStatus(createSystemStatus("connection", "partial", "ข้อมูลบางส่วนยังไม่อัปเดต", `ข้อมูลหลักพร้อมใช้งาน · โหลดล่าสุด ${formatThaiDateTime(syncedAt)}`, { nextAction: "กดลองใหม่เพื่อโหลดส่วนที่ยังขาด", retryable: true, updatedAt: syncedAt }));
       } else {
-        setConnectionState("connected");
-        setMessage("");
+        setConnectionStatus(createSystemStatus("connection", "success", "ข้อมูลเป็นปัจจุบัน", `โหลดล่าสุด ${formatThaiDateTime(syncedAt)}`, { updatedAt: syncedAt }));
       }
     } catch (error) {
       if (!isCurrent()) return;
@@ -179,11 +182,10 @@ export default function App() {
         handleSignOut("เซสชัน Google หมดอายุหรือไม่มีสิทธิ์ โปรดเข้าสู่ระบบใหม่");
       } else {
         if (hasSuccessfulSyncRef.current) {
-          setConnectionState("degraded");
-          setMessage(`ยังใช้ข้อมูลที่โหลดล่าสุดได้ · ${userMessageForApiError(error)}`);
+          const lastUpdated = connectionStatus.updatedAt ? formatThaiDateTime(connectionStatus.updatedAt) : "ครั้งก่อน";
+          setConnectionStatus(createSystemStatus("connection", "offline", "กำลังแสดงข้อมูลที่โหลดล่าสุด", `${userMessageForApiError(error)} · ข้อมูลล่าสุดจาก ${lastUpdated}`, { nextAction: "ตรวจอินเทอร์เน็ตแล้วกดลองใหม่", retryable: true, updatedAt: connectionStatus.updatedAt }));
         } else {
-          setConnectionState("disconnected");
-          setMessage(userMessageForApiError(error));
+          setConnectionStatus(createSystemStatus("connection", "api_error", "โหลดข้อมูลไม่สำเร็จ", userMessageForApiError(error), { nextAction: "ตรวจการเชื่อมต่อแล้วกดลองใหม่", retryable: true }));
         }
       }
     } finally {
@@ -195,13 +197,16 @@ export default function App() {
     onAuthFailure(() => handleSignOut("เซสชัน Google หมดอายุหรือไม่มีสิทธิ์ โปรดเข้าสู่ระบบใหม่"));
     setAuthToken(authToken);
     if (authToken) void refresh("overview");
-    else { setConnectionState("disconnected"); setMessage("กรุณาเข้าสู่ระบบด้วย Google ก่อนเชื่อมต่อฐานข้อมูล"); }
+    else {
+      setConnectionStatus(idleSystemStatus("connection"));
+      setAuthStatus((current) => current.kind === "auth_error" ? current : idleSystemStatus("authentication"));
+    }
   }, [authToken]);
 
   const handleCredential = useCallback((token: string) => {
     localStorage.setItem(AUTH_STORAGE_KEY, token);
     setAuthTokenState(token);
-    setMessage("กำลังตรวจสอบบัญชี Google กับระบบ...");
+    setAuthStatus(createSystemStatus("authentication", "working", "กำลังตรวจสอบบัญชี", "ระบบกำลังตรวจสอบสิทธิ์ของบัญชี Google", { nextAction: "รอสักครู่" }));
   }, []);
   const nav = useMemo(() => [
     ["overview", "ภาพรวม", <Leaf size={18} />],
@@ -226,16 +231,18 @@ export default function App() {
       setData((current) => ({ ...current, unreadNotifications: Math.max(0, (current.unreadNotifications || 0) - 1) }));
     }
     if (target !== "notifications") setScreen(target);
+    setActionStatus(createSystemStatus("action", "working", "กำลังเปิดรายการ", "ระบบกำลังโหลดข้อมูลที่เกี่ยวข้อง", { nextAction: "รอสักครู่" }));
     try {
       if (wasUnread) await api.notifications.read(item.id);
       if (target !== "notifications") await refresh(target);
+      setActionStatus(createSystemStatus("action", "success", "เปิดรายการแล้ว", "แสดงข้อมูลที่เกี่ยวข้องเรียบร้อย", { dismissible: true }));
     } catch (caught) {
-      setMessage(userMessageForApiError(caught));
+      setActionStatus(createSystemStatus("action", "api_error", "เปิดรายการไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "กดลองเปิดรายการอีกครั้ง", retryable: true, dismissible: true }));
     }
   };
 
-  if (!authToken) return <AuthScreen clientId={googleClientId} message={message} onCredential={handleCredential} onError={setMessage} />;
-  if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen loading={loading || connectionState === "connecting"} message={message} onRetry={() => void refresh("overview")} onSignOut={() => handleSignOut()} />;
+  if (!authToken) return <AuthScreen clientId={googleClientId} status={authStatus} onCredential={handleCredential} onError={(detail) => setAuthStatus(createSystemStatus("authentication", "auth_error", "เข้าสู่ระบบไม่สำเร็จ", detail, { nextAction: "ตรวจบัญชี Google แล้วลองใหม่", retryable: true }))} />;
+  if (!hasSuccessfulSyncRef.current) return <InitialSyncScreen loading={loading || connectionState === "connecting"} status={connectionStatus} onRetry={() => void refresh("overview")} onSignOut={() => handleSignOut()} />;
 
   return <div className="app-shell">
     <header className="topbar">
@@ -245,7 +252,8 @@ export default function App() {
       <div className="mobile-header-context"><div><small>สวนที่กำลังใช้งาน</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong></div><span className={`header-connection ${connectionState}`}>{connectionState === "connected" ? "เชื่อมต่อแล้ว" : connectionState === "degraded" ? "ข้อมูลบางส่วน" : "ยังไม่เชื่อมต่อ"}</span></div>
       <svg className="topbar-wave" viewBox="0 0 390 52" preserveAspectRatio="none" aria-hidden="true"><path d="M0 15 C76 15 93 48 184 48 C278 48 298 7 390 7 L390 52 L0 52 Z" /></svg>
     </header>
-    {message && <div className={`sync-banner ${connectionState}`} role="status"><strong>{connectionState === "connected" ? "เชื่อมต่อแล้ว" : connectionState === "degraded" ? "ข้อมูลยังไม่ครบ" : "ยังไม่เชื่อมต่อ"}</strong><span>{message}</span><button onClick={() => void refresh()} disabled={loading}>{loading ? "กำลังตรวจสอบ..." : "ลองใหม่"}</button></div>}
+    {["partial", "offline", "api_error"].includes(connectionStatus.kind) && <SystemStatusBanner status={connectionStatus} busy={loading} onRetry={() => void refresh()} />}
+    {shouldShowStatus(actionStatus) && <SystemStatusBanner status={actionStatus} onRetry={() => void refresh(screen)} onDismiss={() => setActionStatus(idleSystemStatus("action"))} />}
     <div className="mobile-context"><div><small>กำลังดูข้อมูล</small><strong>{activeGarden?.name || "ยังไม่มีสวน"}</strong></div><button onClick={() => openScreen("gardens")} aria-label="เปลี่ยนสวน"><Sprout size={18} /></button></div>
     <div className="layout">
       <aside className="sidebar">
@@ -255,12 +263,11 @@ export default function App() {
       </aside>
       <main className={`content ${loading ? "is-loading" : ""}`}>
         <div className="page-heading"><div><p>{new Date().toLocaleDateString("th-TH", { dateStyle: "full" })}</p><h1>{screenTitle(screen, role)}</h1><span>{screenDescription(screen, role)}</span></div></div>
-        {message && <div className="notice">{message}</div>}
         <div className="screen-stage" aria-busy={loading}>
           <div className="screen-content" key={screen}>
         {screen === "overview" && <Overview data={data} wallet={wallet} role={role} connected={connected} onSale={() => setShowSaleForm(true)} onReceipt={() => { setReceiptInitialFile(null); setShowReceiptForm(true); }} onSettlement={() => setShowSettlementForm(true)} onReviewSales={() => openScreen("sales")} onReviewSettlements={() => openScreen("settlements")} onReports={() => openScreen("reports")} />}
         {screen === "sales" && (!loading || sales.length > 0) && <SalesScreen sales={sales} role={role} onSale={() => setShowSaleForm(true)} onReview={setReviewSale} onRefresh={() => refresh("sales")} />}
-        {screen === "gardens" && <GardensScreen garden={activeGarden} gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} members={members} role={role} onCreate={() => setShowGardenForm(true)} onAddMember={() => setShowMemberForm(true)} onDeactivate={async (member) => { if (!activeGarden || !window.confirm(`ถอด ${member.name || member.email || "คนกรีด"} ออกจากสวนนี้หรือไม่\n\nระบบจะอนุญาตเมื่อไม่มีข้อตกลง รายการค้าง หรือยอดเงินคงค้างเท่านั้น`)) return; try { await api.members.deactivate({ gardenId: activeGarden.id, memberId: member.id }); await refresh("gardens"); setMessage("ปิดสิทธิ์คนกรีดในสวนแล้ว โดยยังเก็บประวัติเดิมไว้ครบถ้วน"); } catch (caught) { setMessage(userMessageForApiError(caught)); } }} />}
+        {screen === "gardens" && <GardensScreen garden={activeGarden} gardens={gardens.length ? gardens : activeGarden ? [activeGarden] : []} members={members} role={role} onCreate={() => setShowGardenForm(true)} onAddMember={() => setShowMemberForm(true)} onDeactivate={async (member) => { if (!activeGarden || !window.confirm(`ถอด ${member.name || member.email || "คนกรีด"} ออกจากสวนนี้หรือไม่\n\nระบบจะอนุญาตเมื่อไม่มีข้อตกลง รายการค้าง หรือยอดเงินคงค้างเท่านั้น`)) return; setActionStatus(createSystemStatus("action", "working", "กำลังปิดสิทธิ์คนกรีด", "ระบบกำลังตรวจสอบรายการและยอดคงค้าง", { nextAction: "รอสักครู่" })); try { await api.members.deactivate({ gardenId: activeGarden.id, memberId: member.id }); await refresh("gardens"); setActionStatus(createSystemStatus("action", "success", "ปิดสิทธิ์คนกรีดแล้ว", "ประวัติเดิมยังถูกเก็บไว้ครบถ้วน", { dismissible: true })); } catch (caught) { setActionStatus(createSystemStatus("action", "api_error", "ปิดสิทธิ์ไม่สำเร็จ", userMessageForApiError(caught), { nextAction: "ตรวจรายการค้างแล้วลองใหม่", retryable: true, dismissible: true })); } }} />}
         {screen === "agreements" && (!loading || agreements.length > 0) && <AgreementsScreen agreements={agreements} garden={activeGarden} role={role} onCreate={() => setShowAgreementForm(true)} />}
         {screen === "settlements" && (!loading || settlements.length > 0) && <SettlementsScreen settlements={settlements} wallet={wallet} role={role} onCreate={() => setShowSettlementForm(true)} onRefresh={() => refresh("settlements")} />}
         {screen === "reports" && <ReportsScreen garden={activeGarden} />}
@@ -288,13 +295,13 @@ export default function App() {
       <button className={mobileNavIndex === 3 ? "active" : ""} onClick={() => { if (showScanMenu) closeScanMenu(); setShowMobileMore(true); }}><span className="mobile-nav-icon"><Menu size={22} /></span><span>เพิ่มเติม</span>{unreadNotifications > 0 && <em>{unreadNotifications}</em>}</button>
     </nav>
     {showMobileMore && <div className="mobile-more-backdrop" role="presentation" onClick={() => setShowMobileMore(false)}><section className="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title" onClick={(event) => event.stopPropagation()}><div className="mobile-more-head"><div><small>เมนู ParaWallet</small><h2 id="mobile-more-title">เพิ่มเติม</h2></div><button className="icon-button" onClick={() => setShowMobileMore(false)} aria-label="ปิดเมนูเพิ่มเติม"><X size={22} /></button></div><div className="mobile-more-grid"><button onClick={() => openMobileScreen("gardens")}><Sprout size={22} /><span><strong>{role === "owner" ? "สวนและสมาชิก" : "ข้อมูลสวน"}</strong><small>{role === "owner" ? "ข้อมูลสวนและสิทธิ์ของคนกรีด" : "ดูข้อมูลสวนที่คุณได้รับสิทธิ์"}</small></span></button><button onClick={() => openMobileScreen("agreements")}><CircleDollarSign size={22} /><span><strong>ข้อตกลง</strong><small>สัดส่วนและเวอร์ชัน</small></span></button><button onClick={() => openMobileScreen("reports")}><FileDown size={22} /><span><strong>รายงาน/ส่งออก</strong><small>เลือกช่วงวันที่และส่งออก CSV</small></span></button><button onClick={() => openMobileScreen("notifications")}><Bell size={22} /><span><strong>การแจ้งเตือน</strong><small>{unreadNotifications > 0 ? `ยังไม่อ่าน ${unreadNotifications} รายการ` : "อ่านครบแล้ว"}</small></span></button><button onClick={() => { setShowMobileMore(false); handleSignOut(); }}><LogOut size={22} /><span><strong>ออกจากระบบ</strong><small>เปลี่ยนบัญชี Google หรือจบการใช้งาน</small></span></button></div><DeveloperCredit /></section></div>}
-    {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); void refresh("gardens"); }} />}
-    {showMemberForm && role === "owner" && <MemberForm garden={activeGarden} onClose={() => setShowMemberForm(false)} onSaved={() => { setShowMemberForm(false); void refresh("gardens"); }} />}
-    {showSaleForm && role === "tapper" && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); void refresh("sales"); }} />}
-    {reviewSale && <SaleReviewModal sale={reviewSale} role={role} onClose={() => setReviewSale(null)} onChanged={() => { setReviewSale(null); void refresh("sales"); }} />}
-    {showReceiptForm && role === "tapper" && <ReceiptForm garden={activeGarden} agreement={agreements[0]} initialFile={receiptInitialFile} onClose={() => { setShowReceiptForm(false); setReceiptInitialFile(null); }} onUseManual={() => { setShowReceiptForm(false); setReceiptInitialFile(null); setShowSaleForm(true); }} onSaved={() => { setShowReceiptForm(false); setReceiptInitialFile(null); setMessage("บันทึกรายการขายสำเร็จ และส่งให้เจ้าของสวนตรวจสอบแล้ว"); void refresh("sales"); }} />}
-    {showAgreementForm && role === "owner" && <AgreementForm garden={activeGarden} members={members} onClose={() => setShowAgreementForm(false)} onSaved={() => { setShowAgreementForm(false); void refresh("agreements"); }} />}
-    {showSettlementForm && role === "tapper" && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={() => { setShowSettlementForm(false); void refresh("settlements"); }} />}
+    {showGardenForm && role === "owner" && <GardenForm onClose={() => setShowGardenForm(false)} onSaved={() => { setShowGardenForm(false); setActionStatus(createSystemStatus("action", "success", "เพิ่มสวนสำเร็จ", "สวนใหม่พร้อมใช้งานแล้ว", { dismissible: true })); void refresh("gardens"); }} />}
+    {showMemberForm && role === "owner" && <MemberForm garden={activeGarden} onClose={() => setShowMemberForm(false)} onSaved={() => { setShowMemberForm(false); setActionStatus(createSystemStatus("action", "success", "เพิ่มคนกรีดสำเร็จ", "คนกรีดเข้าถึงสวนนี้ได้แล้ว", { dismissible: true })); void refresh("gardens"); }} />}
+    {showSaleForm && role === "tapper" && <SaleForm garden={activeGarden} agreement={agreements[0]} role={role} onClose={() => setShowSaleForm(false)} onSaved={() => { setShowSaleForm(false); setActionStatus(createSystemStatus("action", "success", "บันทึกรายการขายสำเร็จ", "ส่งรายการให้เจ้าของสวนตรวจสอบแล้ว", { dismissible: true })); void refresh("sales"); }} />}
+    {reviewSale && <SaleReviewModal sale={reviewSale} role={role} onClose={() => setReviewSale(null)} onChanged={() => { setReviewSale(null); setActionStatus(createSystemStatus("action", "success", "อัปเดตรายการขายสำเร็จ", "สถานะรายการและยอดที่เกี่ยวข้องได้รับการอัปเดตแล้ว", { dismissible: true })); void refresh("sales"); }} />}
+    {showReceiptForm && role === "tapper" && <ReceiptForm garden={activeGarden} agreement={agreements[0]} initialFile={receiptInitialFile} onClose={() => { setShowReceiptForm(false); setReceiptInitialFile(null); }} onUseManual={() => { setShowReceiptForm(false); setReceiptInitialFile(null); setShowSaleForm(true); }} onSaved={() => { setShowReceiptForm(false); setReceiptInitialFile(null); setActionStatus(createSystemStatus("action", "success", "บันทึกรายการขายสำเร็จ", "ส่งรายการและภาพบิลให้เจ้าของสวนตรวจสอบแล้ว", { dismissible: true })); void refresh("sales"); }} />}
+    {showAgreementForm && role === "owner" && <AgreementForm garden={activeGarden} members={members} onClose={() => setShowAgreementForm(false)} onSaved={() => { setShowAgreementForm(false); setActionStatus(createSystemStatus("action", "success", "สร้างข้อตกลงสำเร็จ", "ข้อตกลงเวอร์ชันใหม่พร้อมใช้งานแล้ว", { dismissible: true })); void refresh("agreements"); }} />}
+    {showSettlementForm && role === "tapper" && <SettlementForm garden={activeGarden} role={role} onClose={() => setShowSettlementForm(false)} onSaved={() => { setShowSettlementForm(false); setActionStatus(createSystemStatus("action", "success", "บันทึกการส่งเงินสำเร็จ", "ส่งข้อมูลให้เจ้าของสวนยืนยันการรับเงินแล้ว", { dismissible: true })); void refresh("settlements"); }} />}
   </div>;
 }
 
@@ -324,13 +331,22 @@ function DeveloperCredit() {
   return <section className="developer-credit" aria-labelledby="developer-credit-title"><span className="developer-credit__label"><strong id="developer-credit-title">เกี่ยวกับแอป</strong><small>พัฒนาโดย <b>aod</b></small></span><a className="developer-credit__link" href="https://www.facebook.com/share/1AWvhjdr44/" target="_blank" rel="noopener noreferrer" aria-label="เปิด Facebook ของ aod"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.6 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a21 21 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.5v3h2.7v8h3.4Z" /></svg><span>Facebook</span></a></section>;
 }
 
-function AuthScreen({ clientId, message, onCredential, onError }: { clientId: string; message: string; onCredential: (token: string) => void; onError: (message: string) => void }) {
-  return <main className="auth-screen"><div className="auth-orbit auth-orbit-one" aria-hidden="true" /><div className="auth-orbit auth-orbit-two" aria-hidden="true" /><section className="auth-card"><header className="auth-card-head"><div className="brand-mark"><Leaf size={24} /></div><div><p className="eyebrow">PARAWALLET SECURE ACCESS</p><span className="auth-kicker">บัญชีดิจิทัลสำหรับสวนยาง</span></div></header><div className="auth-copy"><h1>เข้าสู่ระบบ <span>ParaWallet</span></h1><p>จัดการยอดขาย ส่วนแบ่ง และการส่งเงินของสวนคุณอย่างเป็นระบบในที่เดียว</p></div><div className="auth-rule" aria-hidden="true"><span /><i>ปลอดภัยและเป็นส่วนตัว</i><span /></div><GoogleSignIn clientId={clientId} onCredential={onCredential} onError={onError} />{message && <div className="notice" role="alert">{message}</div>}<div className="auth-security-note" role="note"><ShieldCheck size={18} aria-hidden="true" /><span><strong>เข้าสู่ระบบด้วยบัญชี Google</strong><small>ระบบจะโหลดเฉพาะสวนและสิทธิ์ที่บัญชีของคุณได้รับอนุญาต</small></span></div><footer className="auth-footer"><span>Forest Fintech workspace</span><span><i aria-hidden="true" />ข้อมูลของคุณยังเป็นส่วนตัว</span></footer></section></main>;
+function AuthScreen({ clientId, status, onCredential, onError }: { clientId: string; status: SystemStatus; onCredential: (token: string) => void; onError: (detail: string) => void }) {
+  return <main className="auth-screen"><div className="auth-orbit auth-orbit-one" aria-hidden="true" /><div className="auth-orbit auth-orbit-two" aria-hidden="true" /><section className="auth-card"><header className="auth-card-head"><div className="brand-mark"><Leaf size={24} /></div><div><p className="eyebrow">PARAWALLET SECURE ACCESS</p><span className="auth-kicker">บัญชีดิจิทัลสำหรับสวนยาง</span></div></header><div className="auth-copy"><h1>เข้าสู่ระบบ <span>ParaWallet</span></h1><p>จัดการยอดขาย ส่วนแบ่ง และการส่งเงินของสวนคุณอย่างเป็นระบบในที่เดียว</p></div><div className="auth-rule" aria-hidden="true"><span /><i>ปลอดภัยและเป็นส่วนตัว</i><span /></div><GoogleSignIn clientId={clientId} onCredential={onCredential} onError={onError} />{shouldShowStatus(status) && <SystemStatusBanner status={status} /> }<div className="auth-security-note" role="note"><ShieldCheck size={18} aria-hidden="true" /><span><strong>เข้าสู่ระบบด้วยบัญชี Google</strong><small>ระบบจะโหลดเฉพาะสวนและสิทธิ์ที่บัญชีของคุณได้รับอนุญาต</small></span></div><footer className="auth-footer"><span>Forest Fintech workspace</span><span><i aria-hidden="true" />ข้อมูลของคุณยังเป็นส่วนตัว</span></footer></section></main>;
 }
 
-function InitialSyncScreen({ loading, message, onRetry, onSignOut }: { loading: boolean; message: string; onRetry: () => void; onSignOut: () => void }) {
+function InitialSyncScreen({ loading, status, onRetry, onSignOut }: { loading: boolean; status: SystemStatus; onRetry: () => void; onSignOut: () => void }) {
   if (loading) return <main className="splash-screen"><LoadingAnimation variant="splash" label="กำลังเตรียม ParaWallet" detail="ตรวจสอบบัญชีและโหลดข้อมูลล่าสุด" /></main>;
-  return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE SYNC</p><h1>ยังเชื่อมต่อข้อมูลไม่ได้</h1><p>ระบบยังไม่แสดงหน้าของเจ้าของสวนหรือคนกรีด จนกว่าจะตรวจสอบสิทธิ์สำเร็จ</p>{message && <div className="notice">{message}</div>}<div className="quick-actions"><button className="primary" onClick={onRetry}>ลองใหม่</button><button className="secondary" onClick={onSignOut}>เปลี่ยนบัญชี Google</button></div></section></main>;
+  return <main className="auth-screen"><section className="auth-card"><div className="brand-mark"><Leaf size={24} /></div><p className="eyebrow">PARAWALLET SECURE SYNC</p><h1>ยังเชื่อมต่อข้อมูลไม่ได้</h1><p>ระบบยังไม่แสดงหน้าของเจ้าของสวนหรือคนกรีด จนกว่าจะตรวจสอบสิทธิ์สำเร็จ</p><SystemStatusBanner status={status} onRetry={onRetry} /><div className="quick-actions"><button className="secondary" onClick={onSignOut}>เปลี่ยนบัญชี Google</button></div></section></main>;
+}
+
+function SystemStatusBanner({ status, busy = false, onRetry, onDismiss }: { status: SystemStatus; busy?: boolean; onRetry?: () => void; onDismiss?: () => void }) {
+  const alert = isErrorStatus(status);
+  return <section className={`system-status ${status.scope} ${status.kind}`} role={alert ? "alert" : "status"} aria-live={alert ? "assertive" : "polite"}>
+    <span className="system-status-icon" aria-hidden="true">{status.kind === "working" ? <LoaderCircle size={22} /> : status.kind === "success" ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}</span>
+    <span className="system-status-copy"><strong>{status.title}</strong><span>{status.detail}</span>{status.nextAction && <small>{status.nextAction}</small>}</span>
+    <span className="system-status-actions">{status.retryable && onRetry && <button className="secondary" type="button" onClick={onRetry} disabled={busy}>{busy ? "กำลังลองใหม่..." : "ลองใหม่"}</button>}{status.dismissible && onDismiss && <button className="icon-button" type="button" onClick={onDismiss} aria-label="ปิดข้อความสถานะ"><X size={17} /></button>}</span>
+  </section>;
 }
 
 function Overview({ data, wallet, role, connected, onSale, onReceipt, onSettlement, onReviewSales, onReviewSettlements, onReports }: { data: DashboardData; wallet: WalletData | null; role: Role; connected: boolean; onSale: () => void; onReceipt: () => void; onSettlement: () => void; onReviewSales: () => void; onReviewSettlements: () => void; onReports: () => void }) {
@@ -478,12 +494,22 @@ function AgreementsScreen({ agreements, garden, role, onCreate }: { agreements: 
 
 function SettlementsScreen({ settlements, wallet, role, onCreate, onRefresh }: { settlements: Settlement[]; wallet: WalletData | null; role: Role; onCreate: () => void; onRefresh: () => void }) {
   const [reviewSettlement, setReviewSettlement] = useState<Settlement | null>(null);
+  const [cancelBusyId, setCancelBusyId] = useState("");
+  const [error, setError] = useState("");
+  const cancelSettlement = async (item: Settlement) => {
+    if (cancelBusyId || !window.confirm("ยกเลิกรายการส่งเงินนี้หรือไม่")) return;
+    setCancelBusyId(item.id); setError("");
+    try { await api.settlements.cancel(item.id); onRefresh(); }
+    catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setCancelBusyId(""); }
+  };
   return <>
     <section className="panel">
       <div className="panel-head">
         <div><h2>การส่งเงินและยอดคงค้าง</h2><p>เงินของเจ้าของที่ยังอยู่กับคนกรีด: {money(wallet?.owner.outstanding || 0)}</p></div>
         <div className="panel-actions"><button className="secondary" onClick={onRefresh}>รีเฟรช</button>{role === "tapper" && <button className="primary" onClick={onCreate}><Plus size={16} />บันทึกการส่งเงิน</button>}</div>
       </div>
+      {error && <div className="form-error" role="alert">{error}</div>}
       {settlements.length === 0 ? <Empty text="ยังไม่มีรายการส่งเงินในช่วงนี้" /> : <div className="data-list">{settlements.map((item) =>
         <article className="data-row settlement-row" key={item.id}>
           <div className="settlement-row-copy">
@@ -494,7 +520,7 @@ function SettlementsScreen({ settlements, wallet, role, onCreate, onRefresh }: {
           <span className={`status ${item.status}`}>{labelStatus(item.status)}</span>
           <div className="panel-actions settlement-confirm-actions settlement-row-actions">
             <button className={role === "owner" && item.status === "pending_owner_confirmation" ? "primary" : "link-button"} onClick={() => setReviewSettlement(item)}>{role === "owner" && item.status === "pending_owner_confirmation" ? <><ShieldCheck size={15} />ตรวจและยืนยัน</> : <><Eye size={15} />ดูรายละเอียด</>}</button>
-            {role === "tapper" && item.status === "pending_owner_confirmation" && <button className="link-button" onClick={async () => { if (window.confirm("ยกเลิกรายการส่งเงินนี้หรือไม่")) { await api.settlements.cancel(item.id); onRefresh(); } }}>ยกเลิก</button>}
+            {role === "tapper" && item.status === "pending_owner_confirmation" && <button className="link-button" disabled={Boolean(cancelBusyId)} onClick={() => void cancelSettlement(item)}>{cancelBusyId === item.id ? "กำลังยกเลิก..." : "ยกเลิก"}</button>}
           </div>
         </article>
       )}</div>}
@@ -535,14 +561,42 @@ function SettlementReviewModal({ settlement, role, onClose, onChanged }: { settl
   return <Modal title="ตรวจรายละเอียดการส่งเงิน" onClose={onClose}><div className="sale-review settlement-review"><div className="sale-review-summary"><div><small>ยอดที่คนกรีดส่งให้เจ้าของสวน</small><strong>{money(settlement.amount)}</strong><span>{formatThaiDateTime(settlement.transferDate)} · {settlement.method === "cash" ? "เงินสด" : "โอนธนาคาร"}</span></div><span className={`status ${settlement.status}`}>{labelStatus(settlement.status)}</span></div><section className="receipt-evidence settlement-evidence"><div className="receipt-evidence-head"><div>{settlement.method === "cash" ? <Banknote size={18} /> : <Image size={18} />}<span><strong>{settlement.method === "cash" ? "หลักฐานการรับเงินสด" : "สลิปการโอนเงิน"}</strong><small>{settlement.method === "cash" ? "ยืนยันต่อหน้าบนมือถือของเจ้าของสวน" : "ไฟล์ส่วนตัวจาก Google Drive"}</small></span></div></div>{settlement.method === "cash" ? <div className="receipt-placeholder manual cash-evidence"><Banknote size={28} /><strong>โปรดตรวจนับเงินสดก่อนยืนยัน</strong><span>สถานที่ส่งมอบ: {settlement.location || "ไม่ระบุ"}</span></div> : loadingEvidence ? <div className="receipt-placeholder loading-evidence"><LoadingAnimation compact label="กำลังโหลดสลิป" /></div> : evidence?.mimeType === "application/pdf" ? <div className="pdf-evidence"><FileText size={28} /><strong>{evidence.name}</strong><a className="secondary" href={evidence.dataUrl} download={evidence.name}><FileDown size={15} />เปิดไฟล์ PDF</a></div> : evidence ? <img src={evidence.dataUrl} alt={`สลิปการส่งเงิน ${settlement.id}`} /> : <div className="receipt-placeholder manual"><FileText size={25} /><strong>ไม่พบสลิป</strong><span>ห้ามยืนยันรายการโอนจนกว่าจะตรวจสอบหลักฐานได้</span></div>}</section><section className="sale-calculation"><h3>รายละเอียดการส่งมอบ</h3><div className="sale-detail-grid"><Detail label="วิธีส่งเงิน" value={settlement.method === "cash" ? "เงินสด" : "โอนธนาคาร"} /><Detail label="วันที่ส่งเงิน" value={formatThaiDateTime(settlement.transferDate)} /><Detail label="ธนาคาร" value={settlement.bank || "—"} /><Detail label="เลขอ้างอิง" value={settlement.referenceNo || "—"} /><Detail label="สถานที่" value={settlement.location || "—"} /><Detail label="หมายเหตุ" value={settlement.note || "—"} /></div></section>{isPendingOwnerReview && <label className="review-confirmation"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span><strong>{settlement.method === "cash" ? "ฉันตรวจนับและได้รับเงินสดจริงแล้ว" : "ฉันตรวจสลิปและพบยอดเงินเข้าจริงแล้ว"}</strong><small>เมื่อยืนยัน ระบบจะตัดยอดคงค้างและบันทึกประวัติของทั้งสองฝ่าย</small></span></label>}{error && <div className="form-error" role="alert">{error}</div>}<div className="sale-review-actions">{isPendingOwnerReview && <button className="danger-button" disabled={busy} onClick={() => void rejectSettlement()}>ปฏิเสธรายการ</button>}{isPendingOwnerReview && <button className="primary" disabled={busy || !reviewed || loadingEvidence || !evidenceReady} onClick={() => void confirmSettlement()}><CheckCircle2 size={17} />{busy ? "กำลังยืนยัน..." : settlement.method === "cash" ? "ยืนยันว่าได้รับเงินสดแล้ว" : "ยืนยันยอดโอนแล้ว"}</button>}</div></div></Modal>;
 }
 
-function ReportsScreen({ garden }: { garden?: Garden }) { const [from, setFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)); const [to, setTo] = useState(dateToday()); const [report, setReport] = useState<{ summary: Record<string, number | string>; rows: Sale[] } | null>(null); const [busy, setBusy] = useState(false); const load = async () => { if (!garden) return; setBusy(true); try { setReport(await api.reports.summary({ gardenId: garden.id, from, to })); } catch { setReport(null); } finally { setBusy(false); } }; const exportCsv = () => { if (!report) return; const lines = [["saleDate","buyerName","grossSale","ownerShare","tapperShare","status"], ...report.rows.map((row) => [row.saleDate, row.buyerName || "", row.grossSale || 0, row.ownerShare || 0, row.tapperShare || 0, row.status])]; const blob = new Blob([lines.map((line) => line.join(",")).join("\n")], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "parawallet-report.csv"; anchor.click(); URL.revokeObjectURL(url); }; return <section className="panel"><div className="panel-head"><div><h2>รายงานตามช่วงเวลา</h2><p>คำนวณจากรายการขายและการส่งเงินในระบบ</p></div><button className="secondary" disabled={!report} onClick={exportCsv}>ส่งออก CSV</button></div><div className="filters"><label>ตั้งแต่<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>ถึง<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label><button className="primary" onClick={load}>{busy ? "กำลังโหลด..." : "ดูรายงาน"}</button></div>{report ? <div className="report-grid">{[["ยอดขายรวม", money(Number(report.summary.grossSales))], ["ส่วนเจ้าของ", money(Number(report.summary.ownerShare))], ["ส่วนคนกรีด", money(Number(report.summary.tapperShare))], ["ยอดคงค้าง", money(Number(report.summary.outstanding))]].map(([label, value]) => <div className="metric" key={label}><small>{label}</small><strong>{value}</strong></div>)}</div> : <Empty text="เลือกช่วงวันที่เพื่อโหลดรายงาน" />}</section>; }
+function ReportsScreen({ garden }: { garden?: Garden }) {
+  const [from, setFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
+  const [to, setTo] = useState(dateToday());
+  const [report, setReport] = useState<{ summary: Record<string, number | string>; rows: Sale[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const load = async () => {
+    if (!garden || busy) return;
+    setBusy(true); setError("");
+    try { setReport(await api.reports.summary({ gardenId: garden.id, from, to })); }
+    catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setBusy(false); }
+  };
+  const exportCsv = () => { if (!report) return; const lines = [["saleDate","buyerName","grossSale","ownerShare","tapperShare","status"], ...report.rows.map((row) => [row.saleDate, row.buyerName || "", row.grossSale || 0, row.ownerShare || 0, row.tapperShare || 0, row.status])]; const blob = new Blob([lines.map((line) => line.join(",")).join("\n")], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "parawallet-report.csv"; anchor.click(); URL.revokeObjectURL(url); };
+  return <section className="panel"><div className="panel-head"><div><h2>รายงานตามช่วงเวลา</h2><p>คำนวณจากรายการขายและการส่งเงินในระบบ</p></div><button className="secondary" disabled={!report || busy} onClick={exportCsv}>ส่งออก CSV</button></div><div className="filters"><label>ตั้งแต่<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>ถึง<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label><button className="primary" disabled={busy || !garden} onClick={() => void load()}>{busy ? "กำลังโหลดรายงาน..." : "ดูรายงาน"}</button></div>{error && <div className="form-error report-error" role="alert"><strong>โหลดรายงานไม่สำเร็จ</strong><span>{error}</span><button className="secondary" type="button" onClick={() => void load()} disabled={busy}>ลองใหม่</button></div>}{report ? <div className="report-grid">{[["ยอดขายรวม", money(Number(report.summary.grossSales))], ["ส่วนเจ้าของ", money(Number(report.summary.ownerShare))], ["ส่วนคนกรีด", money(Number(report.summary.tapperShare))], ["ยอดคงค้าง", money(Number(report.summary.outstanding))]].map(([label, value]) => <div className="metric" key={label}><small>{label}</small><strong>{value}</strong></div>)}</div> : !error && <Empty text="เลือกช่วงวันที่เพื่อโหลดรายงาน" />}</section>;
+}
 
 function NotificationsScreen({ notifications, onOpen }: { notifications: Notification[]; onOpen: (item: Notification) => void }) {
   const unread = notifications.filter((item) => !item.readAt).length;
   return <section className="panel"><div className="panel-head"><div><h2>การแจ้งเตือน</h2><p>{unread > 0 ? `ยังไม่อ่าน ${unread} รายการ · แตะเพื่อเปิดงานที่เกี่ยวข้อง` : "อ่านครบแล้ว · รายการใหม่จะปรากฏที่นี่"}</p></div></div>{notifications.length === 0 ? <Empty text="ยังไม่มีการแจ้งเตือน" /> : <div className="data-list">{notifications.map((item) => <button type="button" className={`data-row notification-row ${item.readAt ? "read" : "unread"}`} key={item.id} onClick={() => onOpen(item)}><span className="notification-state" aria-hidden="true" /><span className="notification-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}</small></span><span className="notification-action">เปิดรายการ</span></button>)}</div>}</section>;
 }
 
-function GardenForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ name: "", province: "", district: "", areaRai: "", treeCount: "" }); const [busy, setBusy] = useState(false); const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); try { await api.gardens.create({ name: form.name, province: form.province, district: form.district, areaRai: Number(form.areaRai), treeCount: Number(form.treeCount) }); onSaved(); } finally { setBusy(false); } }; return <Modal title="เพิ่มสวนใหม่" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>ชื่อสวน<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>จังหวัด<input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} /></label><label>อำเภอ<input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /></label><label>พื้นที่ (ไร่)<input type="number" min="0" value={form.areaRai} onChange={(e) => setForm({ ...form, areaRai: e.target.value })} /></label><label>จำนวนต้นยาง<input type="number" min="0" value={form.treeCount} onChange={(e) => setForm({ ...form, treeCount: e.target.value })} /></label><button className="primary" disabled={busy}>{busy ? "กำลังบันทึก..." : "บันทึกสวน"}</button></form></Modal>; }
+function GardenForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ name: "", province: "", district: "", areaRai: "", treeCount: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await api.gardens.create({ name: form.name, province: form.province, district: form.district, areaRai: Number(form.areaRai), treeCount: Number(form.treeCount) }); onSaved(); }
+    catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setBusy(false); }
+  };
+  return <Modal title="เพิ่มสวนใหม่" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>ชื่อสวน<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>จังหวัด<input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} /></label><label>อำเภอ<input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /></label><label>พื้นที่ (ไร่)<input type="number" min="0" value={form.areaRai} onChange={(e) => setForm({ ...form, areaRai: e.target.value })} /></label><label>จำนวนต้นยาง<input type="number" min="0" value={form.treeCount} onChange={(e) => setForm({ ...form, treeCount: e.target.value })} /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy}>{busy ? "กำลังบันทึกสวน..." : "บันทึกสวน"}</button></form></Modal>;
+}
 
 function MemberForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: () => void; onSaved: () => void }) {
   const [email, setEmail] = useState("");
@@ -550,7 +604,7 @@ function MemberForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: ()
   const [error, setError] = useState("");
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!garden) return;
+    if (!garden || busy) return;
     setBusy(true); setError("");
     try { await api.members.add({ gardenId: garden.id, email: email.trim().toLowerCase() }); onSaved(); }
     catch (caught) { setError(userMessageForApiError(caught)); }
@@ -559,7 +613,24 @@ function MemberForm({ garden, onClose, onSaved }: { garden?: Garden; onClose: ()
   return <Modal title="เพิ่มคนกรีดเข้าสวน" onClose={onClose}><form className="form-grid member-form" onSubmit={submit}><div className="transparency-note"><ShieldCheck size={19} /><div><strong>เพิ่มได้เฉพาะบัญชีคนกรีดที่ลงทะเบียนแล้ว</strong><span>อีเมลต้องตรงกับบัญชี Google และมีสถานะใช้งานอยู่ในรายชื่อผู้ใช้</span></div></div><label>อีเมล Google ของคนกรีด<input required type="email" inputMode="email" autoCapitalize="none" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@gmail.com" /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy || !garden || !email.trim()}>{busy ? "กำลังตรวจสอบบัญชี..." : "เพิ่มคนกรีดเข้าสวน"}</button></form></Modal>;
 }
 
-function SaleForm({ garden, agreement, role, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; role: Role; onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ saleDate: dateToday(), buyerName: "", productType: "ยางก้อนถ้วย", weightKg: "", unitPrice: "", buyerDeductions: "0", sharedExpenses: "0" }); const [busy, setBusy] = useState(false); const total = Number(form.weightKg || 0) * Number(form.unitPrice || 0); const splitBase = Math.max(0, total - Number(form.buyerDeductions || 0) - Number(form.sharedExpenses || 0)); const owner = splitBase * Number(agreement?.ownerPercentage || 60) / 100; const tapper = splitBase - owner; const submit = async (event: FormEvent) => { event.preventDefault(); if (!garden || !agreement) return; setBusy(true); try { await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, saleDate: form.saleDate, buyerName: form.buyerName, productType: form.productType, weightKg: Number(form.weightKg), unitPrice: Number(form.unitPrice), buyerDeductions: Number(form.buyerDeductions), sharedExpenses: Number(form.sharedExpenses), manualEntry: true }); onSaved(); } finally { setBusy(false); } }; return <Modal title={role === "tapper" ? "บันทึกรายการขาย" : "ทบทวนรายการขาย"} onClose={onClose}><form className="form-grid" onSubmit={submit}><label>วันที่ขาย<input type="date" required value={form.saleDate} onChange={(e) => setForm({ ...form, saleDate: e.target.value })} /></label><label>ร้านรับซื้อ<input value={form.buyerName} onChange={(e) => setForm({ ...form, buyerName: e.target.value })} /></label><label>ประเภทสินค้า<select value={form.productType} onChange={(e) => setForm({ ...form, productType: e.target.value })}><option>น้ำยางสด</option><option>ยางก้อนถ้วย</option><option>ยางแผ่น</option><option>อื่น ๆ</option></select></label><label>น้ำหนัก (กก.)<input type="number" min="0" step="0.01" required value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} /></label><label>ราคา/กก.<input type="number" min="0" step="0.01" required value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} /></label><label>หักหน้าร้าน<input type="number" min="0" step="0.01" value={form.buyerDeductions} onChange={(e) => setForm({ ...form, buyerDeductions: e.target.value })} /></label><label>ค่าใช้จ่ายร่วม<input type="number" min="0" step="0.01" value={form.sharedExpenses} onChange={(e) => setForm({ ...form, sharedExpenses: e.target.value })} /></label><div className="calculation-preview"><span>ฐานแบ่ง {money(splitBase)}</span><strong>เจ้าของสวน {money(owner)} · คนกรีด {money(tapper)}</strong></div><button className="primary" disabled={busy || !garden || !agreement}>{busy ? "กำลังบันทึก..." : "ยืนยันรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี ข้อตกลงที่ใช้งานอยู่ ก่อนสร้างรายการขาย</small>}</form></Modal>; }
+function SaleForm({ garden, agreement, role, onClose, onSaved }: { garden?: Garden; agreement?: Agreement; role: Role; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ saleDate: dateToday(), buyerName: "", productType: "ยางก้อนถ้วย", weightKg: "", unitPrice: "", buyerDeductions: "0", sharedExpenses: "0" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const total = Number(form.weightKg || 0) * Number(form.unitPrice || 0);
+  const splitBase = Math.max(0, total - Number(form.buyerDeductions || 0) - Number(form.sharedExpenses || 0));
+  const owner = splitBase * Number(agreement?.ownerPercentage || 60) / 100;
+  const tapper = splitBase - owner;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!garden || !agreement || busy) return;
+    setBusy(true); setError("");
+    try { await api.sales.create({ gardenId: garden.id, agreementId: agreement.id, saleDate: form.saleDate, buyerName: form.buyerName, productType: form.productType, weightKg: Number(form.weightKg), unitPrice: Number(form.unitPrice), buyerDeductions: Number(form.buyerDeductions), sharedExpenses: Number(form.sharedExpenses), manualEntry: true }); onSaved(); }
+    catch (caught) { setError(userMessageForApiError(caught)); }
+    finally { setBusy(false); }
+  };
+  return <Modal title={role === "tapper" ? "บันทึกรายการขาย" : "ทบทวนรายการขาย"} onClose={onClose}><form className="form-grid" onSubmit={submit}><label>วันที่ขาย<input type="date" required value={form.saleDate} onChange={(e) => setForm({ ...form, saleDate: e.target.value })} /></label><label>ร้านรับซื้อ<input value={form.buyerName} onChange={(e) => setForm({ ...form, buyerName: e.target.value })} /></label><label>ประเภทสินค้า<select value={form.productType} onChange={(e) => setForm({ ...form, productType: e.target.value })}><option>น้ำยางสด</option><option>ยางก้อนถ้วย</option><option>ยางแผ่น</option><option>อื่น ๆ</option></select></label><label>น้ำหนัก (กก.)<input type="number" min="0" step="0.01" required value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} /></label><label>ราคา/กก.<input type="number" min="0" step="0.01" required value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} /></label><label>หักหน้าร้าน<input type="number" min="0" step="0.01" value={form.buyerDeductions} onChange={(e) => setForm({ ...form, buyerDeductions: e.target.value })} /></label><label>ค่าใช้จ่ายร่วม<input type="number" min="0" step="0.01" value={form.sharedExpenses} onChange={(e) => setForm({ ...form, sharedExpenses: e.target.value })} /></label><div className="calculation-preview"><span>ฐานแบ่ง {money(splitBase)}</span><strong>เจ้าของสวน {money(owner)} · คนกรีด {money(tapper)}</strong></div>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy || !garden || !agreement}>{busy ? "กำลังบันทึกรายการขาย..." : "ยืนยันรายการ"}</button>{!agreement && <small className="form-hint">ต้องมี ข้อตกลงที่ใช้งานอยู่ ก่อนสร้างรายการขาย</small>}</form></Modal>;
+}
 
 function SettlementForm({ garden, role, onClose, onSaved }: { garden?: Garden; role: Role; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ amount: "", method: "bank_transfer", transferDate: dateToday(), referenceNo: "", bank: "", location: "", note: "" });
@@ -574,7 +645,7 @@ function SettlementForm({ garden, role, onClose, onSaved }: { garden?: Garden; r
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!garden) return;
+    if (!garden || busy) return;
     if (form.method === "bank_transfer" && !slipFile) { setError("กรุณาแนบสลิปการโอนเงิน"); return; }
     if (form.method === "cash" && !form.location.trim()) { setError("กรุณาระบุสถานที่ส่งมอบเงินสด"); return; }
     setBusy(true); setError("");
@@ -682,7 +753,7 @@ function ReceiptForm({ garden, agreement, initialFile, onClose, onUseManual, onS
   const reviewGate = receiptReviewGate(normalizedPreview, humanReviewed);
 
   const submit = async () => {
-    if (!garden || !agreement) return;
+    if (!garden || !agreement || busy) return;
     if (!reviewGate.canSubmit) { setError(reviewGate.reasons[0]); return; }
     setBusy(true); setError("");
     try {
@@ -747,7 +818,7 @@ function ReceiptForm({ garden, agreement, initialFile, onClose, onUseManual, onS
     <label className="review-confirmation"><input type="checkbox" checked={humanReviewed} onChange={(event) => setHumanReviewed(event.target.checked)} /><span><strong>ฉันเทียบวันที่ น้ำหนัก ราคา และยอดเงินกับภาพแล้ว</strong><small>ระบบจะยังไม่สร้างยอดเงินจนกว่าคุณทำเครื่องหมายยืนยัน</small></span></label>
     {!reviewGate.canSubmit && receiptId && <div className="calculation-preview low-confidence"><span>ยังบันทึกไม่ได้</span><strong>{reviewGate.reasons[0]}</strong></div>}
     {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="secondary" onClick={() => void checkDuplicate()} disabled={!garden || busy || !fields.saleDate}>ตรวจรายการซ้ำ</button>
+    <button className="secondary" onClick={() => void checkDuplicate().catch((caught) => setError(userMessageForApiError(caught)))} disabled={!garden || busy || !fields.saleDate}>ตรวจรายการซ้ำ</button>
     <button className="primary" onClick={() => void submit()} disabled={!garden || !agreement || !receiptId || !receiptFileId || busy || !reviewGate.canSubmit}>{status === "duplicate" ? "ยืนยันว่าเป็นบิลคนละรายการ" : busy ? "กำลังบันทึกและส่งให้เจ้าของตรวจ..." : "บันทึกรายการและส่งให้เจ้าของตรวจ"}</button>
     {!agreement && <small className="form-hint">ต้องมี ข้อตกลงที่ใช้งานอยู่ ก่อนสร้างรายการขาย</small>}
     </>}
@@ -793,7 +864,8 @@ function AgreementForm({ garden, members, onClose, onSaved }: { garden?: Garden;
   const tappers = members.filter((member) => member.role === "tapper" && member.status === "active");
   const [form, setForm] = useState({ tapperId: tappers[0]?.userId || "", ownerPercentage: "60", tapperPercentage: "40", effectiveFrom: dateToday() });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const total = Number(form.ownerPercentage || 0) + Number(form.tapperPercentage || 0);
-  const submit = async (event: FormEvent) => { event.preventDefault(); if (!garden || total !== 100) return; setBusy(true); try { await api.agreements.create({ gardenId: garden.id, tapperId: form.tapperId, ownerPercentage: Number(form.ownerPercentage), tapperPercentage: Number(form.tapperPercentage), effectiveFrom: form.effectiveFrom }); onSaved(); } finally { setBusy(false); } };
-  return <Modal title="สร้างข้อตกลงแบ่งรายได้" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>คนกรีด<select required value={form.tapperId} onChange={(e) => setForm({ ...form, tapperId: e.target.value })}><option value="">เลือกคนกรีดในสวน</option>{tappers.map((member) => <option key={member.id} value={member.userId}>{member.name || member.email || member.userId}</option>)}</select></label><label>เริ่มมีผลวันที่<input required type="date" value={form.effectiveFrom} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} /></label><label>สัดส่วนเจ้าของสวน (%)<input type="number" min="0" max="100" value={form.ownerPercentage} onChange={(e) => setForm({ ...form, ownerPercentage: e.target.value })} /></label><label>สัดส่วนคนกรีด (%)<input type="number" min="0" max="100" value={form.tapperPercentage} onChange={(e) => setForm({ ...form, tapperPercentage: e.target.value })} /></label><div className="calculation-preview"><span>รวมสัดส่วน</span><strong className={total === 100 ? "" : "form-hint"}>{total}% {total === 100 ? "พร้อมบันทึก" : "ต้องรวมให้ได้ 100%"}</strong></div><button className="primary" disabled={busy || !garden || !form.tapperId || total !== 100}>{busy ? "กำลังบันทึก..." : "สร้างข้อตกลงเวอร์ชัน"}</button>{tappers.length === 0 && <small className="form-hint">ต้องเพิ่มคนกรีดในหน้า “สวนและแปลง” ก่อนสร้างข้อตกลง</small>}</form></Modal>;
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!garden || total !== 100 || busy) return; setBusy(true); setError(""); try { await api.agreements.create({ gardenId: garden.id, tapperId: form.tapperId, ownerPercentage: Number(form.ownerPercentage), tapperPercentage: Number(form.tapperPercentage), effectiveFrom: form.effectiveFrom }); onSaved(); } catch (caught) { setError(userMessageForApiError(caught)); } finally { setBusy(false); } };
+  return <Modal title="สร้างข้อตกลงแบ่งรายได้" onClose={onClose}><form className="form-grid" onSubmit={submit}><label>คนกรีด<select required value={form.tapperId} onChange={(e) => setForm({ ...form, tapperId: e.target.value })}><option value="">เลือกคนกรีดในสวน</option>{tappers.map((member) => <option key={member.id} value={member.userId}>{member.name || member.email || member.userId}</option>)}</select></label><label>เริ่มมีผลวันที่<input required type="date" value={form.effectiveFrom} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} /></label><label>สัดส่วนเจ้าของสวน (%)<input type="number" min="0" max="100" value={form.ownerPercentage} onChange={(e) => setForm({ ...form, ownerPercentage: e.target.value })} /></label><label>สัดส่วนคนกรีด (%)<input type="number" min="0" max="100" value={form.tapperPercentage} onChange={(e) => setForm({ ...form, tapperPercentage: e.target.value })} /></label><div className="calculation-preview"><span>รวมสัดส่วน</span><strong className={total === 100 ? "" : "form-hint"}>{total}% {total === 100 ? "พร้อมบันทึก" : "ต้องรวมให้ได้ 100%"}</strong></div>{error && <div className="form-error" role="alert">{error}</div>}<button className="primary" disabled={busy || !garden || !form.tapperId || total !== 100}>{busy ? "กำลังบันทึกข้อตกลง..." : "สร้างข้อตกลงเวอร์ชัน"}</button>{tappers.length === 0 && <small className="form-hint">ต้องเพิ่มคนกรีดในหน้า “สวนและแปลง” ก่อนสร้างข้อตกลง</small>}</form></Modal>;
 }
