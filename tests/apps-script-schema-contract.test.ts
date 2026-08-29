@@ -41,7 +41,8 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.29-ocr-canonical-v5";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.29-ocr-scan-ux-v6";');
+    expect(code).toContain("automaticReadingReady: Boolean(Config.geminiKey())");
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
@@ -73,6 +74,12 @@ describe("Apps Script schema safety contract", () => {
   it("does not score empty OCR fields as a successful extraction", () => {
     expect(code).toContain('if (fields.documentClass !== "rubber_receipt") return 0;');
     expect(code).toContain('["OCR_PROVIDER_UNAVAILABLE"]');
+  });
+
+  it("reports unavailable OCR before storing an orphan receipt image", () => {
+    expect(code).toContain('? "not_configured" : "provider_error"');
+    expect(code).toContain('if (!Config.geminiKey()) throw new Error("OCR_NOT_CONFIGURED")');
+    expect(code.indexOf('throw new Error("OCR_NOT_CONFIGURED")')).toBeLessThan(code.indexOf('DriveStorage.save(contentBase64, mimeType, payload.filename, "receipts"'));
   });
 
   it("stores settlement evidence in Drive without writing base64 into AuditLogs", () => {

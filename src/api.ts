@@ -48,6 +48,7 @@ const apiErrorMessages: Record<string, string> = {
   RECEIPT_IMAGE_REQUIRED: "กรุณาถ่ายหรือเลือกภาพใบเสร็จ",
   RECEIPT_IMAGE_TYPE_INVALID: "รองรับเฉพาะไฟล์ภาพใบเสร็จ",
   RECEIPT_IMAGE_TOO_LARGE: "ภาพใบเสร็จมีขนาดใหญ่เกินไป กรุณาเลือกไฟล์ไม่เกิน 4 MB",
+  OCR_NOT_CONFIGURED: "ระบบอ่านบิลยังไม่ได้เปิดใช้งาน ผู้ดูแลระบบต้องตั้งค่า Gemini API Key ก่อน",
   SALE_RECEIPT_REQUIRED: "รายการจากการสแกนต้องมีหลักฐานใบเสร็จ",
   SALE_RECEIPT_ACCESS_DENIED: "ไม่สามารถใช้ใบเสร็จที่ไม่ได้สร้างจากบัญชี Tapper นี้",
   SALE_RECEIPT_NOT_FOUND: "ไม่พบไฟล์ใบเสร็จของรายการนี้",

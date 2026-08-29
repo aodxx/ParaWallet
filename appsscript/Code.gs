@@ -5,7 +5,7 @@
  * Required Script Properties:
  * SHEET_ID
  * DRIVE_ROOT_FOLDER_ID
- * GEMINI_API_KEY (optional)
+ * GEMINI_API_KEY (required for automatic receipt reading)
  * GEMINI_MODEL (optional, defaults to the pinned production model)
  * GOOGLE_CLOUD_VISION_API_KEY (optional)
  * ALLOWED_ORIGINS (optional)
@@ -15,7 +15,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.29-ocr-canonical-v5";
+var PARAWALLET_RELEASE = "2026.08.29-ocr-scan-ux-v6";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 
 // =====================================================
@@ -136,6 +136,7 @@ function healthCheck_() { return { service: "parawallet-appsscript", status: "ok
 function diagnosticsCheck_() {
   var result = { service: "parawallet-appsscript", status: "ok", release: PARAWALLET_RELEASE, schemaVersion: PARAWALLET_SCHEMA_VERSION, timestamp: new Date().toISOString(), sheetIdConfigured: false, sheetAccessible: false, missingSheets: [], registeredUsers: 0 };
   try {
+    result.ocr = { automaticReadingReady: Boolean(Config.geminiKey()), geminiConfigured: Boolean(Config.geminiKey()), visionConfigured: Boolean(Config.visionKey()), model: Config.geminiModel() };
     result.sheetIdConfigured = Boolean(Config.get("SHEET_ID", false));
     if (!result.sheetIdConfigured) { result.status = "error"; result.error = "MISSING_SCRIPT_PROPERTY:SHEET_ID"; return result; }
     var book = SpreadsheetApp.openById(Config.spreadsheetId());
@@ -391,25 +392,31 @@ var OCR = {
   extract: function (fileBase64, mimeType) {
     var contentBase64 = String(fileBase64 || "").split(",").pop();
     var failures = [];
+    var geminiConfigured = Boolean(Config.geminiKey());
+    var visionConfigured = Boolean(Config.visionKey());
     var vision = { ok: false, text: "", errorCode: "VISION_NOT_CONFIGURED" };
-    if (Config.visionKey()) {
+    if (visionConfigured) {
       try { vision = this.visionText_(contentBase64); }
       catch (error) { failures.push(error && error.message ? error.message : String(error)); }
     }
-    if (Config.geminiKey()) {
-      try { return this.gemini_(contentBase64, mimeType, this.prompt_(), vision); }
+    if (geminiConfigured) {
+      try { var extracted = this.gemini_(contentBase64, mimeType, this.prompt_(), vision); extracted.systemState = "ready"; extracted.systemCode = ""; return extracted; }
       catch (error) { failures.push(error && error.message ? error.message : String(error)); }
     }
     if (vision.ok) {
-      return this.scored_("vision:manual-review", {
+      var manualResult = this.scored_("vision:manual-review", {
         documentClass: "unreadable", receiptType: "unknown", rawText: vision.text,
         uncertainFields: ["all"], warnings: ["VISION_TEXT_ONLY_MANUAL_REVIEW_REQUIRED"].concat(failures), needsReview: true
       });
+      manualResult.systemState = "manual_only"; manualResult.systemCode = "GEMINI_UNAVAILABLE"; return manualResult;
     }
-    return this.scored_("none", {
+    var unavailableResult = this.scored_("none", {
       documentClass: "unreadable", receiptType: "unknown", uncertainFields: ["all"],
       warnings: ["OCR_PROVIDER_UNAVAILABLE"].concat(failures).concat(vision.errorCode ? [vision.errorCode] : []), needsReview: true
     });
+    unavailableResult.systemState = !geminiConfigured && !visionConfigured ? "not_configured" : "provider_error";
+    unavailableResult.systemCode = !geminiConfigured && !visionConfigured ? "OCR_NOT_CONFIGURED" : "OCR_PROVIDER_FAILED";
+    return unavailableResult;
   },
   prompt_: function () {
     return [
@@ -657,12 +664,6 @@ var Services = {
       Repositories.append("AuditLogs", { id: Utilities.getUuid(), actorId: user.id, entityType: "payment", entityId: payload.id, action: "confirm", requestId: payload.requestId, createdAt: new Date().toISOString() });
       return { success: true };
     });
-  },
-  extractReceipt: function (user, payload) {
-    var file = DriveStorage.save(payload.data, payload.mimeType, payload.filename, "receipts", user.id);
-    var result = OCR.extract(payload.data, payload.mimeType);
-    Repositories.append("OcrRecords", { id: Utilities.getUuid(), fileId: file.fileId, provider: result.provider, status: result.needsReview ? "needs_review" : "ready", confidence: result.confidence, rawJson: JSON.stringify(result.fields), createdAt: new Date().toISOString() });
-    return { file: file, ocr: result };
   }
 };
 
@@ -1244,6 +1245,7 @@ Services.extractReceipt = function (user, payload) {
   if (mimeType.indexOf("image/") !== 0) throw new Error("RECEIPT_IMAGE_TYPE_INVALID");
   var contentBase64 = String(payload.data).split(",").pop();
   if (Utilities.base64Decode(contentBase64).length > 4 * 1024 * 1024) throw new Error("RECEIPT_IMAGE_TOO_LARGE");
+  if (!Config.geminiKey()) throw new Error("OCR_NOT_CONFIGURED");
   var file = DriveStorage.save(contentBase64, mimeType, payload.filename, "receipts", user.id);
   var result = OCR.extract(contentBase64, mimeType);
   result.fields = result.fields || {};

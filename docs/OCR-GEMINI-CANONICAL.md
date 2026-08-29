@@ -1,6 +1,6 @@
 # Canonical OCR + Gemini architecture
 
-Target backend release: `2026.08.29-ocr-canonical-v5`  
+Target backend release: `2026.08.29-ocr-scan-ux-v6`
 Schema: `2026-08-production-v3` — no Google Sheets migration
 
 This document is the only current design for ParaWallet receipt scanning. Historical OCR notes do not override it.
@@ -71,8 +71,9 @@ Build a private, consented golden set outside GitHub as real bills become availa
 Required release evidence:
 
 1. `pnpm verify` passes.
-2. `health.get` reports release `2026.08.29-ocr-canonical-v5` and schema `2026-08-production-v3`.
-3. Diagnostics reports `financialSchemaReady=true`.
-4. Provider smoke tests use configured Vision and Gemini keys and confirm `store=false` behavior.
-5. Every real-bill mismatch is caught by the review/validation gate; no unverified Sale is written.
-6. Created test Sales remain `pending_owner_review` and controlled test records are cleaned using the audited test procedure.
+2. `health.get` reports release `2026.08.29-ocr-scan-ux-v6` and schema `2026-08-production-v3`.
+3. `diagnostics.get` reports `ocr.automaticReadingReady=true`; otherwise the UI must say that automatic bill reading is unavailable and offer manual entry.
+4. Diagnostics reports `financialSchemaReady=true`.
+5. Provider smoke tests use configured Vision and Gemini keys and confirm `store=false` behavior.
+6. Every real-bill mismatch is caught by the review/validation gate; no unverified Sale is written.
+7. Created test Sales remain `pending_owner_review` and controlled test records are cleaned using the audited test procedure.
