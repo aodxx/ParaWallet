@@ -180,8 +180,8 @@ describe("role-aware UI contract", () => {
 
   it("exposes both camera capture and device image selection for OCR", () => {
     expect(app).toContain('className="receipt-upload-actions"');
-    expect(app).toContain('className="file-action secondary"><Camera');
-    expect(app).toContain("ถ่ายภาพใบเสร็จ");
+    expect(app).toContain('className="file-action secondary" aria-disabled={scanWorking}><Camera');
+    expect(app).toContain("ถ่ายภาพใหม่");
     expect(app).toContain("เลือกภาพจากเครื่อง");
     expect(app).toContain('accept="image/*" capture="environment"');
     expect(styles).toContain(".receipt-upload-actions");
@@ -191,6 +191,18 @@ describe("role-aware UI contract", () => {
     expect(app).toContain('canvas.toBlob(resolve, "image/jpeg"');
     expect(app).toContain('className="receipt-scan-preview"');
     expect(styles).toContain(".receipt-scan-preview");
+  });
+
+  it("shows plain-language scan progress, outcomes, and recovery actions", () => {
+    expect(app).toContain("เลือกภาพ");
+    expect(app).toContain("กำลังอ่านข้อมูลในบิล...");
+    expect(app).toContain("ขั้นตอนสุดท้าย: ตรวจตัวเลขกับภาพ");
+    expect(app).toContain("ลองอ่านภาพนี้อีกครั้ง");
+    expect(app).toContain("กรอกข้อมูลเองแทน");
+    expect(app).toContain("ข้อมูลสำหรับผู้ดูแลระบบ");
+    expect(app).toContain("showReviewFields &&");
+    expect(styles).toContain(".receipt-scan-status");
+    expect(styles).toContain(".receipt-scan-spinner");
   });
 
   it("links the scanned Receipt record and garden scope into Sale creation", () => {

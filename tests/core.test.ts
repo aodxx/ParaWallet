@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newRequestId } from "../src/api";
-import { normalizeOcrFields, normalizeReceiptDate, receiptReviewGate, receiptTypeLabel, validateReceiptMath } from "../src/ocr";
+import { normalizeOcrFields, normalizeReceiptDate, receiptReviewGate, receiptScanFeedback, receiptTypeLabel, validateReceiptMath } from "../src/ocr";
 import { allocateSettlement, assertActiveTapperMember, calculateSale, canCancelSettlement, canConfirmSale, canCreateAdjustment, canDisputeSale, canResolveDispute, isDuplicateSale, isIdempotentReplay, reconcileWallet, resolveDispute, validateAgreementPercentages, validateAgreementWindow } from "../src/financial";
 
 type SplitInput = { grossSale: number; buyerDeductions?: number; sharedExpenses?: number; ownerPercentage: number; tapperPercentage: number };
@@ -77,7 +77,17 @@ describe("ParaWallet core safeguards", () => {
     expect(fields.grossSale).toBe("9396");
     expect(validateReceiptMath(fields)).toEqual({ weightConsistent: null, entrySumConsistent: true, netWeightConsistent: true, amountConsistent: true });
     expect(receiptReviewGate(fields, true)).toEqual({ canSubmit: true, reasons: [] });
-    expect(receiptTypeLabel(fields.receiptType)).toContain("ใบชั่งน้ำหนัก");
+    expect(receiptTypeLabel(fields.receiptType)).toContain("ราคาต่อกิโล");
+  });
+
+  it("turns missing OCR configuration into an actionable Thai status", () => {
+    expect(receiptScanFeedback({ provider: "none", systemState: "not_configured", warnings: ["OCR_PROVIDER_UNAVAILABLE"] })).toMatchObject({ kind: "unavailable", allowReview: false, retryable: false, title: "ระบบอ่านบิลยังไม่ได้เปิดใช้งาน" });
+  });
+
+  it("hides raw all-field uncertainty from users", () => {
+    const feedback = receiptScanFeedback({ provider: "gemini:gemini-3.7-flash", documentClass: "rubber_receipt", uncertainFields: ["all", "unitPrice"], score: 40 });
+    expect(feedback.detail).toContain("ราคาต่อกิโล");
+    expect(feedback.detail).not.toContain("all");
   });
 
   it("supports a multi-row cash bill with basket tare and one-baht shop rounding", () => {
