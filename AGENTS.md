@@ -2,6 +2,10 @@
 
 This file applies to the entire repository. `main` is the multi-developer source of truth; all changes use a feature branch and pass `pnpm verify` before merge.
 
+## Current blocking priority
+
+Before starting new feature or visual work, read and complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](docs/UX-AUDIT-REMEDIATION-2026-08-29.md). Each UX PR must reference its workstream, update the relevant automated contracts, and satisfy that workstream's acceptance criteria. Do not mark a workstream complete based only on visual changes or a successful API response.
+
 ## Non-negotiable architecture
 
 - Keep `appsscript/Code.gs` as the single Apps Script deployment source. Do not split the backend into additional `.gs` modules.
