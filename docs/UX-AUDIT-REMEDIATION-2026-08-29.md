@@ -243,13 +243,13 @@
 - [x] ชุด 6 Loading/Empty/Error/Offline/Unauthorized แยกครบแล้ว
 - [x] ชุด 7 ตัดคำเทคนิคและผ่าน Mobile readability แล้ว
 - [x] `pnpm verify` ผ่านบน Combined branch
-- [ ] มือถือคนกรีดผ่าน: Login → เพิ่ม Sale ครบ 3 วิธี → เห็นผล → ส่งเงิน → เห็นสถานะรอเจ้าของ
-- [ ] มือถือเจ้าของผ่าน: Login → เปิด Pending Sale โดยตรง → ยืนยัน/ปฏิเสธ → เปิด Pending รับเงิน → ยืนยัน/ปฏิเสธ → เห็นยอดใหม่
+- [ ] มือถือคนกรีดผ่าน: Login → เพิ่ม Sale ครบ 3 วิธี → เห็นผล → ส่งเงิน → เห็นสถานะรอเจ้าของ (ต้องยืนยันบนอุปกรณ์จริง)
+- [ ] มือถือเจ้าของผ่าน: Login → เปิด Pending Sale โดยตรง → ยืนยัน/ปฏิเสธ → เปิด Pending รับเงิน → ยืนยัน/ปฏิเสธ → เห็นยอดใหม่ (ต้องยืนยันบนอุปกรณ์จริง)
 - [ ] Failure journey ผ่าน: Offline, Login หมดอายุ, API Error, Empty, OCR unavailable และโหลดหลักฐานไม่สำเร็จ บอกขั้นตอนถัดไปถูกต้อง
 - [ ] คู่มือและ Deployment notes ใช้คำตรงกับ UI รุ่นสุดท้าย
 
 ## 8. Definition of Done
 
-> Automated repository acceptance ของ workstream 3–7 ผ่านแล้ว; real-device journey และ production deployment closure ยังเป็น release-closure checks แยกต่างหากใน `todo.md`
+> Automated repository acceptance ของ workstream 3–7 และ gap ทั้ง 4 รายการที่ตรวจพบภายหลังผ่านแล้ว; เหลือเฉพาะ real-device journey และ production deployment closure เป็น release-closure checks แยกต่างหากใน `todo.md`
 
 งาน 7 ชุดนี้เสร็จเมื่อ Checklist ทุกข้อถูกทำเครื่องหมาย Automated verification ผ่าน และทั้งสองบทบาททำ Real-device journey ได้โดยไม่มีคนบอกทาง คำว่า “ปุ่มทำงานแล้ว”, “หน้าสวยขึ้น” หรือ “API ตอบ Success” เพียงอย่างเดียวไม่ถือว่าผ่าน
