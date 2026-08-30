@@ -20,7 +20,8 @@ describe("OCR multi-developer governance contract", () => {
     expect(frontend).not.toContain("generativelanguage.googleapis.com");
     expect(frontend).not.toContain("vision.googleapis.com");
     expect(frontend).not.toContain("GEMINI_API_KEY");
-    expect(backend).toContain("generativelanguage.googleapis.com/v1/interactions");
+    expect(backend).toContain("generativelanguage.googleapis.com/v1beta/interactions");
+    expect(backend).not.toContain("generativelanguage.googleapis.com/v1/interactions");
     expect(backend).toContain("vision.googleapis.com/v1/images:annotate");
   });
 

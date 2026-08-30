@@ -1,6 +1,6 @@
 # Canonical OCR + Gemini architecture
 
-Current backend release: `2026.08.29-ux-ws3-v7` (includes the canonical OCR v6 pipeline plus notification deep-link support)
+Current backend source target: `2026.08.30-ocr-provider-v8` (corrects the Interactions REST endpoint to `/v1beta/interactions`)
 Schema: `2026-08-production-v3` — no Google Sheets migration
 
 This document is the only current design for ParaWallet receipt scanning. Historical OCR notes do not override it.
@@ -17,7 +17,7 @@ The five images supplied on 28 August 2026 are temporary reference images becaus
 |---|---|---|
 | Capture | Accept one image, apply EXIF rotation, resize/compress to JPEG, show the image being reviewed | PWA |
 | Text evidence | Run Vision `DOCUMENT_TEXT_DETECTION` when configured; treat its transcript as untrusted supporting evidence | Apps Script |
-| Semantic extraction | Send the image plus optional transcript to pinned `gemini-3.7-flash` through the stateless Interactions API with `store=false` and one JSON Schema | Apps Script |
+| Semantic extraction | Send the image plus optional transcript to pinned `gemini-3.7-flash` through the stateless Interactions API at `POST /v1beta/interactions`, with `store=false` and one JSON Schema | Apps Script |
 | Normalization | Normalize Thai digits/dates, weight rows, gross/tare/net, DRC/dry weight, price, written total, and explicit deductions | Apps Script |
 | Validation | Score completeness and verify equations independently of model confidence; reject blank templates, promotional examples, unrelated images, unreadable receipts, and unknown receipt types | Apps Script |
 | Tapper review | Display the source image and editable fields; any edit clears the confirmation; require an explicit image check | PWA + Apps Script |
@@ -71,7 +71,7 @@ Build a private, consented golden set outside GitHub as real bills become availa
 Required release evidence:
 
 1. `pnpm verify` passes.
-2. `health.get` reports release `2026.08.29-ux-ws3-v7` and schema `2026-08-production-v3`.
+2. `health.get` reports release `2026.08.30-ocr-provider-v8` and schema `2026-08-production-v3`.
 3. `diagnostics.get` reports `ocr.automaticReadingReady=true`; otherwise the UI must say that automatic bill reading is unavailable and offer manual entry.
 4. Diagnostics reports `financialSchemaReady=true`.
 5. Provider smoke tests use configured Vision and Gemini keys and confirm `store=false` behavior.

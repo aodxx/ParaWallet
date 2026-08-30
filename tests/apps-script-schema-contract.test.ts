@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.29-ux-ws3-v7";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v8";');
     expect(code).toContain("automaticReadingReady: Boolean(Config.geminiKey())");
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
@@ -67,7 +67,8 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('geminiModel: function () { return this.get("GEMINI_MODEL", false) || "gemini-3.7-flash"; }');
     expect(code).not.toContain("gemini-1.5-flash");
     expect(code).toContain("response.getResponseCode()");
-    expect(code).toContain('"https://generativelanguage.googleapis.com/v1/interactions"');
+    expect(code).toContain('"https://generativelanguage.googleapis.com/v1beta/interactions"');
+    expect(code).not.toContain('"https://generativelanguage.googleapis.com/v1/interactions"');
     expect(code).toContain('store: false');
     expect(code).toContain('response_format: { type: "text", mime_type: "application/json", schema: this.responseSchema_() }');
     expect(code).toContain('headers: { "x-goog-api-key": Config.geminiKey() }');

@@ -4,10 +4,11 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 
 ## Current repository baseline
 
-| Component | Accepted baseline |
+| Component | Current status |
 |---|---|
 | Frontend | UX remediation workstreams 1–7 on GitHub Pages |
-| Backend target | `2026.08.29-ux-ws3-v7` |
+| Backend deployed | `2026.08.29-ux-ws3-v7` |
+| Backend target awaiting Apps Script deploy | `2026.08.30-ocr-provider-v8` |
 | Schema | `2026-08-production-v3` |
 | Automated verification | 146 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
@@ -59,7 +60,7 @@ For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script We
 
 - Frontend changes are verified and deployed by the GitHub Pages workflow.
 - Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
-- After deploying the current Apps Script release, require health to report `release=2026.08.29-ux-ws3-v7` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
+- After deploying the current Apps Script target, require health to report `release=2026.08.30-ocr-provider-v8` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. This release corrects the Gemini Interactions REST endpoint to `/v1beta/interactions` and requires no Sheet migration. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
 - Run a migration only when its release document explicitly requires it. D10–D12 require no schema migration.
 
 Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).

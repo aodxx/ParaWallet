@@ -39,6 +39,7 @@ These are operational checks, not new feature development.
 
 Use [`docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md`](docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md) for exact steps, expected Thai UI, evidence rules, stop conditions, and sign-off. Do not mark a real-device item complete from automated tests alone, and do not commit credentials or production evidence.
 
+- [ ] Deploy Apps Script target `2026.08.30-ocr-provider-v8`, confirm health/schema fingerprints, and smoke-test one authorized receipt; current deployed backend remains `2026.08.29-ux-ws3-v7` until this passes
 - [ ] Complete one final real-device acceptance pass for Owner and Tapper after D12.1: login, curved-header layout, dock navigation, More sheet, localized dates, pending work, notification read, Sale review, bank transfer, cash handover, reconnect, and loading transitions
 - [ ] Confirm that any password or secret ever shared during testing has been rotated; do not record the replacement in this repository
 - [ ] Monitor Apps Script failures and connection interruptions during controlled real use; record exact request ID, time, role, action, and error before changing code
