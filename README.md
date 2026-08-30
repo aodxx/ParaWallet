@@ -9,7 +9,7 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 | Frontend | UX remediation workstreams 1–7 on GitHub Pages |
 | Backend target | `2026.08.29-ux-ws3-v7` |
 | Schema | `2026-08-production-v3` |
-| Automated verification | 143 tests, TypeScript, Apps Script syntax, and production build |
+| Automated verification | 146 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
 
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
@@ -18,7 +18,7 @@ Repository: <https://github.com/aodxx/ParaWallet>
 > [!IMPORTANT]
 > **สถานะ UX ปัจจุบัน:** remediation ทั้ง 7 ชุดผ่าน automated repository verification แล้ว เหลือ real-device acceptance และ production closure ตาม `todo.md` ก่อนปิด release
 
-> **งานสำคัญของทีมตอนนี้:** ใช้ [รายงานความบกพร่องด้าน UX และแผนแก้ไข](docs/UX-AUDIT-REMEDIATION-2026-08-29.md) เป็นเกณฑ์ทดสอบบนมือถือจริงทั้งบทบาทเจ้าของสวนและคนกรีด ก่อนปิด release หรือเริ่มฟีเจอร์ใหม่
+> **งานสำคัญของทีมตอนนี้:** ใช้ [เช็กลิสต์ปิดงานบนมือถือจริง](docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md) ทดสอบทั้งบทบาทเจ้าของสวนและคนกรีด ก่อนปิด release หรือเริ่มฟีเจอร์ใหม่
 
 ## Implemented scope
 

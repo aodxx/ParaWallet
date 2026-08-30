@@ -246,14 +246,14 @@
 - [x] ชุด 5 ปุ่มเงียบถูกลบหรือเชื่อมครบแล้ว
 - [x] ชุด 6 Loading/Empty/Error/Offline/Unauthorized แยกครบแล้ว
 - [x] ชุด 7 ตัดคำเทคนิคและผ่าน Mobile readability แล้ว
-- [x] `pnpm verify` ผ่าน 143 tests พร้อม TypeScript, Apps Script syntax และ production build บน Combined branch
+- [x] `pnpm verify` ผ่าน 146 tests พร้อม TypeScript, Apps Script syntax และ production build
 - [ ] มือถือคนกรีดผ่าน: Login → เพิ่ม Sale ครบ 3 วิธี → เห็นผล → ส่งเงิน → เห็นสถานะรอเจ้าของ
 - [ ] มือถือเจ้าของผ่าน: Login → เปิด Pending Sale โดยตรง → ยืนยัน/ปฏิเสธ → เปิด Pending รับเงิน → ยืนยัน/ปฏิเสธ → เห็นยอดใหม่
 - [ ] Failure journey ผ่าน: Offline, Login หมดอายุ, API Error, Empty, OCR unavailable และโหลดหลักฐานไม่สำเร็จ บอกขั้นตอนถัดไปถูกต้อง
-- [ ] คู่มือและ Deployment notes ใช้คำตรงกับ UI รุ่นสุดท้าย
+- [x] คู่มือและ Deployment notes ใช้คำตรงกับ UI รุ่นสุดท้าย และมีเช็กลิสต์ปิดงานที่ [`RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md`](RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md)
 
 ## 8. Definition of Done
 
-> Automated repository acceptance ของ workstream 3–7 ผ่านแล้ว; real-device journey และ production deployment closure ยังเป็น release-closure checks แยกต่างหากใน `todo.md`
+> Automated repository acceptance ของ workstream 1–7 ผ่านแล้ว; real-device journey และ production deployment closure ยังเป็น release-closure checks แยกต่างหากใน `todo.md`
 
 งาน 7 ชุดนี้เสร็จเมื่อ Checklist ทุกข้อถูกทำเครื่องหมาย Automated verification ผ่าน และทั้งสองบทบาททำ Real-device journey ได้โดยไม่มีคนบอกทาง คำว่า “ปุ่มทำงานแล้ว”, “หน้าสวยขึ้น” หรือ “API ตอบ Success” เพียงอย่างเดียวไม่ถือว่าผ่าน
