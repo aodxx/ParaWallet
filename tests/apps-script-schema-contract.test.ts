@@ -41,11 +41,15 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v8";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v9";');
     expect(code).toContain("automaticReadingReady: Boolean(Config.geminiKey())");
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
+    expect(code).toContain('if (request.action === "health.get") return healthCheck_();');
+    expect(code).toContain('if (request.action === "diagnostics.get") {');
+    expect(code.indexOf("var user = Auth.requireUser(request.authToken)")).toBeLessThan(code.indexOf('if (request.action === "diagnostics.get") {'));
+    expect(code).toContain('if (user.role !== "owner" && user.role !== "admin") throw new Error("OWNER_PERMISSION_REQUIRED")');
   });
 
   it("replays the same mutation request instead of writing a duplicate record", () => {
@@ -64,7 +68,10 @@ describe("Apps Script schema safety contract", () => {
   });
 
   it("uses the canonical stateless Gemini Interactions adapter with Vision evidence", () => {
-    expect(code).toContain('geminiModel: function () { return this.get("GEMINI_MODEL", false) || "gemini-3.7-flash"; }');
+    expect(code).toContain('var PINNED_GEMINI_MODEL = "gemini-3.7-flash";');
+    expect(code).toContain('configured === PINNED_GEMINI_MODEL ? configured : PINNED_GEMINI_MODEL');
+    expect(code).toContain('modelPropertyStatus: modelPropertyStatus');
+    expect(code).toContain('GEMINI_MODEL_PROPERTY_INVALID_IGNORED');
     expect(code).not.toContain("gemini-1.5-flash");
     expect(code).toContain("response.getResponseCode()");
     expect(code).toContain('"https://generativelanguage.googleapis.com/v1beta/interactions"');
@@ -76,7 +83,10 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('untrusted transcript');
     expect(code).toContain('visionOcrUsed');
     expect(code).toContain('fetchJsonWithRetry_');
-    expect(code).toContain('OCR_PROVIDER_HTTP_');
+    expect(code).toContain('"GEMINI"');
+    expect(code).toContain('"VISION"');
+    expect(code).toContain('"_HTTP_" + lastCode');
+    expect(code).toContain('vision = { ok: false, text: "", errorCode: visionError }');
   });
 
   it("does not score empty OCR fields as a successful extraction", () => {
@@ -226,7 +236,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('documentClass');
     expect(code).toContain('never depend on fixed x/y coordinates');
     expect(code).toContain('fetchJsonWithRetry_');
-    expect(code).toContain('OCR_PROVIDER_HTTP_');
+    expect(code).toContain('String(provider || "OCR_PROVIDER") + "_HTTP_" + lastCode');
   });
 
   it("blocks unsafe scanned sales and reconciles normal shop rounding", () => {

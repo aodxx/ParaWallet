@@ -6,7 +6,7 @@
  * SHEET_ID
  * DRIVE_ROOT_FOLDER_ID
  * GEMINI_API_KEY (required for automatic receipt reading)
- * GEMINI_MODEL (optional, defaults to the pinned production model)
+ * GEMINI_MODEL (optional; only the pinned production model is accepted)
  * GOOGLE_CLOUD_VISION_API_KEY (optional)
  * ALLOWED_ORIGINS (optional)
  * GOOGLE_OAUTH_CLIENT_ID (required for Google Sign-In)
@@ -15,8 +15,9 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v8";
+var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v9";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
+var PINNED_GEMINI_MODEL = "gemini-3.7-flash";
 
 // =====================================================
 // 0. ADMIN SETUP ENTRYPOINTS
@@ -87,8 +88,11 @@ function parseRequest_(e) {
 
 function routeAction_(request) {
   if (request.action === "health.get") return healthCheck_();
-  if (request.action === "diagnostics.get") return diagnosticsCheck_();
   var user = Auth.requireUser(request.authToken);
+  if (request.action === "diagnostics.get") {
+    if (user.role !== "owner" && user.role !== "admin") throw new Error("OWNER_PERMISSION_REQUIRED");
+    return diagnosticsCheck_();
+  }
   request.payload = request.payload && typeof request.payload === "object" ? request.payload : {};
   // The durable RequestID belongs in every audit record. Clients send it at the
   // envelope level, so copy it into the service payload after authentication.
@@ -136,7 +140,15 @@ function healthCheck_() { return { service: "parawallet-appsscript", status: "ok
 function diagnosticsCheck_() {
   var result = { service: "parawallet-appsscript", status: "ok", release: PARAWALLET_RELEASE, schemaVersion: PARAWALLET_SCHEMA_VERSION, timestamp: new Date().toISOString(), sheetIdConfigured: false, sheetAccessible: false, missingSheets: [], registeredUsers: 0 };
   try {
-    result.ocr = { automaticReadingReady: Boolean(Config.geminiKey()), geminiConfigured: Boolean(Config.geminiKey()), visionConfigured: Boolean(Config.visionKey()), model: Config.geminiModel() };
+    var modelPropertyStatus = Config.geminiModelPropertyStatus();
+    result.ocr = {
+      automaticReadingReady: Boolean(Config.geminiKey()),
+      geminiConfigured: Boolean(Config.geminiKey()),
+      visionConfigured: Boolean(Config.visionKey()),
+      model: Config.geminiModel(),
+      modelPropertyStatus: modelPropertyStatus,
+      configurationIssues: modelPropertyStatus === "invalid_ignored" ? ["GEMINI_MODEL_PROPERTY_INVALID_IGNORED"] : []
+    };
     result.sheetIdConfigured = Boolean(Config.get("SHEET_ID", false));
     if (!result.sheetIdConfigured) { result.status = "error"; result.error = "MISSING_SCRIPT_PROPERTY:SHEET_ID"; return result; }
     var book = SpreadsheetApp.openById(Config.spreadsheetId());
@@ -172,7 +184,15 @@ var Config = {
   spreadsheetId: function () { return this.get("SHEET_ID", true); },
   driveRootId: function () { return this.get("DRIVE_ROOT_FOLDER_ID", true); },
   geminiKey: function () { return this.get("GEMINI_API_KEY", false); },
-  geminiModel: function () { return this.get("GEMINI_MODEL", false) || "gemini-3.7-flash"; },
+  geminiModelPropertyStatus: function () {
+    var configured = String(this.get("GEMINI_MODEL", false) || "").trim();
+    if (!configured) return "default";
+    return configured === PINNED_GEMINI_MODEL ? "valid" : "invalid_ignored";
+  },
+  geminiModel: function () {
+    var configured = String(this.get("GEMINI_MODEL", false) || "").trim();
+    return configured === PINNED_GEMINI_MODEL ? configured : PINNED_GEMINI_MODEL;
+  },
   visionKey: function () { return this.get("GOOGLE_CLOUD_VISION_API_KEY", false); },
   allowedOrigins: function () { return this.get("ALLOWED_ORIGINS", false).split(",").filter(Boolean); },
   // OAuth client IDs are public configuration. The Script Property can override this
@@ -394,10 +414,14 @@ var OCR = {
     var failures = [];
     var geminiConfigured = Boolean(Config.geminiKey());
     var visionConfigured = Boolean(Config.visionKey());
-    var vision = { ok: false, text: "", errorCode: "VISION_NOT_CONFIGURED" };
+    var vision = { ok: false, text: "", errorCode: visionConfigured ? "VISION_UNAVAILABLE" : "VISION_NOT_CONFIGURED" };
     if (visionConfigured) {
       try { vision = this.visionText_(contentBase64); }
-      catch (error) { failures.push(error && error.message ? error.message : String(error)); }
+      catch (error) {
+        var visionError = error && error.message ? error.message : String(error);
+        failures.push(visionError);
+        vision = { ok: false, text: "", errorCode: visionError };
+      }
     }
     if (geminiConfigured) {
       try { var extracted = this.gemini_(contentBase64, mimeType, this.prompt_(), vision); extracted.systemState = "ready"; extracted.systemCode = ""; return extracted; }
@@ -410,9 +434,11 @@ var OCR = {
       });
       manualResult.systemState = "manual_only"; manualResult.systemCode = "GEMINI_UNAVAILABLE"; return manualResult;
     }
+    var providerWarnings = ["OCR_PROVIDER_UNAVAILABLE"].concat(failures);
+    if (vision.errorCode && providerWarnings.indexOf(vision.errorCode) < 0) providerWarnings.push(vision.errorCode);
     var unavailableResult = this.scored_("none", {
       documentClass: "unreadable", receiptType: "unknown", uncertainFields: ["all"],
-      warnings: ["OCR_PROVIDER_UNAVAILABLE"].concat(failures).concat(vision.errorCode ? [vision.errorCode] : []), needsReview: true
+      warnings: providerWarnings, needsReview: true
     });
     unavailableResult.systemState = !geminiConfigured && !visionConfigured ? "not_configured" : "provider_error";
     unavailableResult.systemCode = !geminiConfigured && !visionConfigured ? "OCR_NOT_CONFIGURED" : "OCR_PROVIDER_FAILED";
@@ -557,7 +583,7 @@ var OCR = {
     var body = this.fetchJsonWithRetry_("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "post", contentType: "application/json", headers: { "x-goog-api-key": Config.geminiKey() },
       payload: JSON.stringify(payload), muteHttpExceptions: true
-    });
+    }, "GEMINI");
     var text = this.interactionText_(body);
     if (!text) throw new Error("OCR_PROVIDER_EMPTY_RESPONSE");
     var fields;
@@ -570,13 +596,13 @@ var OCR = {
   },
   visionText_: function (base64) {
     var url = "https://vision.googleapis.com/v1/images:annotate?key=" + encodeURIComponent(Config.visionKey());
-    var body = this.fetchJsonWithRetry_(url, { method: "post", contentType: "application/json", payload: JSON.stringify({ requests: [{ image: { content: base64 }, features: [{ type: "DOCUMENT_TEXT_DETECTION" }] }] }), muteHttpExceptions: true });
+    var body = this.fetchJsonWithRetry_(url, { method: "post", contentType: "application/json", payload: JSON.stringify({ requests: [{ image: { content: base64 }, features: [{ type: "DOCUMENT_TEXT_DETECTION" }] }] }), muteHttpExceptions: true }, "VISION");
     var response = body.responses && body.responses[0] || {};
     if (response.error) return { ok: false, text: "", errorCode: "VISION_PROVIDER_ERROR" };
     var text = response.fullTextAnnotation && response.fullTextAnnotation.text || response.textAnnotations && response.textAnnotations[0] && response.textAnnotations[0].description || "";
     return text ? { ok: true, text: String(text), errorCode: "" } : { ok: false, text: "", errorCode: "VISION_NO_TEXT" };
   },
-  fetchJsonWithRetry_: function (url, options) {
+  fetchJsonWithRetry_: function (url, options, provider) {
     var lastCode = 0;
     for (var attempt = 0; attempt < 3; attempt += 1) {
       var response = UrlFetchApp.fetch(url, options);
@@ -588,7 +614,7 @@ var OCR = {
       if ([408, 429, 500, 502, 503, 504].indexOf(lastCode) < 0) break;
       if (attempt < 2) Utilities.sleep(400 * Math.pow(2, attempt));
     }
-    throw new Error("OCR_PROVIDER_HTTP_" + lastCode);
+    throw new Error(String(provider || "OCR_PROVIDER") + "_HTTP_" + lastCode);
   }
 };
 

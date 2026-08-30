@@ -84,6 +84,10 @@ describe("ParaWallet core safeguards", () => {
     expect(receiptScanFeedback({ provider: "none", systemState: "not_configured", warnings: ["OCR_PROVIDER_UNAVAILABLE"] })).toMatchObject({ kind: "unavailable", allowReview: false, retryable: false, title: "ระบบอ่านบิลยังไม่ได้เปิดใช้งาน" });
   });
 
+  it("does not mislabel configured provider failures as an unopened service", () => {
+    expect(receiptScanFeedback({ provider: "none", systemState: "provider_error", warnings: ["OCR_PROVIDER_UNAVAILABLE", "VISION_HTTP_401", "GEMINI_HTTP_404"] })).toMatchObject({ kind: "error", allowReview: false, retryable: true, title: "บริการอ่านบิลขัดข้องชั่วคราว" });
+  });
+
   it("hides raw all-field uncertainty from users", () => {
     const feedback = receiptScanFeedback({ provider: "gemini:gemini-3.7-flash", documentClass: "rubber_receipt", uncertainFields: ["all", "unitPrice"], score: 40 });
     expect(feedback.detail).toContain("ราคาต่อกิโล");
