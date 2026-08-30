@@ -1,10 +1,10 @@
 # ParaWallet Release Roadmap and Acceptance Gates
 
-Updated: 24 August 2026
+Updated: 30 August 2026
 
 ## Current release — stabilization
 
-The accepted baseline is backend `2026.08.24-phase-d10`, schema `2026-08-production-v3`, and frontend Phase D12.1. Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass in [`todo.md`](../todo.md) is recorded.
+The accepted baseline is backend `2026.08.29-ux-ws3-v7`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass in [`todo.md`](../todo.md) is recorded.
 
 Acceptance requires all of the following:
 
