@@ -6,10 +6,10 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 
 | Component | Accepted baseline |
 |---|---|
-| Frontend | Phase D12.1 Forest Fintech mobile QA refinement on GitHub Pages |
+| Frontend | UX remediation workstreams 1–7 on GitHub Pages |
 | Backend target | `2026.08.29-ux-ws3-v7` |
 | Schema | `2026-08-production-v3` |
-| Automated verification | 137 tests, TypeScript, Apps Script syntax, and production build |
+| Automated verification | 143 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
 
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
@@ -18,7 +18,7 @@ Repository: <https://github.com/aodxx/ParaWallet>
 > [!IMPORTANT]
 > **สถานะ UX ปัจจุบัน:** remediation ทั้ง 7 ชุดผ่าน automated repository verification แล้ว เหลือ real-device acceptance และ production closure ตาม `todo.md` ก่อนปิด release
 
-> **งานสำคัญของทีมตอนนี้:** แก้ทั้ง 7 ชุดใน [รายงานความบกพร่องด้าน UX และแผนแก้ไข](docs/UX-AUDIT-REMEDIATION-2026-08-29.md) ให้ครบก่อนเริ่มฟีเจอร์หรือปรับภาพลักษณ์ใหม่ ภายในมีข้อบกพร่องทั้งหมด วิธีแก้ตามบทบาท ไฟล์ที่เกี่ยวข้อง เกณฑ์รับงาน และ Checklist กลางของทีม
+> **งานสำคัญของทีมตอนนี้:** ใช้ [รายงานความบกพร่องด้าน UX และแผนแก้ไข](docs/UX-AUDIT-REMEDIATION-2026-08-29.md) เป็นเกณฑ์ทดสอบบนมือถือจริงทั้งบทบาทเจ้าของสวนและคนกรีด ก่อนปิด release หรือเริ่มฟีเจอร์ใหม่
 
 ## Implemented scope
 
@@ -27,7 +27,7 @@ Repository: <https://github.com/aodxx/ParaWallet>
 - Receipt upload/OCR, review, duplicate signals, Sale confirmation, dispute, and adjustment
 - Confirmed/pending/disputed dual-wallet ledger with server-side calculations
 - Bank-transfer slip evidence and cash-handover Owner confirmation
-- Pending-work queue, notifications, audit logs, date reports, and CSV export
+- Pending-work queue, notifications, audit logs, date reports, and downloadable tables
 - RequestID idempotency, LockService write boundaries, schema guards, and connection recovery
 - Mobile-first Owner/Tapper views, PWA install support, structured Lottie loading states, curved mobile header, and accessible animated dock navigation
 
