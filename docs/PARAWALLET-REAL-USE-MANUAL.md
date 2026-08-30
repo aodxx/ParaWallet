@@ -37,7 +37,7 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 | Tapper ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | GardenMembers | ใช่ | Owner และ Tapper ผูกกับ garden เดียวกันและ active |
 | Production schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-production-v3` |
-| Web App deployment | ใช่ | health ต้องรายงาน `release=2026.08.24-phase-d10` |
+| Web App deployment | ใช่ | health ต้องรายงาน `release=2026.08.29-ux-ws3-v7` |
 
 ## 3. การเตรียม Apps Script และ Google Sheets
 
@@ -154,7 +154,7 @@ Tapper ควรส่งเงินตามยอดคงค้างที�
 
 เจ้าของสวนใช้หน้าภาพรวมเพื่อตรวจ **ส่วนแบ่งทั้งหมดของฉัน**, **ได้รับแล้ว**, **ยังอยู่กับคนกรีด**, รายการรอตรวจ และรายการคัดค้าน คนกรีดใช้หน้าภาพรวมเพื่อตรวจรายได้ของตนและเงินเจ้าของที่กำลังถืออยู่
 
-รายงานสามารถกรองช่วงวันที่และ export CSV ได้ ผู้ใช้ควรเปรียบเทียบรายงานกับบิลต้นฉบับและรายการโอนเงินจริงเป็นระยะ การเห็นยอดใน Wallet ไม่ได้แปลว่าเงินถูกโอนแล้ว ต้องดูสถานะ Sale, Settlement และ WalletEntry ประกอบกัน
+รายงานสามารถกรองช่วงวันที่และกด **ดาวน์โหลดตาราง** ได้ ผู้ใช้ควรเปรียบเทียบรายงานกับบิลต้นฉบับและรายการโอนเงินจริงเป็นระยะ การเห็นยอดในกระเป๋าไม่ได้แปลว่าเงินถูกโอนแล้ว ต้องดูสถานะรายการขาย การส่งเงิน และยอดคงค้างประกอบกัน
 
 ## 12. การแก้ไขและข้อพิพาท
 
@@ -180,7 +180,7 @@ Tapper ควรส่งเงินตามยอดคงค้างที�
 | ตรวจสอบ | ผ่านเมื่อ |
 |---|---|
 | Deployment | Web App ใช้ `Code.gs` revision ล่าสุดจาก repository |
-| Health | endpoint ตอบ `status=ok`, `release=2026.08.24-phase-d10` และ `schemaVersion=2026-08-production-v3` |
+| Health | endpoint ตอบ `status=ok`, `release=2026.08.29-ux-ws3-v7` และ `schemaVersion=2026-08-production-v3` |
 | Diagnostics | `financialSchemaReady=true` และไม่มี schema mismatch |
 | OAuth | Owner และ Tapper login ด้วยบัญชีที่ลงทะเบียนได้ |
 | Authorization | Owner เห็นเฉพาะสวนของตน และ Tapper เห็นเฉพาะสวนที่ผูก |
