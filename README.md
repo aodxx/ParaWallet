@@ -7,8 +7,7 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 | Component | Current status |
 |---|---|
 | Frontend | UX remediation workstreams 1–7 on GitHub Pages |
-| Backend deployed | `2026.08.29-ux-ws3-v7` |
-| Backend target awaiting Apps Script deploy | `2026.08.30-ocr-provider-v8` |
+| Backend deployed | `2026.08.30-ocr-provider-v8` |
 | Schema | `2026-08-production-v3` |
 | Automated verification | 146 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |

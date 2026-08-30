@@ -3,7 +3,7 @@
 **ชื่อระบบ:** ParaWallet — Rubber Dual Wallet System  
 **แพลตฟอร์ม:** GitHub Pages PWA + Google Apps Script + Google Sheets + Google Drive  
 **ผู้จัดทำคู่มือ:** Manus AI  
-**สถานะคู่มือ:** ใช้งานจริงแบบควบคุม — backend target `2026.08.30-ocr-provider-v8` / frontend UX remediation ชุด 1–7
+**สถานะคู่มือ:** ใช้งานจริงแบบควบคุม — backend `2026.08.30-ocr-provider-v8` / frontend UX remediation ชุด 1–7
 
 **อัปเดตล่าสุด:** 30 สิงหาคม 2026
 

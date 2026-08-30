@@ -4,7 +4,7 @@ Updated: 30 August 2026
 
 ## Current release — stabilization
 
-The accepted deployed baseline is backend `2026.08.29-ux-ws3-v7`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. Backend source target `2026.08.30-ocr-provider-v8` remains pending until its Apps Script health check and authorized receipt smoke test pass. Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass in [`todo.md`](../todo.md) is recorded.
+The accepted deployed baseline is backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. The v8 health check is complete; its authorized receipt smoke test remains open in [`todo.md`](../todo.md). Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass is recorded.
 
 Acceptance requires all of the following:
 
