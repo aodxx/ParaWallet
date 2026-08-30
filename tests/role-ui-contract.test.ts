@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+const api = readFileSync(new URL("../src/api.ts", import.meta.url), "utf8");
+const ocr = readFileSync(new URL("../src/ocr.ts", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 const loader = readFileSync(new URL("../src/LoadingAnimation.tsx", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
@@ -338,7 +340,8 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("ข้อตกลงเวอร์ชัน");
     expect(app).not.toContain("agreementId.slice");
     expect(app).not.toContain("member.email || member.userId");
-    expect(app).not.toContain("Gemini API Key");
+    expect(`${app}\n${api}\n${ocr}`).not.toContain("Gemini API Key");
+    expect(ocr).toContain("แจ้งผู้ดูแลระบบให้เปิดบริการอ่านบิล หรือเลือกกรอกตัวเลขเอง");
     expect(app).toContain("ข้อมูลสำหรับผู้ดูแลระบบ");
   });
 
