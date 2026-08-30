@@ -38,7 +38,7 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 | Tapper ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | GardenMembers | ใช่ | Owner และ Tapper ผูกกับ garden เดียวกันและ active |
 | Production schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-production-v3` |
-| Web App deployment | ใช่ | หลัง Deploy รุ่นใหม่ health ต้องรายงาน `release=2026.08.30-ocr-provider-v8` |
+| Web App deployment | ใช่ | หลัง Deploy source ปัจจุบัน health ต้องรายงาน `release=2026.08.30-ocr-provider-v9` (ค่าก่อน Deploy ยังเป็น `2026.08.30-ocr-provider-v8`) |
 
 ## 3. การเตรียม Apps Script และ Google Sheets
 
@@ -181,7 +181,7 @@ Tapper ควรส่งเงินตามยอดคงค้างที�
 | ตรวจสอบ | ผ่านเมื่อ |
 |---|---|
 | Deployment | Web App ใช้ `Code.gs` revision ล่าสุดจาก repository |
-| Health | endpoint ตอบ `status=ok`, `release=2026.08.30-ocr-provider-v8` และ `schemaVersion=2026-08-production-v3` |
+| Health | หลัง Deploy source ปัจจุบัน endpoint ตอบ `status=ok`, `release=2026.08.30-ocr-provider-v9` และ `schemaVersion=2026-08-production-v3` |
 | Diagnostics | `financialSchemaReady=true` และไม่มี schema mismatch |
 | OAuth | Owner และ Tapper login ด้วยบัญชีที่ลงทะเบียนได้ |
 | Authorization | Owner เห็นเฉพาะสวนของตน และ Tapper เห็นเฉพาะสวนที่ผูก |

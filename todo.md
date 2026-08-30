@@ -30,7 +30,7 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 - [x] D11 Lottie loading, typography hierarchy, grid alignment, and non-overlapping state transitions deployed
 - [x] D12 Earthy Harmony palette, curved mobile header, prioritized dual wallets, and accessible Animated Circle Dock implemented
 - [x] D12.1 Tapper date formatting, settlement-card spacing, outdoor text contrast, screen-specific descriptions, wallet-heading alignment, and dock clearance implemented
-- [x] Automated verification passes 146 tests, TypeScript, Apps Script syntax, and production build
+- [x] Automated verification passes 147 tests, TypeScript, Apps Script syntax, and production build
 - [x] Current README, operating manual, roadmap, gap matrix, and document index synchronized
 
 ## Release closure — validation only
@@ -40,7 +40,10 @@ These are operational checks, not new feature development.
 Use [`docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md`](docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md) for exact steps, expected Thai UI, evidence rules, stop conditions, and sign-off. Do not mark a real-device item complete from automated tests alone, and do not commit credentials or production evidence.
 
 - [x] Deploy Apps Script `2026.08.30-ocr-provider-v8` and confirm `status=ok` with schema `2026-08-production-v3`
-- [ ] Smoke-test one authorized receipt and confirm the Gemini provider returns reviewable fields without `OCR_PROVIDER_HTTP_400` or `OCR_PROVIDER_HTTP_401`
+- [x] Run the first authorized v8 receipt smoke test; it correctly blocked saving but exposed provider/configuration failures (`VISION HTTP 401`, `Gemini HTTP 404`) and did not pass recognition acceptance
+- [ ] Revoke the credential mistakenly stored in `GEMINI_MODEL`, store a replacement only in `GEMINI_API_KEY`, delete the invalid optional Vision key, and never commit or record replacement secrets
+- [ ] Deploy Apps Script `2026.08.30-ocr-provider-v9` and confirm `status=ok` with schema `2026-08-production-v3`
+- [ ] Smoke-test one authorized receipt and confirm the Gemini provider returns reviewable fields without `GEMINI_HTTP_400`, `GEMINI_HTTP_401`, or `GEMINI_HTTP_404`
 - [ ] Complete one final real-device acceptance pass for Owner and Tapper after D12.1: login, curved-header layout, dock navigation, More sheet, localized dates, pending work, notification read, Sale review, bank transfer, cash handover, reconnect, and loading transitions
 - [ ] Confirm that any password or secret ever shared during testing has been rotated; do not record the replacement in this repository
 - [ ] Monitor Apps Script failures and connection interruptions during controlled real use; record exact request ID, time, role, action, and error before changing code

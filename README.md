@@ -8,8 +8,9 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 |---|---|
 | Frontend | UX remediation workstreams 1–7 on GitHub Pages |
 | Backend deployed | `2026.08.30-ocr-provider-v8` |
+| Backend next deployment | `2026.08.30-ocr-provider-v9` |
 | Schema | `2026-08-production-v3` |
-| Automated verification | 146 tests, TypeScript, Apps Script syntax, and production build |
+| Automated verification | 147 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
 
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
@@ -59,7 +60,7 @@ For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script We
 
 - Frontend changes are verified and deployed by the GitHub Pages workflow.
 - Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
-- After deploying the current Apps Script target, require health to report `release=2026.08.30-ocr-provider-v8` and `schemaVersion=2026-08-production-v3`, then require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. This release corrects the Gemini Interactions REST endpoint to `/v1beta/interactions` and requires no Sheet migration. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
+- After deploying the current Apps Script target, require health to report `release=2026.08.30-ocr-provider-v9` and `schemaVersion=2026-08-production-v3`, then use Owner-authenticated diagnostics to require `financialSchemaReady=true`, `ocr.automaticReadingReady=true`, `ocr.model=gemini-3.7-flash`, and no configuration issues. This release pins the model, protects diagnostics, separates Gemini/Vision errors, and requires no Sheet migration. Follow the controlled rollout in `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
 - Run a migration only when its release document explicitly requires it. D10–D12 require no schema migration.
 
 Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).

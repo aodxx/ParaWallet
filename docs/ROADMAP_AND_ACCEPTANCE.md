@@ -4,7 +4,7 @@ Updated: 30 August 2026
 
 ## Current release — stabilization
 
-The accepted deployed baseline is backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. The v8 health check is complete; its authorized receipt smoke test remains open in [`todo.md`](../todo.md). Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass is recorded.
+The accepted deployed baseline is backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. Its first authorized receipt smoke test failed safely and exposed provider configuration defects; backend `2026.08.30-ocr-provider-v9` is the next deployment target. Remediation and the repeated smoke test remain open in [`todo.md`](../todo.md). Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass is recorded.
 
 Acceptance requires all of the following:
 

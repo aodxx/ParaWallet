@@ -3,7 +3,9 @@
 สถานะ: **รอทดสอบบนมือถือจริงและลงนามรับรอง**  
 อัปเดต: 30 สิงหาคม 2026  
 PWA: <https://aodxx.github.io/ParaWallet/>  
-Backend ที่ต้องพบหลัง Deploy รุ่นแก้ระบบอ่านภาพ: `2026.08.30-ocr-provider-v8`
+Backend ที่ยืนยันว่า Deploy อยู่ก่อนรอบแก้ล่าสุด: `2026.08.30-ocr-provider-v8`
+
+Backend ที่ต้องพบหลัง Deploy รุ่นแก้ล่าสุด: `2026.08.30-ocr-provider-v9`
 
 Schema ที่ต้องพบ: `2026-08-production-v3`
 
@@ -88,10 +90,10 @@ Schema ที่ต้องพบ: `2026-08-production-v3`
 | ผ่าน | จุดตรวจ | เกณฑ์ |
 |---|---|---|
 | [ ] | Repository | Feature branch ผ่าน review และ Merge เข้า `main` แล้ว |
-| [ ] | Automated verification | `pnpm verify` ผ่าน 146 tests, TypeScript, Apps Script syntax และ production build |
+| [ ] | Automated verification | `pnpm verify` ผ่าน 147 tests, TypeScript, Apps Script syntax และ production build |
 | [ ] | GitHub Pages | Workflow ของ commit ที่ Merge สำเร็จ และ PWA เปิดได้จาก URL จริง |
 | [ ] | Frontend wording | หน้า production ใช้คำตามบทบาทและไม่มีคำเก่า เช่น `Gemini API Key`, `ข้อมูลและการตั้งค่า`, `ข้อตกลงฉบับที่` |
-| [ ] | Backend health | ตอบ `status=ok`, `release=2026.08.30-ocr-provider-v8`, `schemaVersion=2026-08-production-v3` |
+| [ ] | Backend health | ตอบ `status=ok`, `release=2026.08.30-ocr-provider-v9`, `schemaVersion=2026-08-production-v3` |
 | [ ] | Cache/PWA | ปิดแล้วเปิดแอปใหม่หรือ Hard refresh จากนั้นยืนยันว่าโหลด asset รุ่นใหม่ ไม่ใช่ Service Worker cache เก่า |
 
 การแก้เอกสารหรือ frontend เท่านั้นไม่ต้อง Deploy `Code.gs` ใหม่ หาก `appsscript/Code.gs` ไม่มี Diff ให้ตรวจ Health ว่ายังเป็นรุ่นเดิมและห้ามรัน migration โดยไม่จำเป็น

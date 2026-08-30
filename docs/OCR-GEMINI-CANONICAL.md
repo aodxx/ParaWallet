@@ -1,6 +1,7 @@
 # Canonical OCR + Gemini architecture
 
-Current deployed backend release: `2026.08.30-ocr-provider-v8` (corrects the Interactions REST endpoint to `/v1beta/interactions`)
+Current deployed backend release: `2026.08.30-ocr-provider-v8`
+Next deployment target: `2026.08.30-ocr-provider-v9` (pins the model in code, protects diagnostics, and separates provider errors)
 Schema: `2026-08-production-v3` — no Google Sheets migration
 
 This document is the only current design for ParaWallet receipt scanning. Historical OCR notes do not override it.
@@ -40,7 +41,7 @@ The written total remains evidence. The server compares it with the calculated a
 ## Team rules
 
 - There is one runtime AI entry point: `OCR` inside `appsscript/Code.gs`.
-- There is one model setting: Script Property `GEMINI_MODEL`, default `gemini-3.7-flash`. Never use floating aliases such as `latest`.
+- There is one model: `gemini-3.7-flash`, pinned in `Code.gs`. `GEMINI_MODEL` may be empty or contain that exact value; every other value is ignored and reported as `GEMINI_MODEL_PROPERTY_INVALID_IGNORED`. Never place credentials in a model property or use floating aliases such as `latest`.
 - The browser never calls Gemini/Vision and never owns OCR scoring or financial validation.
 - Do not add fixed-coordinate templates, store-specific parsers, regex-only extraction, or a second JSON shape. New layouts are supported by semantic fields and reference scenarios.
 - Provider output is evidence, not truth. Provider confidence alone cannot unlock saving.
@@ -71,8 +72,8 @@ Build a private, consented golden set outside GitHub as real bills become availa
 Required release evidence:
 
 1. `pnpm verify` passes.
-2. `health.get` reports release `2026.08.30-ocr-provider-v8` and schema `2026-08-production-v3`.
-3. `diagnostics.get` reports `ocr.automaticReadingReady=true`; otherwise the UI must say that automatic bill reading is unavailable and offer manual entry.
+2. After v9 deployment, `health.get` reports release `2026.08.30-ocr-provider-v9` and schema `2026-08-production-v3`.
+3. Owner-authenticated `diagnostics.get` reports `ocr.automaticReadingReady=true`, `ocr.model=gemini-3.7-flash`, and no configuration issues; otherwise the UI must offer manual entry.
 4. Diagnostics reports `financialSchemaReady=true`.
 5. Provider smoke tests use configured Vision and Gemini keys and confirm `store=false` behavior.
 6. Every real-bill mismatch is caught by the review/validation gate; no unverified Sale is written.
