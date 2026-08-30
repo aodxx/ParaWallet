@@ -1,6 +1,6 @@
 # Apps Script Deployment Checklist
 
-> Canonical OCR target: `2026.08.29-ocr-scan-ux-v6`; schema: `2026-08-production-v3`. This release requires a new Web App version but no Sheet migration. `GEMINI_API_KEY` is required for automatic bill reading. Historical migration instructions apply only to the release that introduced them.
+> Current backend target: `2026.08.29-ux-ws3-v7`; schema: `2026-08-production-v3`. This release requires a Web App version newer than the OCR v6 baseline but no Sheet migration. `GEMINI_API_KEY` is required for automatic bill reading. Historical migration instructions apply only to the release that introduced them.
 
 Create a standalone Apps Script project and copy only `appsscript/Code.gs` and `appsscript/appsscript.json` into it, or use clasp with a local `.clasp.json` that contains the real Script ID. `Code.gs` is intentionally the single deployment source and already contains configuration, routing, repositories, calculator, locking, idempotency, Drive, OCR, and domain services. The committed `.clasp.json` is intentionally ignored and only serves as a template reference.
 
@@ -24,4 +24,4 @@ The PWA displays the official Google Sign-In button, stores only the short-lived
 
 To diagnose synchronization without exposing Sheet data, send a POST request with action `diagnostics.get` and a unique `requestId`. The response reports whether `SHEET_ID` is configured, whether the spreadsheet is accessible, how many required tabs are missing, and how many Users rows exist. `health.get` only proves the Web App is reachable; it does not prove that Google Sheets is configured.
 
-After deploying the canonical OCR release, verify health reports `release=2026.08.29-ocr-scan-ux-v6` and `schemaVersion=2026-08-production-v3`, then authenticate and require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. Follow [`OCR-GEMINI-CANONICAL.md`](OCR-GEMINI-CANONICAL.md). The supplied sample images are compatibility references only; real-bill recognition remains uncertified until the private rollout gate passes. A frontend-only Pages deployment does not require copying `Code.gs`, deploying Apps Script, or running a migration.
+After deploying the current backend, verify health reports `release=2026.08.29-ux-ws3-v7` and `schemaVersion=2026-08-production-v3`, then authenticate and require diagnostics to report `financialSchemaReady=true` and `ocr.automaticReadingReady=true`. Follow [`OCR-GEMINI-CANONICAL.md`](OCR-GEMINI-CANONICAL.md). The supplied sample images are compatibility references only; real-bill recognition remains uncertified until the private rollout gate passes. A frontend-only Pages deployment does not require copying `Code.gs`, deploying Apps Script, or running a migration.
