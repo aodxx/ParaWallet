@@ -9,7 +9,7 @@ This is the current non-secret integration summary. Exact Spreadsheet IDs, Apps 
 | Integration | Accepted result |
 |---|---|
 | GitHub Pages PWA | Frontend D11 serves the production build at the repository subpath |
-| Apps Script Web App | Health reports `status=ok` and `release=2026.08.29-ux-ws3-v7` |
+| Apps Script Web App | After the provider fix is deployed, Health reports `status=ok` and `release=2026.08.30-ocr-provider-v8` |
 | Google Sheets | Schema reports `2026-08-production-v3`; all 22 canonical domain headers were migrated and verified |
 | Authentication | Separate active Owner and Tapper Google accounts completed controlled E2E |
 | Garden scope | Both roles see only records permitted by garden ownership or active membership |

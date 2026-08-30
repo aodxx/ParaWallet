@@ -10,10 +10,12 @@ const closure = read("docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md");
 const index = read("docs/INDEX.md");
 
 describe("current operating documentation contract", () => {
-  it("keeps the current backend and completed UX baseline in operating documents", () => {
-    for (const document of [readme, todo, manual, uxAudit, closure]) {
-      expect(document).toContain("2026.08.29-ux-ws3-v7");
+  it("separates the deployed backend from the next Apps Script target", () => {
+    for (const document of [readme, todo, manual, closure]) {
+      expect(document).toContain("2026.08.30-ocr-provider-v8");
     }
+    expect(todo).toContain("2026.08.29-ux-ws3-v7");
+    expect(uxAudit).toContain("2026.08.29-ux-ws3-v7");
     expect(manual).toContain("frontend UX remediation ชุด 1–7");
     expect(manual).not.toContain("backend D10 / frontend UX remediation ชุด 2");
   });
