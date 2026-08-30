@@ -1,6 +1,6 @@
 # Canonical OCR + Gemini architecture
 
-Current backend source target: `2026.08.30-ocr-provider-v8` (corrects the Interactions REST endpoint to `/v1beta/interactions`)
+Current deployed backend release: `2026.08.30-ocr-provider-v8` (corrects the Interactions REST endpoint to `/v1beta/interactions`)
 Schema: `2026-08-production-v3` — no Google Sheets migration
 
 This document is the only current design for ParaWallet receipt scanning. Historical OCR notes do not override it.
