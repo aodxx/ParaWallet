@@ -1,6 +1,6 @@
 # ParaWallet Documentation Index
 
-Updated: 29 August 2026
+Updated: 30 August 2026
 
 Use this page to identify the current source of truth. A release number inside a historical report describes that report's point in time; it does not override the current baseline.
 

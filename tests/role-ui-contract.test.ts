@@ -291,7 +291,7 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain(".top-actions .signout-button{display:none");
     expect(styles).toContain(".topbar .brand small{display:none}");
     expect(styles).toContain(".topbar .brand{min-width:0;flex:1}");
-    expect(styles).toContain(".topbar .notification-button{width:42px;height:42px;padding:0}");
+    expect(styles).toContain(".topbar .notification-button{width:44px!important;height:44px!important}");
     expect(styles).toContain("--mobile-dock-height:calc(88px + env(safe-area-inset-bottom))");
     expect(styles).toContain("--mobile-content-clearance:calc(var(--mobile-dock-height) + 52px)");
     expect(styles).toContain("min-height:var(--mobile-dock-height)");
@@ -309,6 +309,46 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain(".auth-security-note");
     expect(styles).toContain("min-height:100svh");
     expect(styles).toContain("@media(prefers-reduced-motion:reduce)");
+  });
+
+  it("closes every visible menu with an observable action and keyboard escape", () => {
+    expect(app).toContain("ข้อมูลเพิ่มเติม");
+    expect(app).not.toContain("ข้อมูลและการตั้งค่า");
+    expect(app).toContain("if (!showMobileMore) return");
+    expect(app).toContain('if (event.key === "Escape") setShowMobileMore(false)');
+    expect(app).toContain('aria-label="ปิดเมนูเพิ่มเติม"');
+    expect(app).toContain('aria-label={`ปิดหน้าต่าง ${title}`}');
+  });
+
+  it("uses role-specific empty, report, and permission page states", () => {
+    expect(app).toContain("function PageState");
+    expect(app).not.toContain("function Empty(");
+    expect(app).toContain("บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าสวน");
+    expect(app).toContain("ติดต่อเจ้าของสวนให้เพิ่มบัญชี Google นี้เป็นคนกรีด");
+    expect(app).toContain("ยังไม่มีประวัติการส่งเงิน");
+    expect(app).toContain("ยังไม่มีข้อตกลงแบ่งรายได้");
+    expect(app).toContain("ไม่พบรายการในช่วงนี้");
+    expect(app).toContain("โหลดรายงานไม่สำเร็จ");
+    expect(app).toContain("โหลดรายงานที่มีรายการก่อน จึงจะดาวน์โหลดตารางได้");
+  });
+
+  it("does not expose raw workflow status or implementation identifiers", () => {
+    expect(app).toContain("labelStatus(agreement.status)");
+    expect(app).not.toContain("{agreement.status}");
+    expect(app).toContain("ข้อตกลงเวอร์ชัน");
+    expect(app).not.toContain("agreementId.slice");
+    expect(app).not.toContain("member.email || member.userId");
+    expect(app).not.toContain("Gemini API Key");
+    expect(app).toContain("ข้อมูลสำหรับผู้ดูแลระบบ");
+  });
+
+  it("keeps important mobile text readable and touch targets at least 44 pixels", () => {
+    expect(styles).toContain("UX workstreams 5–7");
+    expect(styles).toContain(".mobile-scan-trigger-label,.mobile-bottom-nav .scan-option");
+    expect(styles).toContain(".receipt-scan-steps small,.receipt-scan-status span");
+    expect(styles).toContain("font-size:12px!important");
+    expect(styles).toContain("min-height:44px!important");
+    expect(styles).toContain(".page-state-actions button{min-height:44px}");
   });
 });
 

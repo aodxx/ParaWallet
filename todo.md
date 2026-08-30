@@ -1,6 +1,6 @@
 # ParaWallet — Canonical Work Status
 
-Updated: 29 August 2026
+Updated: 30 August 2026
 
 This file is the current work queue. Phase reports under `docs/PHASE-D*.md` are release evidence, not open task lists.
 
@@ -18,8 +18,8 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 
 ## Accepted production baseline
 
-- [x] Backend `2026.08.24-phase-d10` deployed with schema `2026-08-production-v3`
-- [x] Frontend Phase D12.1 Forest Fintech mobile QA refinement deployed on GitHub Pages
+- [x] Backend `2026.08.29-ux-ws3-v7` deployed with schema `2026-08-production-v3`
+- [x] Frontend UX remediation workstreams 1–7 implemented for GitHub Pages
 - [x] Production schema migration completed and all 22 domain headers verified
 - [x] Controlled Owner/Tapper production E2E completed
 - [x] D5 Owner-managed Tapper membership accepted on mobile
@@ -30,7 +30,7 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 - [x] D11 Lottie loading, typography hierarchy, grid alignment, and non-overlapping state transitions deployed
 - [x] D12 Earthy Harmony palette, curved mobile header, prioritized dual wallets, and accessible Animated Circle Dock implemented
 - [x] D12.1 Tapper date formatting, settlement-card spacing, outdoor text contrast, screen-specific descriptions, wallet-heading alignment, and dock clearance implemented
-- [x] Automated verification passes 137 tests, TypeScript, Apps Script syntax, and production build
+- [x] Automated verification passes 143 tests, TypeScript, Apps Script syntax, and production build
 - [x] Current README, operating manual, roadmap, gap matrix, and document index synchronized
 
 ## Release closure — validation only
