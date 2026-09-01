@@ -37,8 +37,8 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 | Owner ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | Tapper ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | GardenMembers | ใช่ | Owner และ Tapper ผูกกับ garden เดียวกันและ active |
-| Production schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-production-v3` |
-| Web App deployment | ใช่ | ก่อน Deploy ต้องให้ `testGeminiProviderConnection()` ผ่าน แล้ว health ต้องรายงาน `release=2026.09.01-ocr-provider-v10` (ค่าก่อน Deploy ยังเป็น `2026.08.30-ocr-provider-v8`) |
+| Production schema | ใช่ | หลัง migration diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-09-financial-clarity-v4` |
+| Web App deployment | ใช่ | ก่อน Deploy ต้องให้ `testGeminiProviderConnection()` ผ่าน แล้ว health ต้องรายงาน `release=2026.09.01-financial-clarity-v11` |
 
 ## 3. การเตรียม Apps Script และ Google Sheets
 
@@ -182,7 +182,7 @@ Tapper ควรส่งเงินตามยอดคงค้างที�
 |---|---|
 | Deployment | Web App ใช้ `Code.gs` revision ล่าสุดจาก repository |
 | Gemini ก่อน Deploy | `testGeminiProviderConnection()` ตอบ `GEMINI_CONNECTION_OK` พร้อม `imageInput=true` และ `structuredOutput=true` |
-| Health | หลัง Deploy source ปัจจุบัน endpoint ตอบ `status=ok`, `release=2026.09.01-ocr-provider-v10` และ `schemaVersion=2026-08-production-v3` |
+| Health | หลัง Deploy source ปัจจุบัน endpoint ตอบ `status=ok`, `release=2026.09.01-financial-clarity-v11` และ `schemaVersion=2026-09-financial-clarity-v4` |
 | Diagnostics | `financialSchemaReady=true` และไม่มี schema mismatch |
 | OAuth | Owner และ Tapper login ด้วยบัญชีที่ลงทะเบียนได้ |
 | Authorization | Owner เห็นเฉพาะสวนของตน และ Tapper เห็นเฉพาะสวนที่ผูก |

@@ -15,9 +15,12 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.09.01-ocr-provider-v10";
-var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
+var PARAWALLET_RELEASE = "2026.09.01-financial-clarity-v11";
+var PARAWALLET_SCHEMA_VERSION = "2026-09-financial-clarity-v4";
 var PINNED_GEMINI_MODEL = "gemini-3.7-flash";
+var PARAWALLET_TIME_ZONE = "Asia/Bangkok";
+var DATA_MODE_PRODUCTION = "production";
+var DATA_MODE_TEST = "test";
 
 // =====================================================
 // 0. ADMIN SETUP ENTRYPOINTS
@@ -102,6 +105,9 @@ function routeAction_(request) {
     return diagnosticsCheck_();
   }
   request.payload = request.payload && typeof request.payload === "object" ? request.payload : {};
+  // dataMode is an internal-only control. Never accept it from Web App clients;
+  // the editor-only controlled E2E runner calls Services directly.
+  delete request.payload._dataMode;
   // The durable RequestID belongs in every audit record. Clients send it at the
   // envelope level, so copy it into the service payload after authentication.
   request.payload.requestId = request.requestId;
@@ -281,16 +287,16 @@ var HEADERS = {
   Gardens: ["id","ownerId","name","locationText","province","district","areaRai","treeCount","status","createdAt","updatedAt"],
   Plots: ["id","gardenId","name","notes","status","createdAt","updatedAt"],
   GardenMembers: ["id","gardenId","userId","role","status","createdAt"],
-  Agreements: ["id","gardenId","ownerId","tapperId","version","ownerPercentage","tapperPercentage","sharedExpenseRulesJson","ownerExpenseRulesJson","tapperExpenseRulesJson","advanceRuleJson","effectiveFrom","effectiveTo","expenseRules","status","createdAt"],
+  Agreements: ["id","gardenId","ownerId","tapperId","version","ownerPercentage","tapperPercentage","sharedExpenseRulesJson","ownerExpenseRulesJson","tapperExpenseRulesJson","advanceRuleJson","effectiveFrom","effectiveTo","expenseRules","status","createdAt","dataMode"],
   ProductTypes: ["id","name","unit","calculationType","configJson","active","createdAt"],
   Buyers: ["id","name","branch","contact","notes","status","createdAt"],
   Receipts: ["id","fileId","fileUrl","imageHash","ocrRawJson","ocrConfidenceJson","createdBy","manualNetAmount","createdAt"],
-  Sales: ["id","gardenId","plotId","agreementId","tapperId","receiptId","buyerId","saleDate","ticketNumber","productTypeId","buyerName","productType","grossWeight","tareWeight","netWeight","drc","weightKg","unitPrice","pricePerUnit","grossSale","buyerDeductions","sharedExpenses","splitBase","ownerShare","tapperShare","netReceived","status","manualEntry","receiptFileId","ocrConfidence","createdAt","updatedAt"],
+  Sales: ["id","gardenId","plotId","agreementId","tapperId","receiptId","buyerId","saleDate","ticketNumber","productTypeId","buyerName","productType","grossWeight","tareWeight","netWeight","drc","weightKg","unitPrice","pricePerUnit","grossSale","buyerDeductions","sharedExpenses","splitBase","ownerShare","tapperShare","netReceived","status","manualEntry","receiptFileId","ocrConfidence","createdAt","updatedAt","dataMode"],
   SaleDeductions: ["id","saleId","deductionType","description","amount","responsibility","createdAt"],
   Payments: ["id","gardenId","saleId","fromUserId","toUserId","amount","method","reference","proofFileId","status","paidAt","createdAt"],
   WalletTransactions: ["id","gardenId","userId","type","amount","sourceType","sourceId","requestId","createdAt"],
   WalletEntries: ["id","walletOwnerUserId","saleId","settlementId","entryType","direction","amount","status","createdAt"],
-  Settlements: ["id","gardenId","tapperId","ownerId","method","amount","transferDate","bank","referenceNo","slipFileId","location","note","status","createdAt"],
+  Settlements: ["id","gardenId","tapperId","ownerId","method","amount","transferDate","bank","referenceNo","slipFileId","location","note","status","createdAt","dataMode"],
   SettlementAllocations: ["id","settlementId","saleId","amount","createdAt"],
   Disputes: ["id","saleId","openedBy","reason","note","evidenceFileId","status","resolvedAt","createdAt"],
   Adjustments: ["id","saleId","userId","adjustmentType","amount","reason","status","createdAt"],
@@ -690,17 +696,17 @@ var Services = {
   dashboard: function (user) {
     var gardens = Repositories.gardensForUser(user.id);
     var garden = gardens[0] || null;
-    var userNotifications = rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); });
+    var userNotifications = Services.listNotifications(user);
     var unreadNotifications = userNotifications.filter(function (row) { return !row.readAt; }).length;
     if (!garden) return { role: user.role, garden: null, wallet: { owner: 0, tapper: 0, outstanding: 0, currency: "THB" }, pendingReviews: 0, pendingSales: 0, pendingSettlements: 0, unreadNotifications: unreadNotifications, monthlySales: 0 };
     var wallet = Services.wallet(user, { gardenId: garden.id });
-    var monthStart = new Date().toISOString().slice(0, 7) + "-01";
-    var gardenSales = rows_("Sales").filter(function (row) {
+    var monthStart = Utilities.formatDate(new Date(), PARAWALLET_TIME_ZONE, "yyyy-MM") + "-01";
+    var gardenSales = productionRows_("Sales").filter(function (row) {
       if (id_(row.gardenId) !== id_(garden.id)) return false;
       return user.role !== "tapper" || id_(row.tapperId) === id_(user.id);
     });
     var pendingSales = gardenSales.filter(function (row) { return row.status === "pending_owner_review" || row.status === "ocr_review"; }).length;
-    var pendingSettlements = rows_("Settlements").filter(function (row) {
+    var pendingSettlements = productionRows_("Settlements").filter(function (row) {
       if (id_(row.gardenId) !== id_(garden.id) || row.status !== "pending_owner_confirmation") return false;
       return user.role === "owner" ? id_(row.ownerId) === id_(user.id) : id_(row.tapperId) === id_(user.id);
     }).length;
@@ -710,7 +716,7 @@ var Services = {
     }), monthStart, "", "saleDate");
     var monthlySalesSeries = [0, 0, 0, 0, 0];
     monthlySales.forEach(function (row) {
-      var saleDay = new Date(row.saleDate || row.createdAt).getUTCDate();
+      var saleDay = Number(dateOnly_(row.saleDate || row.createdAt).slice(8, 10));
       var weekIndex = Math.min(4, Math.max(0, Math.floor((saleDay - 1) / 7)));
       monthlySalesSeries[weekIndex] += numeric_(row.grossSale);
     });
@@ -720,7 +726,7 @@ var Services = {
       wallet: {
         owner: wallet.owner.totalEntitlement,
         tapper: wallet.tapper.totalIncome,
-        outstanding: wallet.owner.outstanding,
+        outstanding: user.role === "tapper" ? wallet.tapper.ownerMoneyHeld : wallet.owner.outstanding,
         currency: "THB"
       },
       walletDetails: wallet,
@@ -763,9 +769,27 @@ var Services = {
 // =====================================================
 
 function nowIso_() { return new Date().toISOString(); }
+function dateOnly_(value) {
+  if (!value) return "";
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) return Utilities.formatDate(value, PARAWALLET_TIME_ZONE, "yyyy-MM-dd");
+  var raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  var parsed = new Date(raw);
+  return isNaN(parsed.getTime()) ? raw.slice(0, 10) : Utilities.formatDate(parsed, PARAWALLET_TIME_ZONE, "yyyy-MM-dd");
+}
+function dateOnlyView_(row, key) { var view = Object.assign({}, row); view[key] = dateOnly_(row[key]); return view; }
 function jsonOrEmpty_(value) { return value ? JSON.stringify(value) : ""; }
 function parseJson_(value, fallback) { try { return value ? JSON.parse(value) : fallback; } catch (error) { return fallback; } }
 function rows_(name) { return Repositories.rows_(name); }
+function isProductionRecord_(row) { return String(row && row.dataMode || "") === DATA_MODE_PRODUCTION; }
+function productionRows_(name) { return rows_(name).filter(isProductionRecord_); }
+function isControlledTestPayload_(payload) {
+  var requestId = String(payload && payload.requestId || "");
+  return payload && payload._dataMode === DATA_MODE_TEST && payload.gardenId === "garden-pahpayom-001" && requestId.indexOf("E2E-PAHPAYOM-001") === 0;
+}
+function requestedDataMode_(payload) { return isControlledTestPayload_(payload) ? DATA_MODE_TEST : DATA_MODE_PRODUCTION; }
+function recordAllowedForPayload_(row, payload) { return isProductionRecord_(row) || (String(row && row.dataMode || "") === DATA_MODE_TEST && isControlledTestPayload_(payload)); }
+function requireVisibleFinancialRecord_(row, payload, code) { if (!recordAllowedForPayload_(row, payload)) throw new Error(code); return row; }
 function id_(value) { return String(value || ""); }
 function findById_(name, value) { return rows_(name).filter(function (row) { return id_(row.id) === id_(value); })[0] || null; }
 function requireGarden_(user, gardenId) {
@@ -820,9 +844,9 @@ function updateRowById_(name, recordId, patch) {
   return false;
 }
 function filterByDate_(items, from, to, dateKey) {
-  var start = from ? new Date(from).getTime() : -Infinity;
-  var end = to ? new Date(to).getTime() + 86400000 - 1 : Infinity;
-  return items.filter(function (item) { var time = new Date(item[dateKey] || item.createdAt).getTime(); return isNaN(time) || (time >= start && time <= end); });
+  var start = from ? dateOnly_(from) : "";
+  var end = to ? dateOnly_(to) : "";
+  return items.filter(function (item) { var key = dateOnly_(item[dateKey] || item.createdAt); return (!start || key >= start) && (!end || key <= end); });
 }
 function numeric_(value) { var number = Number(value); return isNaN(number) ? 0 : number; }
 
@@ -906,7 +930,7 @@ function memberOwnerMoneyHeld_(gardenId, tapperId) {
   rows_("SettlementAllocations").forEach(function (row) {
     allocationsBySale[id_(row.saleId)] = round_(numeric_(allocationsBySale[id_(row.saleId)]) + numeric_(row.amount));
   });
-  return round_(rows_("Sales").filter(function (sale) {
+  return round_(productionRows_("Sales").filter(function (sale) {
     return id_(sale.gardenId) === id_(gardenId) && id_(sale.tapperId) === id_(tapperId) && sale.status === "confirmed";
   }).reduce(function (sum, sale) {
     var entitlement = round_(numeric_(sale.ownerShare) + ownerAdjustmentForSale_(sale.id));
@@ -921,13 +945,13 @@ Services.deactivateMember = function (user, payload) {
   if (!membership || id_(membership.gardenId) !== id_(payload.gardenId) || membership.status !== "active") throw new Error("MEMBER_NOT_FOUND");
   if (membership.role === "owner" || id_(membership.userId) === id_(access.garden.ownerId)) throw new Error("OWNER_MEMBER_CANNOT_BE_REMOVED");
 
-  var hasActiveAgreement = rows_("Agreements").some(function (row) {
+  var hasActiveAgreement = productionRows_("Agreements").some(function (row) {
     return id_(row.gardenId) === id_(payload.gardenId) && id_(row.tapperId) === id_(membership.userId) && row.status === "active";
   });
   if (hasActiveAgreement) throw new Error("MEMBER_HAS_ACTIVE_AGREEMENT");
-  var hasOpenItems = rows_("Sales").some(function (row) {
+  var hasOpenItems = productionRows_("Sales").some(function (row) {
     return id_(row.gardenId) === id_(payload.gardenId) && id_(row.tapperId) === id_(membership.userId) && ["pending_owner_review", "disputed"].indexOf(row.status) >= 0;
-  }) || rows_("Settlements").some(function (row) {
+  }) || productionRows_("Settlements").some(function (row) {
     return id_(row.gardenId) === id_(payload.gardenId) && id_(row.tapperId) === id_(membership.userId) && row.status === "pending_owner_confirmation";
   });
   if (hasOpenItems) throw new Error("MEMBER_HAS_OPEN_ITEMS");
@@ -940,11 +964,13 @@ Services.deactivateMember = function (user, payload) {
   return memberView_(after);
 };
 
-Services.listAgreements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); }); };
+Services.listAgreements = function (user, payload) { requireGarden_(user, payload.gardenId); return productionRows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); }).map(function (row) { return dateOnlyView_(row, "effectiveFrom"); }); };
 Services.createAgreement = function (user, payload) {
   assertFinancialSchemaReady_();
   requireOwner_(user, payload.gardenId);
-  var existing = Services.listAgreements(user, payload);
+  var dataMode = requestedDataMode_(payload);
+  var allExisting = rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); });
+  var existing = allExisting.filter(function (row) { return String(row.dataMode || "") === dataMode; });
   if (!payload.effectiveFrom || isNaN(new Date(payload.effectiveFrom).getTime())) throw new Error("AGREEMENT_EFFECTIVE_FROM_REQUIRED");
   var ownerPercentage = numeric_(payload.ownerPercentage);
   var tapperPercentage = numeric_(payload.tapperPercentage);
@@ -953,33 +979,35 @@ Services.createAgreement = function (user, payload) {
   var tapperMember = rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && id_(row.userId) === id_(payload.tapperId) && row.role === "tapper" && row.status === "active"; })[0];
   if (!tapperMember) throw new Error("TAPPER_NOT_ACTIVE_MEMBER");
   var agreementId = Utilities.getUuid();
-  var version = existing.length ? numeric_(existing[0].version) + 1 : 1;
+  var version = allExisting.length ? Math.max.apply(null, allExisting.map(function (row) { return numeric_(row.version); })) + 1 : 1;
   existing.filter(function (row) { return row.status === "active"; }).forEach(function (row) { updateRowById_("Agreements", row.id, { status: "superseded", effectiveTo: payload.effectiveFrom || nowIso_() }); });
-  Repositories.append("Agreements", { id: agreementId, gardenId: payload.gardenId, ownerId: user.id, tapperId: payload.tapperId, version: version, ownerPercentage: ownerPercentage, tapperPercentage: tapperPercentage, sharedExpenseRulesJson: jsonOrEmpty_(payload.sharedExpenseRules), ownerExpenseRulesJson: jsonOrEmpty_(payload.ownerExpenseRules), tapperExpenseRulesJson: jsonOrEmpty_(payload.tapperExpenseRules), advanceRuleJson: jsonOrEmpty_(payload.advanceRule), effectiveFrom: payload.effectiveFrom, effectiveTo: payload.effectiveTo || "", expenseRules: jsonOrEmpty_(payload.expenseRules), status: "active", createdAt: nowIso_() });
+  Repositories.append("Agreements", { id: agreementId, gardenId: payload.gardenId, ownerId: user.id, tapperId: payload.tapperId, version: version, ownerPercentage: ownerPercentage, tapperPercentage: tapperPercentage, sharedExpenseRulesJson: jsonOrEmpty_(payload.sharedExpenseRules), ownerExpenseRulesJson: jsonOrEmpty_(payload.ownerExpenseRules), tapperExpenseRulesJson: jsonOrEmpty_(payload.tapperExpenseRules), advanceRuleJson: jsonOrEmpty_(payload.advanceRule), effectiveFrom: payload.effectiveFrom, effectiveTo: payload.effectiveTo || "", expenseRules: jsonOrEmpty_(payload.expenseRules), status: "active", createdAt: nowIso_(), dataMode: dataMode });
   writeAudit_(user, "agreement_created", "agreement", agreementId, null, payload, payload.requestId);
   if (payload.tapperId) notifyUser_(payload.tapperId, "agreement_created", "มีข้อตกลงใหม่", "เจ้าของสวนสร้างข้อตกลงเวอร์ชัน " + version, "agreement", agreementId);
-  return findById_("Agreements", agreementId);
+  return dateOnlyView_(findById_("Agreements", agreementId), "effectiveFrom");
 };
 Services.listProducts = function () { return rows_("ProductTypes").filter(function (row) { return row.active !== false && row.active !== "false"; }); };
 Services.listBuyers = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Buyers").filter(function (row) { return row.status !== "archived"; }); };
 
-function activeAgreement_(gardenId, agreementId, saleDate) {
-  var agreement = agreementId ? findById_("Agreements", agreementId) : rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && row.status === "active"; }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); })[0];
+function activeAgreement_(gardenId, agreementId, saleDate, dataMode) {
+  var agreement = agreementId ? findById_("Agreements", agreementId) : rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(gardenId) && row.status === "active" && String(row.dataMode || "") === String(dataMode || DATA_MODE_PRODUCTION); }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); })[0];
   if (!agreement) throw new Error("AGREEMENT_NOT_FOUND");
   if (id_(agreement.gardenId) !== id_(gardenId)) throw new Error("AGREEMENT_GARDEN_MISMATCH");
+  if (String(agreement.dataMode || "") !== String(dataMode || DATA_MODE_PRODUCTION)) throw new Error("AGREEMENT_NOT_FOUND");
   if (agreement.status !== "active") throw new Error("AGREEMENT_NOT_ACTIVE");
-  var dateValue = new Date(saleDate || nowIso_()).getTime();
-  var from = agreement.effectiveFrom ? new Date(agreement.effectiveFrom).getTime() : -Infinity;
-  var to = agreement.effectiveTo ? new Date(agreement.effectiveTo).getTime() : Infinity;
-  if (isNaN(dateValue) || dateValue < from || dateValue > to) throw new Error("AGREEMENT_DATE_OUT_OF_RANGE");
+  var dateValue = dateOnly_(saleDate || new Date());
+  var from = agreement.effectiveFrom ? dateOnly_(agreement.effectiveFrom) : "";
+  var to = agreement.effectiveTo ? dateOnly_(agreement.effectiveTo) : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || (from && dateValue < from) || (to && dateValue > to)) throw new Error("AGREEMENT_DATE_OUT_OF_RANGE");
   return agreement;
 }
 
 Services.createSale = function (user, payload) {
   assertFinancialSchemaReady_();
   var access = requireTapper_(user, payload.gardenId);
+  var dataMode = requestedDataMode_(payload);
   if (!payload.saleDate || isNaN(new Date(payload.saleDate).getTime())) throw new Error("SALE_DATE_REQUIRED");
-  var agreement = activeAgreement_(payload.gardenId, payload.agreementId, payload.saleDate);
+  var agreement = activeAgreement_(payload.gardenId, payload.agreementId, payload.saleDate, dataMode);
   if (id_(agreement.tapperId) !== id_(user.id)) throw new Error("AGREEMENT_TAPPER_MISMATCH");
   var receipt = payload.receiptId ? findById_("Receipts", payload.receiptId) : null;
   if (payload.manualEntry !== true && !receipt) throw new Error("SALE_RECEIPT_REQUIRED");
@@ -1031,7 +1059,7 @@ Services.createSale = function (user, payload) {
   }
   var calc = Calculator.sale({ weightKg: weight, unitPrice: unitPrice, buyerDeductions: buyerDeductions, sharedExpenses: payload.sharedExpenses, ownerPercentage: agreement.ownerPercentage, tapperPercentage: agreement.tapperPercentage });
     var saleId = Utilities.getUuid();
-    Repositories.append("Sales", { id: saleId, gardenId: payload.gardenId, plotId: payload.plotId || "", agreementId: agreement.id, tapperId: user.id, receiptId: receipt ? receipt.id : "", buyerId: payload.buyerId || "", saleDate: payload.saleDate, ticketNumber: payload.ticketNumber || "", productTypeId: payload.productTypeId || "", buyerName: payload.buyerName || "", productType: payload.productType || "", grossWeight: payload.grossWeight || weight, tareWeight: payload.tareWeight || 0, netWeight: weight, drc: payload.drc || "", weightKg: weight, unitPrice: unitPrice, pricePerUnit: unitPrice, grossSale: calc.grossSale, buyerDeductions: buyerDeductions, sharedExpenses: numeric_(payload.sharedExpenses), splitBase: calc.splitBase, ownerShare: calc.ownerShare, tapperShare: calc.tapperShare, netReceived: calc.splitBase, status: "pending_owner_review", manualEntry: payload.manualEntry === true, receiptFileId: receiptFileId, ocrConfidence: receiptConfidence, createdAt: nowIso_(), updatedAt: nowIso_() });
+    Repositories.append("Sales", { id: saleId, gardenId: payload.gardenId, plotId: payload.plotId || "", agreementId: agreement.id, tapperId: user.id, receiptId: receipt ? receipt.id : "", buyerId: payload.buyerId || "", saleDate: payload.saleDate, ticketNumber: payload.ticketNumber || "", productTypeId: payload.productTypeId || "", buyerName: payload.buyerName || "", productType: payload.productType || "", grossWeight: payload.grossWeight || weight, tareWeight: payload.tareWeight || 0, netWeight: weight, drc: payload.drc || "", weightKg: weight, unitPrice: unitPrice, pricePerUnit: unitPrice, grossSale: calc.grossSale, buyerDeductions: buyerDeductions, sharedExpenses: numeric_(payload.sharedExpenses), splitBase: calc.splitBase, ownerShare: calc.ownerShare, tapperShare: calc.tapperShare, netReceived: calc.splitBase, status: "pending_owner_review", manualEntry: payload.manualEntry === true, receiptFileId: receiptFileId, ocrConfidence: receiptConfidence, createdAt: nowIso_(), updatedAt: nowIso_(), dataMode: dataMode });
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: agreement.ownerId, saleId: saleId, settlementId: "", entryType: "sale_entitlement", direction: "credit", amount: calc.ownerShare, status: "pending", createdAt: nowIso_() });
     Repositories.append("WalletEntries", { id: Utilities.getUuid(), walletOwnerUserId: user.id, saleId: saleId, settlementId: "", entryType: "tapper_income", direction: "credit", amount: calc.tapperShare, status: "pending", createdAt: nowIso_() });
     notifyUser_(agreement.ownerId, "sale_pending_review", "มีรายการขายใหม่รอตรวจ", "โปรดตรวจหลักฐานและยืนยันรายการขาย", "sale", saleId);
@@ -1041,17 +1069,18 @@ Services.createSale = function (user, payload) {
 
 Services.listSales = function (user, payload) {
   requireGarden_(user, payload.gardenId);
-  var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); });
+  var sales = productionRows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); });
   sales = filterByDate_(sales, payload.from, payload.to, "saleDate");
   if (payload.status) sales = sales.filter(function (row) { return row.status === payload.status; });
   if (payload.productTypeId) sales = sales.filter(function (row) { return id_(row.productTypeId) === id_(payload.productTypeId); });
   sales.sort(function (a, b) { return new Date(b.saleDate || b.createdAt).getTime() - new Date(a.saleDate || a.createdAt).getTime(); });
-  return sales;
+  return sales.map(function (row) { return dateOnlyView_(row, "saleDate"); });
 };
 
 Services.saleReceipt = function (user, payload) {
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireVisibleFinancialRecord_(sale, payload, "SALE_NOT_FOUND");
   requireGarden_(user, sale.gardenId);
   var receipt = sale.receiptId ? findById_("Receipts", sale.receiptId) : null;
   var fileId = receipt ? receipt.fileId : sale.receiptFileId;
@@ -1071,8 +1100,9 @@ Services.duplicateCheck = function (user, payload) {
   var targetDate = payload.saleDate ? new Date(payload.saleDate).getTime() : NaN;
   var amount = numeric_(payload.grossSale || payload.netReceived);
   var weight = numeric_(payload.netWeight || payload.weightKg);
-  var matches = rows_("Sales").filter(function (row) {
+  var matches = productionRows_("Sales").filter(function (row) {
     if (id_(row.gardenId) !== id_(payload.gardenId)) return false;
+    if (user.role === "tapper" && id_(row.tapperId) !== id_(user.id)) return false;
     var sameDate = targetDate && new Date(row.saleDate).getTime() === targetDate;
     var sameBuyer = payload.buyerName && String(row.buyerName || "").trim().toLowerCase() === String(payload.buyerName).trim().toLowerCase();
     var sameAmount = amount > 0 && Math.abs(numeric_(row.grossSale) - amount) < 0.01;
@@ -1087,6 +1117,7 @@ Services.confirmSale = function (user, payload) {
   assertFinancialSchemaReady_();
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireVisibleFinancialRecord_(sale, payload, "SALE_NOT_FOUND");
   requireOwner_(user, sale.gardenId);
   if (sale.status !== "pending_owner_review" && sale.status !== "ocr_review") throw new Error("SALE_NOT_REVIEWABLE");
   var ledgerExpected = round_(numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses) + numeric_(sale.ownerShare) + numeric_(sale.tapperShare));
@@ -1095,13 +1126,14 @@ Services.confirmSale = function (user, payload) {
   rows_("WalletEntries").filter(function (row) { return id_(row.saleId) === id_(sale.id); }).forEach(function (entry) { updateRowById_("WalletEntries", entry.id, { status: "confirmed" }); });
   writeAudit_(user, "sale_confirmed", "sale", sale.id, sale, { status: "confirmed" }, payload.requestId);
   notifyUser_(sale.tapperId, "sale_confirmed", "เจ้าของยืนยันรายการขาย", "รายการขายได้รับการยืนยันแล้ว", "sale", sale.id);
-  return findById_("Sales", sale.id);
+  return dateOnlyView_(findById_("Sales", sale.id), "saleDate");
 };
 
 Services.disputeSale = function (user, payload) {
   assertFinancialSchemaReady_();
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireVisibleFinancialRecord_(sale, payload, "SALE_NOT_FOUND");
   requireGarden_(user, sale.gardenId);
   if (!payload.reason) throw new Error("DISPUTE_REASON_REQUIRED");
   var disputeId = Utilities.getUuid();
@@ -1117,16 +1149,17 @@ function ownerAdjustmentForSale_(saleId) {
   return round_(rows_("Adjustments").filter(function (row) { return id_(row.saleId) === id_(saleId) && row.status === "confirmed"; }).reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0));
 }
 
-function settlementOutstanding_(gardenId, ownerId, tapperId) {
+function settlementOutstanding_(gardenId, ownerId, tapperId, dataMode) {
+  dataMode = dataMode || DATA_MODE_PRODUCTION;
   var sales = rows_("Sales").filter(function (row) {
-    return id_(row.gardenId) === id_(gardenId) && row.status === "confirmed" && (!tapperId || id_(row.tapperId) === id_(tapperId));
+    return id_(row.gardenId) === id_(gardenId) && String(row.dataMode || "") === dataMode && row.status === "confirmed" && (!tapperId || id_(row.tapperId) === id_(tapperId));
   });
   var total = sales.reduce(function (sum, sale) { return sum + numeric_(sale.ownerShare); }, 0);
   var saleIds = sales.reduce(function (map, sale) { map[id_(sale.id)] = true; return map; }, {});
   var adjustments = rows_("Adjustments").filter(function (row) { return row.status === "confirmed" && saleIds[id_(row.saleId)]; });
   var ownerAdjustment = adjustments.reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0);
   var settlements = rows_("Settlements").filter(function (row) {
-    return id_(row.gardenId) === id_(gardenId) && id_(row.ownerId) === id_(ownerId) && row.status === "confirmed" && (!tapperId || id_(row.tapperId) === id_(tapperId));
+    return id_(row.gardenId) === id_(gardenId) && String(row.dataMode || "") === dataMode && id_(row.ownerId) === id_(ownerId) && row.status === "confirmed" && (!tapperId || id_(row.tapperId) === id_(tapperId));
   });
   var paid = settlements.reduce(function (sum, item) { return sum + numeric_(item.amount); }, 0);
   var entitlement = round_(total + ownerAdjustment);
@@ -1136,9 +1169,9 @@ function settlementOutstanding_(gardenId, ownerId, tapperId) {
 Services.wallet = function (user, payload) {
   var access = requireGarden_(user, payload.gardenId);
   var garden = access.garden;
-  var agreementRows = rows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(garden.id); });
+  var agreementRows = productionRows_("Agreements").filter(function (row) { return id_(row.gardenId) === id_(garden.id) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); });
   var ownerId = garden.ownerId;
-  var sales = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(garden.id); });
+  var sales = productionRows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(garden.id) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); });
   var confirmed = sales.filter(function (row) { return row.status === "confirmed"; });
   var pending = sales.filter(function (row) { return row.status === "pending_owner_review" || row.status === "ocr_review"; });
   var disputed = sales.filter(function (row) { return row.status === "disputed"; });
@@ -1147,14 +1180,16 @@ Services.wallet = function (user, payload) {
   var adjustments = rows_("Adjustments").filter(function (row) { return row.status === "confirmed" && confirmedIds[id_(row.saleId)]; });
   var ownerEntitlement = confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) + adjustments.reduce(function (sum, row) { return sum + (row.adjustmentType === "owner_credit" ? numeric_(row.amount) : row.adjustmentType === "owner_debit" ? -numeric_(row.amount) : 0); }, 0);
   var tapperIncome = confirmed.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0) + adjustments.filter(function (row) { var sale = findById_("Sales", row.saleId); return sale && (!tapperId || id_(sale.tapperId) === id_(tapperId)); }).reduce(function (sum, row) { return sum + (row.adjustmentType === "tapper_credit" ? numeric_(row.amount) : row.adjustmentType === "tapper_debit" ? -numeric_(row.amount) : 0); }, 0);
-  var settlement = settlementOutstanding_(garden.id, ownerId);
+  var settlement = user.role === "tapper" && tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlementOutstanding_(garden.id, ownerId);
   var tapperSettlement = tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlement;
-  return { gardenId: garden.id, role: user.role, agreementCount: agreementRows.length, owner: { totalEntitlement: round_(ownerEntitlement), totalReceived: settlement.received, outstanding: settlement.outstanding, pending: pending.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0), disputed: disputed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) }, tapper: { totalIncome: round_(tapperIncome), ownerMoneyHeld: tapperSettlement.outstanding, ownerMoneyTransferred: tapperSettlement.received, pendingReviews: pending.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).length } };
+  var testDataCount = rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(garden.id) && String(row.dataMode || "") === DATA_MODE_TEST && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); }).length + rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(garden.id) && String(row.dataMode || "") === DATA_MODE_TEST && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); }).length;
+  return { gardenId: garden.id, role: user.role, agreementCount: agreementRows.length, testDataCount: testDataCount, owner: { totalEntitlement: round_(ownerEntitlement), totalReceived: settlement.received, outstanding: settlement.outstanding, pending: pending.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0), disputed: disputed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0) }, tapper: { totalIncome: round_(tapperIncome), ownerEntitlement: tapperSettlement.entitlement, ownerMoneyHeld: tapperSettlement.outstanding, ownerMoneyTransferred: tapperSettlement.received, pendingReviews: pending.filter(function (row) { return !tapperId || id_(row.tapperId) === id_(tapperId); }).length } };
 };
 
 Services.createSettlement = function (user, payload) {
   assertFinancialSchemaReady_();
   var access = requireGarden_(user, payload.gardenId);
+  var dataMode = requestedDataMode_(payload);
   var isOwner = access.isOwner;
   if (!isOwner && user.role !== "tapper") throw new Error("SETTLEMENT_PERMISSION_DENIED");
   var tapperId = payload.tapperId || user.id;
@@ -1184,20 +1219,31 @@ Services.createSettlement = function (user, payload) {
     }
   }
   if (method === "cash" && !String(payload.location || "").trim()) throw new Error("CASH_LOCATION_REQUIRED");
-  var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId, tapperId).outstanding;
+  var outstanding = settlementOutstanding_(payload.gardenId, access.garden.ownerId, tapperId, dataMode).outstanding;
   if (numeric_(payload.amount) > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
   var settlementId = Utilities.getUuid();
-  Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || nowIso_(), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_() });
+  Repositories.append("Settlements", { id: settlementId, gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || dateOnly_(new Date()), bank: payload.bank || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "", status: "pending_owner_confirmation", createdAt: nowIso_(), dataMode: dataMode });
   notifyUser_(access.garden.ownerId, "settlement_pending", method === "cash" ? "มีรายการเงินสดรอยืนยันรับเงิน" : "มีรายการโอนพร้อมสลิปรอยืนยัน", "ยอด " + payload.amount, "settlement", settlementId);
   writeAudit_(user, "settlement_created", "settlement", settlementId, null, { gardenId: payload.gardenId, tapperId: tapperId, ownerId: access.garden.ownerId, method: method, amount: round_(numeric_(payload.amount)), transferDate: payload.transferDate || "", referenceNo: payload.referenceNo || payload.reference || "", slipFileId: slipFileId, location: payload.location || "", note: payload.note || "" }, payload.requestId);
-  return findById_("Settlements", settlementId);
+  return settlementView_(findById_("Settlements", settlementId));
 };
 
-Services.listSettlements = function (user, payload) { requireGarden_(user, payload.gardenId); return rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }).sort(function (a, b) { return new Date(b.transferDate || b.createdAt).getTime() - new Date(a.transferDate || a.createdAt).getTime(); }); };
+function settlementView_(settlement) {
+  var salesById = {};
+  productionRows_("Sales").forEach(function (sale) { salesById[id_(sale.id)] = sale; });
+  var allocations = rows_("SettlementAllocations").filter(function (row) { return id_(row.settlementId) === id_(settlement.id); }).map(function (row) {
+    var sale = salesById[id_(row.saleId)] || {};
+    return { saleId: row.saleId, saleDate: dateOnly_(sale.saleDate), buyerName: sale.buyerName || "ไม่ระบุร้านรับซื้อ", amount: round_(numeric_(row.amount)), ownerShare: round_(numeric_(sale.ownerShare)) };
+  });
+  return Object.assign(dateOnlyView_(settlement, "transferDate"), { allocations: allocations });
+}
+
+Services.listSettlements = function (user, payload) { requireGarden_(user, payload.gardenId); return productionRows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); }).sort(function (a, b) { return dateOnly_(b.transferDate || b.createdAt).localeCompare(dateOnly_(a.transferDate || a.createdAt)); }).map(settlementView_); };
 
 Services.settlementEvidence = function (user, payload) {
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireVisibleFinancialRecord_(settlement, payload, "SETTLEMENT_NOT_FOUND");
   requireGarden_(user, settlement.gardenId);
   if (settlement.method !== "bank_transfer" || !settlement.slipFileId) throw new Error("SETTLEMENT_SLIP_NOT_FOUND");
   var trustedFile = rows_("Files").filter(function (row) {
@@ -1217,12 +1263,14 @@ Services.confirmSettlement = function (user, payload) {
   assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireVisibleFinancialRecord_(settlement, payload, "SETTLEMENT_NOT_FOUND");
   requireOwner_(user, settlement.gardenId);
     if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_CONFIRMABLE");
     if (settlement.method === "bank_transfer" && !settlement.slipFileId) throw new Error("SETTLEMENT_SLIP_REQUIRED");
     var amount = numeric_(settlement.amount);
     if (amount <= 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
-    var outstanding = settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId).outstanding;
+    var settlementMode = String(settlement.dataMode || DATA_MODE_PRODUCTION);
+    var outstanding = settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId, settlementMode).outstanding;
     if (amount > outstanding) throw new Error("SETTLEMENT_EXCEEDS_OUTSTANDING");
     var remaining = amount;
     var allocations = [];
@@ -1234,7 +1282,7 @@ Services.confirmSettlement = function (user, payload) {
       map[saleId] = round_(numeric_(map[saleId]) + delta);
       return map;
     }, {});
-    rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(settlement.gardenId) && id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"; }).sort(function (a, b) { return new Date(a.saleDate || a.createdAt).getTime() - new Date(b.saleDate || b.createdAt).getTime(); }).forEach(function (sale) {
+    rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(settlement.gardenId) && id_(row.tapperId) === id_(settlement.tapperId) && String(row.dataMode || "") === settlementMode && row.status === "confirmed"; }).sort(function (a, b) { return dateOnly_(a.saleDate || a.createdAt).localeCompare(dateOnly_(b.saleDate || b.createdAt)); }).forEach(function (sale) {
       if (remaining <= 0) return;
       var already = existingAllocations.filter(function (row) { return id_(row.saleId) === id_(sale.id) && row.settlementId !== settlement.id && row.status !== "rejected" && row.status !== "cancelled"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0);
       var allocated = Math.min(remaining, Math.max(0, numeric_(sale.ownerShare) + numeric_(adjustmentBySaleId[id_(sale.id)]) - already));
@@ -1246,33 +1294,35 @@ Services.confirmSettlement = function (user, payload) {
     updateRowById_("Settlements", settlement.id, { status: "confirmed" });
     writeAudit_(user, "settlement_confirmed", "settlement", settlement.id, settlement, { status: "confirmed", allocations: allocations }, payload.requestId);
     notifyUser_(settlement.tapperId, "settlement_confirmed", "เจ้าของยืนยันการรับเงิน", "ยอด " + settlement.amount, "settlement", settlement.id);
-  return Object.assign({}, settlement, { status: "confirmed" });
+  return settlementView_(Object.assign({}, settlement, { status: "confirmed" }));
 };
 
 Services.rejectSettlement = function (user, payload) {
   assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireVisibleFinancialRecord_(settlement, payload, "SETTLEMENT_NOT_FOUND");
   requireOwner_(user, settlement.gardenId);
   if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_REJECTABLE");
   if (!payload.reason) throw new Error("SETTLEMENT_REJECTION_REASON_REQUIRED");
   updateRowById_("Settlements", settlement.id, { status: "rejected", note: (settlement.note || "") + "\nเหตุผล: " + payload.reason });
   writeAudit_(user, "settlement_rejected", "settlement", settlement.id, settlement, { status: "rejected", reason: payload.reason }, payload.requestId);
   notifyUser_(settlement.tapperId, "settlement_rejected", "เจ้าของปฏิเสธรายการส่งเงิน", payload.reason, "settlement", settlement.id);
-  return findById_("Settlements", settlement.id);
+  return settlementView_(findById_("Settlements", settlement.id));
 };
 
 Services.cancelSettlement = function (user, payload) {
   assertFinancialSchemaReady_();
   var settlement = findById_("Settlements", payload.settlementId);
   if (!settlement) throw new Error("SETTLEMENT_NOT_FOUND");
+  requireVisibleFinancialRecord_(settlement, payload, "SETTLEMENT_NOT_FOUND");
   requireGarden_(user, settlement.gardenId);
   if (id_(settlement.tapperId) !== id_(user.id) || user.role !== "tapper") throw new Error("TAPPER_PERMISSION_REQUIRED");
   if (settlement.status !== "pending_owner_confirmation") throw new Error("SETTLEMENT_NOT_CANCELLABLE");
   updateRowById_("Settlements", settlement.id, { status: "cancelled", note: (settlement.note || "") + "\nยกเลิกโดย: " + user.id });
   writeAudit_(user, "settlement_cancelled", "settlement", settlement.id, settlement, { status: "cancelled" }, payload.requestId);
   notifyUser_(settlement.ownerId, "settlement_cancelled", "คนกรีดยกเลิกรายการส่งเงิน", "รายการส่งเงินถูกยกเลิกแล้ว", "settlement", settlement.id);
-  return findById_("Settlements", settlement.id);
+  return settlementView_(findById_("Settlements", settlement.id));
 };
 
 Services.resolveDispute = function (user, payload) {
@@ -1282,6 +1332,7 @@ Services.resolveDispute = function (user, payload) {
   if (!dispute) throw new Error("DISPUTE_NOT_FOUND");
   var sale = findById_("Sales", dispute.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireVisibleFinancialRecord_(sale, payload, "SALE_NOT_FOUND");
   requireOwner_(user, sale.gardenId);
   if (["open", "under_review"].indexOf(dispute.status) < 0) throw new Error("DISPUTE_NOT_RESOLVABLE");
   var decision = String(payload.decision || "").toLowerCase();
@@ -1298,6 +1349,7 @@ Services.createAdjustment = function (user, payload) {
   assertFinancialSchemaReady_();
   var sale = findById_("Sales", payload.saleId);
   if (!sale) throw new Error("SALE_NOT_FOUND");
+  requireVisibleFinancialRecord_(sale, payload, "SALE_NOT_FOUND");
   requireOwner_(user, sale.gardenId);
   if (sale.status !== "confirmed") throw new Error("SALE_NOT_ADJUSTABLE");
   var amount = round_(numeric_(payload.amount));
@@ -1323,9 +1375,15 @@ function notificationTarget_(type) {
   return "notifications";
 }
 Services.listNotifications = function (user) {
-  return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); }).map(function (row) {
-    return notificationView_(row);
-  });
+  var productionSaleIds = productionRows_("Sales").reduce(function (map, row) { map[id_(row.id)] = true; return map; }, {});
+  var productionSettlementIds = productionRows_("Settlements").reduce(function (map, row) { map[id_(row.id)] = true; return map; }, {});
+  var productionAgreementIds = productionRows_("Agreements").reduce(function (map, row) { map[id_(row.id)] = true; return map; }, {});
+  return rows_("Notifications").filter(function (row) { return id_(row.userId) === id_(user.id); }).map(notificationView_).filter(function (row) {
+    if (row.entityType === "sale") return Boolean(productionSaleIds[id_(row.entityId)]);
+    if (row.entityType === "settlement") return Boolean(productionSettlementIds[id_(row.entityId)]);
+    if (row.entityType === "agreement") return Boolean(productionAgreementIds[id_(row.entityId)]);
+    return true;
+  }).sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
 };
 Services.readNotification = function (user, payload) {
   var notification = rows_("Notifications").filter(function (row) { return id_(row.id) === id_(payload.notificationId) && id_(row.userId) === id_(user.id); })[0];
@@ -1338,11 +1396,12 @@ Services.readNotification = function (user, payload) {
 
 Services.report = function (user, payload) {
   requireGarden_(user, payload.gardenId);
-  var sales = filterByDate_(rows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }), payload.from, payload.to, "saleDate");
-  var settlements = filterByDate_(rows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId); }), payload.from, payload.to, "transferDate");
+  var sales = filterByDate_(productionRows_("Sales").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); }), payload.from, payload.to, "saleDate");
+  var settlements = filterByDate_(productionRows_("Settlements").filter(function (row) { return id_(row.gardenId) === id_(payload.gardenId) && (user.role !== "tapper" || id_(row.tapperId) === id_(user.id)); }), payload.from, payload.to, "transferDate");
   var confirmed = sales.filter(function (row) { return row.status === "confirmed"; });
-  var summary = { from: payload.from || "", to: payload.to || "", salesCount: sales.length, confirmedSales: confirmed.length, grossSales: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0)), ownerShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0)), tapperShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0)), deductions: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.buyerDeductions) + numeric_(row.sharedExpenses); }, 0)), settlements: round_(settlements.filter(function (row) { return row.status === "confirmed"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0)), outstanding: settlementOutstanding_(payload.gardenId, requireGarden_(user, payload.gardenId).garden.ownerId).outstanding };
-  return { summary: summary, rows: sales };
+  var reportTapperId = user.role === "tapper" ? user.id : "";
+  var summary = { from: payload.from || "", to: payload.to || "", salesCount: sales.length, confirmedSales: confirmed.length, grossSales: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.grossSale); }, 0)), ownerShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.ownerShare); }, 0)), tapperShare: round_(confirmed.reduce(function (sum, row) { return sum + numeric_(row.tapperShare); }, 0)), deductions: round_(sales.reduce(function (sum, row) { return sum + numeric_(row.buyerDeductions) + numeric_(row.sharedExpenses); }, 0)), settlements: round_(settlements.filter(function (row) { return row.status === "confirmed"; }).reduce(function (sum, row) { return sum + numeric_(row.amount); }, 0)), outstanding: settlementOutstanding_(payload.gardenId, requireGarden_(user, payload.gardenId).garden.ownerId, reportTapperId).outstanding };
+  return { summary: summary, rows: sales.map(function (row) { return dateOnlyView_(row, "saleDate"); }) };
 };
 
 
@@ -1399,7 +1458,7 @@ function runAuthorizedE2ETestOnce() {
     var membership = rows_("GardenMembers").filter(function (row) { return id_(row.gardenId) === gardenId && id_(row.userId) === tapperId && row.role === "tapper" && row.status === "active"; })[0];
     if (!membership) throw new Error("E2E_TAPPER_MEMBERSHIP_INVALID");
 
-    var agreement = rows_("Agreements").filter(function (row) { return id_(row.gardenId) === gardenId && id_(row.tapperId) === tapperId && row.status === "active"; }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); })[0];
+    var agreement = rows_("Agreements").filter(function (row) { return id_(row.gardenId) === gardenId && id_(row.tapperId) === tapperId && String(row.dataMode || "") === DATA_MODE_TEST && row.status === "active"; }).sort(function (a, b) { return numeric_(b.version) - numeric_(a.version); })[0];
     if (!agreement) {
       agreement = Services.createAgreement(owner, {
         gardenId: gardenId,
@@ -1408,6 +1467,7 @@ function runAuthorizedE2ETestOnce() {
         tapperPercentage: 40,
         effectiveFrom: "2026-08-21T00:00:00+12:00",
         expenseRules: { testFixture: true, label: runTag },
+        _dataMode: DATA_MODE_TEST,
         requestId: runTag + "-AGREEMENT"
       });
     }
@@ -1430,13 +1490,14 @@ function runAuthorizedE2ETestOnce() {
         buyerDeductions: 100,
         sharedExpenses: 50,
         manualEntry: true,
+        _dataMode: DATA_MODE_TEST,
         requestId: saleRequestId
       });
       sale = findById_("Sales", sale.id);
     }
     if (!sale) throw new Error("E2E_SALE_NOT_CREATED");
     if (sale.status === "pending_owner_review" || sale.status === "ocr_review") {
-      sale = Services.confirmSale(owner, { saleId: sale.id, requestId: saleRequestId + "-CONFIRM" });
+      sale = Services.confirmSale(owner, { saleId: sale.id, gardenId: gardenId, _dataMode: DATA_MODE_TEST, requestId: saleRequestId + "-CONFIRM" });
     }
     if (sale.status !== "confirmed") throw new Error("E2E_SALE_NOT_CONFIRMED");
     if (round_(numeric_(sale.grossSale)) !== 6000 || round_(numeric_(sale.buyerDeductions) + numeric_(sale.sharedExpenses)) !== 150 || round_(numeric_(sale.splitBase)) !== 5850 || round_(numeric_(sale.ownerShare)) !== 3510 || round_(numeric_(sale.tapperShare)) !== 2340) throw new Error("E2E_SALE_CALCULATION_INVALID");
@@ -1452,11 +1513,12 @@ function runAuthorizedE2ETestOnce() {
         referenceNo: runTag,
         location: "สวนป่าพะยอม",
         note: "รายการทดสอบ E2E: ส่งเงินบางส่วน",
+        _dataMode: DATA_MODE_TEST,
         requestId: settlementRequestId
       });
     }
     if (!settlement) throw new Error("E2E_SETTLEMENT_NOT_CREATED");
-    if (settlement.status === "pending_owner_confirmation") settlement = Services.confirmSettlement(owner, { settlementId: settlement.id, requestId: settlementRequestId + "-CONFIRM" });
+    if (settlement.status === "pending_owner_confirmation") settlement = Services.confirmSettlement(owner, { settlementId: settlement.id, gardenId: gardenId, _dataMode: DATA_MODE_TEST, requestId: settlementRequestId + "-CONFIRM" });
     if (settlement.status !== "confirmed") throw new Error("E2E_SETTLEMENT_NOT_CONFIRMED");
 
     var saleRows = rows_("Sales").filter(function (row) { return id_(row.id) === id_(sale.id); });
@@ -1493,7 +1555,7 @@ function mapLegacyAgreementRow_(row) {
   return [
     row[0], row[1], row[2], row[3], row[4], row[5], row[6],
     "", "", "", "",
-    row[7], row[8], row[9], row[10], row[11]
+    row[7], row[8], row[9], row[10], row[11], "production"
   ];
 }
 
@@ -1510,12 +1572,69 @@ function mapLegacySaleRow_(row) {
     row[0], row[1], "", row[2], row[3], "", "", row[4], "", "",
     row[5], row[6], row[7], 0, row[7], "", row[7], row[8], row[8], row[9],
     row[10], row[11], row[12], row[13], row[14], row[12], row[15], true,
-    row[16], row[17], row[18], ""
+    row[16], row[17], row[18], "", "production"
   ];
 }
 
 function mapLegacySettlementRow_(row) {
-  return [row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], ""];
+  return [row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], "", "production"];
+}
+
+function financialClarityMigrationPlans_() {
+  return [
+    { name: "Agreements", previous: ["id","gardenId","ownerId","tapperId","version","ownerPercentage","tapperPercentage","sharedExpenseRulesJson","ownerExpenseRulesJson","tapperExpenseRulesJson","advanceRuleJson","effectiveFrom","effectiveTo","expenseRules","status","createdAt"] },
+    { name: "Sales", previous: ["id","gardenId","plotId","agreementId","tapperId","receiptId","buyerId","saleDate","ticketNumber","productTypeId","buyerName","productType","grossWeight","tareWeight","netWeight","drc","weightKg","unitPrice","pricePerUnit","grossSale","buyerDeductions","sharedExpenses","splitBase","ownerShare","tapperShare","netReceived","status","manualEntry","receiptFileId","ocrConfidence","createdAt","updatedAt"] },
+    { name: "Settlements", previous: ["id","gardenId","tapperId","ownerId","method","amount","transferDate","bank","referenceNo","slipFileId","location","note","status","createdAt"] }
+  ];
+}
+
+function previewFinancialClarityV11Migration() {
+  var book = SpreadsheetApp.openById(Config.spreadsheetId());
+  return financialClarityMigrationPlans_().map(function (plan) {
+    var sheet = book.getSheetByName(plan.name);
+    if (!sheet) return { name: plan.name, status: "missing" };
+    var actual = readHeaders_(sheet);
+    var status = headersEqual_(actual, HEADERS[plan.name]) ? "already_migrated" : headersEqual_(actual, plan.previous) ? "ready_to_migrate_as_test" : "unexpected";
+    return { name: plan.name, status: status, dataRows: Math.max(sheet.getLastRow() - 1, 0), actual: actual, expected: HEADERS[plan.name] };
+  });
+}
+
+function migrateFinancialClaritySheet_(book, plan, suffix) {
+  var sheet = book.getSheetByName(plan.name);
+  if (!sheet) throw new Error("SHEET_MISSING:" + plan.name);
+  var actual = readHeaders_(sheet);
+  if (headersEqual_(actual, HEADERS[plan.name])) return { name: plan.name, status: "already_migrated", dataRows: Math.max(sheet.getLastRow() - 1, 0) };
+  if (!headersEqual_(actual, plan.previous)) throw new Error("SCHEMA_MIGRATION_UNEXPECTED:" + plan.name + ":" + actual.join(","));
+
+  var backupName = plan.name + "_Backup_FinancialClarity_" + suffix;
+  if (book.getSheetByName(backupName)) backupName += "_" + Utilities.getUuid().slice(0, 6);
+  var backup = sheet.copyTo(book).setName(backupName);
+  backup.setFrozenRows(1);
+  var lastRow = sheet.getLastRow();
+  var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, plan.previous.length).getValues() : [];
+  var migrated = rows.map(function (row) { return row.concat([DATA_MODE_TEST]); });
+  ensureSheetColumnCapacity_(sheet, HEADERS[plan.name].length);
+  sheet.getRange(1, 1, Math.max(lastRow, 1), Math.max(sheet.getLastColumn(), HEADERS[plan.name].length)).clearContent();
+  sheet.getRange(1, 1, 1, HEADERS[plan.name].length).setValues([HEADERS[plan.name]]);
+  if (migrated.length) sheet.getRange(2, 1, migrated.length, HEADERS[plan.name].length).setValues(migrated);
+  sheet.setFrozenRows(1);
+  return { name: plan.name, status: "migrated_as_test", backupSheet: backupName, migratedRows: migrated.length };
+}
+
+// One-time, backup-first migration for the audited pre-production workbook.
+// Every existing Agreement, Sale, and Settlement is preserved but classified
+// as test data because the operator confirmed that real bills are not in use yet.
+function migrateFinancialClarityV11() {
+  return Locking.run("admin:financial-clarity-v11", function () {
+    var book = SpreadsheetApp.openById(Config.spreadsheetId());
+    book.setSpreadsheetTimeZone(PARAWALLET_TIME_ZONE);
+    var suffix = Utilities.formatDate(new Date(), PARAWALLET_TIME_ZONE, "yyyyMMdd_HHmmss");
+    var results = financialClarityMigrationPlans_().map(function (plan) { return migrateFinancialClaritySheet_(book, plan, suffix); });
+    SpreadsheetApp.flush();
+    Repositories.resetRequestContext_();
+    var mismatches = Repositories.validateSchema().filter(function (item) { return item.status !== "ok"; });
+    return { status: mismatches.length ? "incomplete" : "ready", release: PARAWALLET_RELEASE, schemaVersion: PARAWALLET_SCHEMA_VERSION, timeZone: book.getSpreadsheetTimeZone(), financialSchemaReady: mismatches.length === 0, results: results, mismatches: mismatches, nextAction: mismatches.length ? "STOP_AND_REVIEW" : "CREATE_REAL_PRODUCTION_AGREEMENT" };
+  });
 }
 
 function productionSchemaMigrationPlans_() {

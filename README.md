@@ -8,9 +8,9 @@ ParaWallet is a mobile-first Rubber Dual Wallet PWA for transparent money sharin
 |---|---|
 | Frontend | UX remediation workstreams 1–7 on GitHub Pages |
 | Backend deployed | `2026.08.30-ocr-provider-v8` |
-| Backend next deployment | `2026.09.01-ocr-provider-v10` |
-| Schema | `2026-08-production-v3` |
-| Automated verification | 155 tests, TypeScript, Apps Script syntax, and production build |
+| Backend next deployment | `2026.09.01-financial-clarity-v11` |
+| Schema next deployment | `2026-09-financial-clarity-v4` |
+| Automated verification | 159 tests, TypeScript, Apps Script syntax, and production build |
 | Production workflow | Owner/Tapper authenticated E2E and D5–D10 mobile acceptance completed |
 
 Live PWA: <https://aodxx.github.io/ParaWallet/>  
@@ -60,8 +60,8 @@ For local development, set `VITE_APPS_SCRIPT_URL` to the deployed Apps Script We
 
 - Frontend changes are verified and deployed by the GitHub Pages workflow.
 - Backend changes are not synchronized automatically. Copy the latest `appsscript/Code.gs`, save it in the existing Apps Script project, and deploy a new Web App version.
-- Before deploying the current Apps Script target, run editor-only `testGeminiProviderConnection()` and require `ok=true`, `model=gemini-3.7-flash`, `imageInput=true`, `structuredOutput=true`, and `code=GEMINI_CONNECTION_OK`. Then deploy and require health to report `release=2026.09.01-ocr-provider-v10` and `schemaVersion=2026-08-production-v3`; Owner-authenticated diagnostics must report `financialSchemaReady=true`, `ocr.automaticReadingReady=true`, the pinned model, and no configuration issues. v10 contains all undeployed v9 protections, adds the non-secret provider self-test, and requires no Sheet migration. Follow `docs/OCR-GEMINI-CANONICAL.md`; the supplied sample images are reference scenarios, not real-bill acceptance evidence.
-- Run a migration only when its release document explicitly requires it. D10–D12 require no schema migration.
+- Before deploying the current Apps Script target, run editor-only `testGeminiProviderConnection()` and require `GEMINI_CONNECTION_OK`. Then deploy and require health to report `release=2026.09.01-financial-clarity-v11` and `schemaVersion=2026-09-financial-clarity-v4`.
+- v11 requires the one-time backup-first `migrateFinancialClarityV11()` migration. It classifies the audited existing Agreement/Sale/Settlement rows as test data without deleting them, and requires the Owner to create a clean production Agreement before real use. Follow [`docs/FINANCIAL-CLARITY-REMEDIATION-2026-09-01.md`](docs/FINANCIAL-CLARITY-REMEDIATION-2026-09-01.md) in exact order.
 
 Detailed setup is in [docs/SETUP_APPS_SCRIPT.md](docs/SETUP_APPS_SCRIPT.md), and real-use procedures are in [docs/PARAWALLET-REAL-USE-MANUAL.md](docs/PARAWALLET-REAL-USE-MANUAL.md).
 

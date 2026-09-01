@@ -1,8 +1,8 @@
 # Canonical OCR + Gemini architecture
 
 Current deployed backend release: `2026.08.30-ocr-provider-v8`
-Next deployment target: `2026.09.01-ocr-provider-v10` (includes the undeployed v9 protections and adds a safe pre-deployment provider self-test)
-Schema: `2026-08-production-v3` — no Google Sheets migration
+Next deployment target: `2026.09.01-financial-clarity-v11` (retains the v10 Gemini self-test and adds financial clarity/data separation)
+Schema: `2026-09-financial-clarity-v4` — requires the backup-first migration in `FINANCIAL-CLARITY-REMEDIATION-2026-09-01.md`
 
 This document is the only current design for ParaWallet receipt scanning. Historical OCR notes do not override it.
 
@@ -73,7 +73,7 @@ Required release evidence:
 
 1. `pnpm verify` passes.
 2. Before deployment, editor-only `testGeminiProviderConnection()` reports `ok=true`, `model=gemini-3.7-flash`, `imageInput=true`, `structuredOutput=true`, and `code=GEMINI_CONNECTION_OK` without writing Sheets/Drive or exposing provider data.
-3. After v10 deployment, `health.get` reports release `2026.09.01-ocr-provider-v10` and schema `2026-08-production-v3`.
+3. After v11 deployment, `health.get` reports release `2026.09.01-financial-clarity-v11` and schema `2026-09-financial-clarity-v4`.
 4. Owner-authenticated `diagnostics.get` reports `ocr.automaticReadingReady=true`, `ocr.model=gemini-3.7-flash`, and no configuration issues; otherwise the UI must offer manual entry.
 5. Diagnostics reports `financialSchemaReady=true`.
 6. Provider smoke tests confirm the receipt image path and `store=false` behavior; optional Vision is tested only when intentionally provisioned.

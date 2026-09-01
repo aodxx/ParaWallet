@@ -137,11 +137,12 @@ export type GardenMember = { id: string; gardenId: string; userId: string; role:
 export type Agreement = { id: string; gardenId: string; ownerId: string; tapperId: string; version: number; ownerPercentage: number; tapperPercentage: number; effectiveFrom: string; effectiveTo?: string; status: string };
 export type Sale = { id: string; gardenId: string; agreementId: string; tapperId?: string; receiptId?: string; saleDate: string; ticketNumber?: string; buyerName?: string; productType?: string; weightKg?: number; netWeight?: number; unitPrice?: number; grossSale?: number; buyerDeductions?: number; sharedExpenses?: number; splitBase?: number; ownerShare?: number; tapperShare?: number; status: string; receiptFileId?: string; ocrConfidence?: number | string; manualEntry?: boolean; createdAt?: string };
 export type SaleReceiptEvidence = { saleId: string; receiptId?: string; fileId: string; name: string; mimeType: string; dataUrl: string };
-export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string };
+export type SettlementAllocation = { saleId: string; saleDate?: string; buyerName?: string; amount: number; ownerShare?: number };
+export type Settlement = { id: string; gardenId: string; amount: number; method: string; status: string; transferDate?: string; referenceNo?: string; bank?: string; slipFileId?: string; location?: string; note?: string; allocations?: SettlementAllocation[] };
 export type SettlementEvidence = { settlementId: string; fileId: string; name: string; mimeType: string; dataUrl: string };
 export type Notification = { id: string; userId: string; type: string; title: string; body: string; readAt?: string; createdAt: string; targetScreen?: "sales" | "settlements" | "gardens" | "agreements" | "notifications"; entityType?: "sale" | "settlement" | "garden" | "agreement"; entityId?: string };
 export type WalletSummary = { owner: number; tapper: number; outstanding: number; currency: "THB" };
-export type WalletData = { gardenId: string; role: Role; owner: { totalEntitlement: number; totalReceived: number; outstanding: number; pending: number; disputed: number }; tapper: { totalIncome: number; ownerMoneyHeld: number; ownerMoneyTransferred: number; pendingReviews: number } };
+export type WalletData = { gardenId: string; role: Role; agreementCount: number; testDataCount?: number; owner: { totalEntitlement: number; totalReceived: number; outstanding: number; pending: number; disputed: number }; tapper: { totalIncome: number; ownerEntitlement: number; ownerMoneyHeld: number; ownerMoneyTransferred: number; pendingReviews: number } };
 export type DashboardData = { role: Role; garden?: Garden; wallet: WalletSummary; walletDetails?: WalletData; pendingReviews: number; pendingSales?: number; pendingSettlements?: number; unreadNotifications?: number; monthlySales: number; monthlySalesSeries?: number[] };
 export type ReportData = { summary: { from: string; to: string; salesCount: number; confirmedSales: number; grossSales: number; ownerShare: number; tapperShare: number; deductions: number; settlements: number; outstanding: number }; rows: Sale[] };
 
@@ -235,7 +236,7 @@ export const api = {
     list: (gardenId: string) => callApi<unknown, Settlement[]>("settlements.list", { gardenId }),
     evidence: (settlementId: string) => callApi<unknown, SettlementEvidence>("settlements.evidence", { settlementId }),
     create: (payload: Record<string, unknown>) => callApi<unknown, Settlement>("settlements.create", payload),
-    confirm: (settlementId: string, requestId?: string) => callApi("settlements.confirm", { settlementId }, { requestId }),
+    confirm: (settlementId: string, requestId?: string) => callApi<unknown, Settlement>("settlements.confirm", { settlementId }, { requestId }),
     reject: (payload: { settlementId: string; reason: string }, requestId?: string) => callApi("settlements.reject", payload, { requestId }),
     cancel: (settlementId: string, requestId?: string) => callApi("settlements.cancel", { settlementId }, { requestId }),
   },

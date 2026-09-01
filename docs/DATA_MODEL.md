@@ -8,16 +8,16 @@ Each tab has one stable header row created by `setupParaWalletSheets()` through 
 | `Gardens` | `id`, `ownerId`, `name`, `locationText`, `province`, `district`, `areaRai`, `treeCount`, `status`, `createdAt`, `updatedAt` |
 | `Plots` | `id`, `gardenId`, `name`, `notes`, `status`, `createdAt`, `updatedAt` |
 | `GardenMembers` | `id`, `gardenId`, `userId`, `role`, `status`, `createdAt` |
-| `Agreements` | `id`, `gardenId`, `ownerId`, `tapperId`, `version`, `ownerPercentage`, `tapperPercentage`, `sharedExpenseRulesJson`, `ownerExpenseRulesJson`, `tapperExpenseRulesJson`, `advanceRuleJson`, `effectiveFrom`, `effectiveTo`, `expenseRules`, `status`, `createdAt` |
+| `Agreements` | `id`, `gardenId`, `ownerId`, `tapperId`, `version`, `ownerPercentage`, `tapperPercentage`, `sharedExpenseRulesJson`, `ownerExpenseRulesJson`, `tapperExpenseRulesJson`, `advanceRuleJson`, `effectiveFrom`, `effectiveTo`, `expenseRules`, `status`, `createdAt`, `dataMode` |
 | `ProductTypes` | `id`, `name`, `unit`, `calculationType`, `configJson`, `active`, `createdAt` |
 | `Buyers` | `id`, `name`, `branch`, `contact`, `notes`, `status`, `createdAt` |
 | `Receipts` | `id`, `fileId`, `fileUrl`, `imageHash`, `ocrRawJson`, `ocrConfidenceJson`, `createdBy`, `manualNetAmount`, `createdAt` |
-| `Sales` | `id`, `gardenId`, `plotId`, `agreementId`, `tapperId`, `receiptId`, `buyerId`, `saleDate`, `ticketNumber`, `productTypeId`, `buyerName`, `productType`, `grossWeight`, `tareWeight`, `netWeight`, `drc`, `weightKg`, `unitPrice`, `pricePerUnit`, `grossSale`, `buyerDeductions`, `sharedExpenses`, `splitBase`, `ownerShare`, `tapperShare`, `netReceived`, `status`, `manualEntry`, `receiptFileId`, `ocrConfidence`, `createdAt`, `updatedAt` |
+| `Sales` | `id`, `gardenId`, `plotId`, `agreementId`, `tapperId`, `receiptId`, `buyerId`, `saleDate`, `ticketNumber`, `productTypeId`, `buyerName`, `productType`, `grossWeight`, `tareWeight`, `netWeight`, `drc`, `weightKg`, `unitPrice`, `pricePerUnit`, `grossSale`, `buyerDeductions`, `sharedExpenses`, `splitBase`, `ownerShare`, `tapperShare`, `netReceived`, `status`, `manualEntry`, `receiptFileId`, `ocrConfidence`, `createdAt`, `updatedAt`, `dataMode` |
 | `SaleDeductions` | `id`, `saleId`, `deductionType`, `description`, `amount`, `responsibility`, `createdAt` |
 | `Payments` | `id`, `gardenId`, `saleId`, `fromUserId`, `toUserId`, `amount`, `method`, `reference`, `proofFileId`, `status`, `paidAt`, `createdAt` |
 | `WalletTransactions` | `id`, `gardenId`, `userId`, `type`, `amount`, `sourceType`, `sourceId`, `requestId`, `createdAt` |
 | `WalletEntries` | `id`, `walletOwnerUserId`, `saleId`, `settlementId`, `entryType`, `direction`, `amount`, `status`, `createdAt` |
-| `Settlements` | `id`, `gardenId`, `tapperId`, `ownerId`, `method`, `amount`, `transferDate`, `bank`, `referenceNo`, `slipFileId`, `location`, `note`, `status`, `createdAt` |
+| `Settlements` | `id`, `gardenId`, `tapperId`, `ownerId`, `method`, `amount`, `transferDate`, `bank`, `referenceNo`, `slipFileId`, `location`, `note`, `status`, `createdAt`, `dataMode` |
 | `SettlementAllocations` | `id`, `settlementId`, `saleId`, `amount`, `createdAt` |
 | `Disputes` | `id`, `saleId`, `openedBy`, `reason`, `note`, `evidenceFileId`, `status`, `resolvedAt`, `createdAt` |
 | `Adjustments` | `id`, `saleId`, `userId`, `adjustmentType`, `amount`, `reason`, `status`, `createdAt` |
@@ -34,3 +34,18 @@ Each tab has one stable header row created by `setupParaWalletSheets()` through 
 `setupParaWalletSheets()` opens the spreadsheet from `SHEET_ID`, creates missing tabs, writes the exact header row with `setValues()`, and freezes row 1 for newly initialized tabs. Existing tabs are validated and never overwritten silently. A mismatched header raises `SCHEMA_MISMATCH:<tab>`.
 
 A sale stores its agreement ID and the exact percentage/calculation inputs used at creation time. Later agreement versions cannot mutate historical sale calculations. Confirmed sales must not be hard-deleted; corrections require a reversal or adjustment entry. Settlement allocations link payments back to individual sales so owner custody can be reconciled.
+
+## Data Dictionary and tab lifecycle
+
+| กลุ่ม | แท็บ | ใช้ทำอะไร | กติกา |
+|---|---|---|---|
+| Active master | `Users`, `Gardens`, `Plots`, `GardenMembers`, `ProductTypes`, `Buyers` | ผู้ใช้ สวน สมาชิก และข้อมูลอ้างอิง | แก้ผ่าน service/admin workflow เท่านั้น |
+| Active financial | `Agreements`, `Sales`, `SaleDeductions`, `WalletEntries`, `Settlements`, `SettlementAllocations`, `Disputes`, `Adjustments` | source of truth ของสิทธิ รายได้ การส่งเงิน และการแก้ไข | ห้ามลบหรือแก้ยอดย้อนหลังในเซลล์; ใช้ status/adjustment/reversal |
+| Active evidence | `Receipts`, `Files`, `OcrRecords` | metadata และการอ้างอิงหลักฐานส่วนตัวใน Drive | ห้ามใส่ base64 หรือ secret ใน Sheet |
+| Active operations | `Notifications`, `AuditLogs`, `Requests` | แจ้งเตือน audit และ idempotency | append/update ผ่าน backend เท่านั้น |
+| Legacy retained | `Payments`, `WalletTransactions` | schema รุ่นก่อนที่ยังเก็บไว้เพื่อ compatibility | ไม่ใช่ฐานคำนวณกระเป๋าปัจจุบัน; ห้ามเพิ่ม feature ใหม่บนแท็บเหล่านี้ |
+| Backup | ชื่อที่มี `_Backup_` | snapshot ก่อน migration | read-only; ห้ามใช้เป็น source ของหน้าจอหรือรายงาน |
+
+`dataMode` มีค่าเพียง `production` หรือ `test`. Read models ที่มีผลทางการเงินต้องใช้ `production` เท่านั้น ข้อมูล `test` เก็บเพื่อ audit/QA แต่ไม่เข้ากระเป๋า รายงาน งานรอตรวจ หรือการแจ้งเตือนธุรกรรม
+
+วันที่ธุรกิจ (`saleDate`, `transferDate`, `effectiveFrom`, `effectiveTo`) ใช้ `YYYY-MM-DD` และตีความใน `Asia/Bangkok`; timestamp (`createdAt`, `updatedAt`) ใช้ ISO 8601 UTC แล้วแสดงผลเป็นเวลาไทยที่ frontend

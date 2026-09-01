@@ -9,8 +9,8 @@ This is the current non-secret integration summary. Exact Spreadsheet IDs, Apps 
 | Integration | Accepted result |
 |---|---|
 | GitHub Pages PWA | Frontend D11 serves the production build at the repository subpath |
-| Apps Script Web App | Deployed baseline is v8; after the current provider fix is deployed, Health reports `status=ok` and `release=2026.09.01-ocr-provider-v10` |
-| Google Sheets | Schema reports `2026-08-production-v3`; all 22 canonical domain headers were migrated and verified |
+| Apps Script Web App | Next target health reports `status=ok` and `release=2026.09.01-financial-clarity-v11` |
+| Google Sheets | After backup-first migration, schema reports `2026-09-financial-clarity-v4`, timezone is `Asia/Bangkok`, and all canonical headers verify |
 | Authentication | Separate active Owner and Tapper Google accounts completed controlled E2E |
 | Garden scope | Both roles see only records permitted by garden ownership or active membership |
 | Google Drive evidence | Receipt and settlement evidence are stored privately and retrieved through authorized API actions |

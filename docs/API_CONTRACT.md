@@ -84,10 +84,14 @@ repairParaWalletProductionSchema();
 
 `previewParaWalletProductionSchemaRepair()` is read-only. `repairParaWalletProductionSchema()` accepts only the explicitly known legacy headers for Agreements, Gardens, Buyers, Sales, and Settlements, copies every changed sheet to a timestamped backup, semantically maps the existing rows, and refuses any unexpected schema.
 
+`previewFinancialClarityV11Migration()` is the read-only preflight for schema v4. `migrateFinancialClarityV11()` accepts only the exact audited v3 headers, creates timestamped copies of Agreements, Sales, and Settlements, appends `dataMode=test` to every pre-existing row, sets the workbook timezone to `Asia/Bangkok`, and then validates all domain schemas. Client payloads cannot set `dataMode`; normal authenticated mutations are always `production`, while only the editor-only controlled E2E runner may create `test` records.
+
+Financial list, dashboard, wallet, report, work-queue, and transaction-notification responses exclude test records. Settlement responses include `allocations[]` after confirmation with `saleId`, date, buyer, and allocated amount so both roles can reconcile a transfer against individual sales.
+
 ## Security and transaction boundary
 
 Every authenticated action must resolve a registered user, verify garden ownership or active membership, enforce the role-specific permission, validate the state transition, and then enter a `LockService` critical section for writes. File bytes go to Drive, while Sheets store metadata and references only. API keys remain in Apps Script `PropertiesService`.
 
 Bank-transfer settlements store the uploaded slip in the configured Drive evidence folder and persist only `slipFileId` in the Settlements row and audit event. Cash settlements remain `pending_owner_confirmation` until the Owner explicitly confirms receipt on their device; only then are allocations and wallet debits written.
 
-The production baseline uses Google OpenID Connect ID tokens. `Auth.requireUser()` verifies issuer, audience, expiry, subject, verified email, active User status, role, and garden membership before protected work. `health.get` remains public, while `diagnostics.get` requires an authenticated Owner or admin and never returns raw Script Property values. The current source target is backend `2026.09.01-ocr-provider-v10` with schema `2026-08-production-v3`; see [`INDEX.md`](INDEX.md) for the deployed baseline, current acceptance evidence, and historical reports.
+The production baseline uses Google OpenID Connect ID tokens. `Auth.requireUser()` verifies issuer, audience, expiry, subject, verified email, active User status, role, and garden membership before protected work. `health.get` remains public, while `diagnostics.get` requires an authenticated Owner or admin and never returns raw Script Property values. The current source target is backend `2026.09.01-financial-clarity-v11` with schema `2026-09-financial-clarity-v4`; see [`INDEX.md`](INDEX.md) for the deployed baseline, current acceptance evidence, and historical reports.
