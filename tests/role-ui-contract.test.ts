@@ -5,6 +5,7 @@ const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const api = readFileSync(new URL("../src/api.ts", import.meta.url), "utf8");
 const ocr = readFileSync(new URL("../src/ocr.ts", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const readability = readFileSync(new URL("../src/readability.css", import.meta.url), "utf8");
 const loader = readFileSync(new URL("../src/LoadingAnimation.tsx", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 const loadingAnimation = JSON.parse(readFileSync(new URL("../public/loading/animation.json", import.meta.url), "utf8"));
@@ -200,7 +201,7 @@ describe("role-aware UI contract", () => {
   });
 
   it("preloads the transparent splash asset and rotates the shell cache", () => {
-    expect(serviceWorker).toContain('const CACHE = "parawallet-shell-v7"');
+    expect(serviceWorker).toContain('const CACHE = "parawallet-shell-v8"');
     expect(serviceWorker).toContain("brand/splash-logo-transparent.png");
     expect(serviceWorker).not.toContain("brand/splash-logo.png`");
   });
@@ -352,6 +353,14 @@ describe("role-aware UI contract", () => {
     expect(styles).toContain("font-size:12px!important");
     expect(styles).toContain("min-height:44px!important");
     expect(styles).toContain(".page-state-actions button{min-height:44px}");
+    expect(readability).toContain("Outdoor readability v2");
+    expect(readability).toContain("--text-secondary: #526554");
+    expect(readability).toContain(".metric small { font-size: 13px");
+    expect(readability).toContain(".data-row span { font-size: 14px");
+    expect(readability).toContain(".form-grid textarea { font-size: 16px");
+    expect(readability).toContain(".receipt-scan-status small,");
+    expect(readability).toContain(".financial-proof small { min-height: auto; font-size: 13px");
+    expect(readability).toContain(".mobile-bottom-nav.has-scan-action > button { font-size: 13px");
   });
 });
 
