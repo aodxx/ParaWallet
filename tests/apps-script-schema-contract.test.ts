@@ -19,6 +19,7 @@ const expectedAgreementHeaders = [
   "expenseRules",
   "status",
   "createdAt",
+  "dataMode",
 ];
 const legacyAgreementHeaders = expectedAgreementHeaders.slice(0, 7).concat(["effectiveFrom", "effectiveTo", "expenseRules", "status", "createdAt"]);
 
@@ -41,9 +42,9 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.09.01-ocr-provider-v10";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.09.01-financial-clarity-v11";');
     expect(code).toContain("automaticReadingReady: Boolean(Config.geminiKey())");
-    expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
+    expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-09-financial-clarity-v4";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
     expect(code).toContain("schemaVersion: PARAWALLET_SCHEMA_VERSION");
     expect(code).toContain('if (request.action === "health.get") return healthCheck_();');
@@ -195,11 +196,11 @@ describe("Apps Script schema safety contract", () => {
   });
 
   it("scopes Tapper wallet and settlement allocation to the same Tapper", () => {
-    expect(code).toContain("function settlementOutstanding_(gardenId, ownerId, tapperId)");
+    expect(code).toContain("function settlementOutstanding_(gardenId, ownerId, tapperId, dataMode)");
     expect(code).toContain("id_(row.tapperId) === id_(tapperId)");
-    expect(code).toContain("settlementOutstanding_(payload.gardenId, access.garden.ownerId, tapperId)");
-    expect(code).toContain("settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId)");
-    expect(code).toContain('id_(row.tapperId) === id_(settlement.tapperId) && row.status === "confirmed"');
+    expect(code).toContain("settlementOutstanding_(payload.gardenId, access.garden.ownerId, tapperId, dataMode)");
+    expect(code).toContain("settlementOutstanding_(settlement.gardenId, settlement.ownerId, settlement.tapperId, settlementMode)");
+    expect(code).toContain('id_(row.tapperId) === id_(settlement.tapperId) && String(row.dataMode || "") === settlementMode && row.status === "confirmed"');
     expect(code).toContain("var tapperSettlement = tapperId ? settlementOutstanding_(garden.id, ownerId, tapperId) : settlement");
   });
 
@@ -212,7 +213,7 @@ describe("Apps Script schema safety contract", () => {
     const saleLoop = service.match(/rows_\("Sales"\)[\s\S]*?if \(remaining !== 0\)/)?.[0] || "";
     expect(saleLoop).not.toContain('rows_("SettlementAllocations")');
     expect(saleLoop).not.toContain("ownerAdjustmentForSale_");
-    expect(service).toContain('return Object.assign({}, settlement, { status: "confirmed" });');
+    expect(service).toContain('return settlementView_(Object.assign({}, settlement, { status: "confirmed" }));');
   });
 
   it("binds scanned receipt evidence to the authenticated Tapper and Sale", () => {
@@ -271,7 +272,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('result.fields.sourceGardenId = payload.gardenId');
   });
 
-  it("migrates legacy Agreement values into the correct 16-column positions", () => {
+  it("migrates legacy Agreement values into the current 17-column positions", () => {
     const source = code.match(/function mapLegacyAgreementRow_\(row\) \{[\s\S]*?\n\}/)?.[0];
     expect(source).toBeTruthy();
     const mapper = new Function(`${source}; return mapLegacyAgreementRow_;`)() as (row: unknown[]) => unknown[];
@@ -279,7 +280,7 @@ describe("Apps Script schema safety contract", () => {
     expect(mapper(legacyRow)).toEqual([
       "a1", "g1", "o1", "t1", 2, 60, 40,
       "", "", "", "",
-      "2026-08-21", "", "{}", "active", "2026-08-21T00:00:00Z",
+      "2026-08-21", "", "{}", "active", "2026-08-21T00:00:00Z", "production",
     ]);
   });
 
@@ -292,12 +293,12 @@ describe("Apps Script schema safety contract", () => {
     ]);
   });
 
-  it("semantically expands the observed legacy Sale row to 32 columns", () => {
+  it("semantically expands the observed legacy Sale row to 33 columns", () => {
     const source = code.match(/function mapLegacySaleRow_\(row\) \{[\s\S]*?\n\}/)?.[0];
     expect(source).toBeTruthy();
     const mapper = new Function(`${source}; return mapLegacySaleRow_;`)() as (row: unknown[]) => unknown[];
     const migrated = mapper(["s1", "g1", "a1", "t1", "2026-08-21", "buyer", "rubber", 100, 60, 6000, 100, 50, 5850, 3510, 2340, "confirmed", "file1", 0.95, "created"]);
-    expect(migrated).toHaveLength(32);
+    expect(migrated).toHaveLength(33);
     expect(migrated[3]).toBe("a1");
     expect(migrated[7]).toBe("2026-08-21");
     expect(migrated[12]).toBe(100);
@@ -307,6 +308,7 @@ describe("Apps Script schema safety contract", () => {
     expect(migrated[25]).toBe(5850);
     expect(migrated[26]).toBe("confirmed");
     expect(migrated[30]).toBe("created");
+    expect(migrated[32]).toBe("production");
   });
 
   it("backs up every changed legacy sheet and flushes writes before releasing the script lock", () => {
@@ -318,6 +320,26 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('name: "Sales"');
     expect(code).toContain('name: "Settlements"');
     expect(code).toContain("try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }");
+  });
+
+  it("separates audited test fixtures from production balances without deleting rows", () => {
+    expect(code).toContain("function migrateFinancialClarityV11()");
+    expect(code).toContain("previewFinancialClarityV11Migration");
+    expect(code).toContain("sheet.copyTo(book).setName(backupName)");
+    expect(code).toContain("row.concat([DATA_MODE_TEST])");
+    expect(code).toContain('function productionRows_(name)');
+    expect(code).toContain('testDataCount: testDataCount');
+    expect(code).toContain('dataMode: dataMode');
+    expect(code).toContain("delete request.payload._dataMode");
+  });
+
+  it("normalizes date-only financial fields in Bangkok before returning them", () => {
+    expect(code).toContain('var PARAWALLET_TIME_ZONE = "Asia/Bangkok"');
+    expect(code).toContain('function dateOnly_(value)');
+    expect(code).toContain('Utilities.formatDate(value, PARAWALLET_TIME_ZONE, "yyyy-MM-dd")');
+    expect(code).toContain('dateOnlyView_(row, "saleDate")');
+    expect(code).toContain('dateOnlyView_(row, "effectiveFrom")');
+    expect(code).toContain('dateOnlyView_(settlement, "transferDate")');
   });
 
   it("guards all critical financial mutations before row writes", () => {

@@ -4,7 +4,7 @@ Updated: 1 September 2026
 
 ## Current release — stabilization
 
-The accepted deployed baseline is backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. Its first authorized receipt smoke test failed safely and exposed provider configuration defects. v9 was merged but not deployed; backend `2026.09.01-ocr-provider-v10` supersedes it as the next target and adds the mandatory provider self-test. Credential rotation, self-test, deployment, and the repeated receipt smoke test remain open in [`todo.md`](../todo.md). Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass is recorded.
+The accepted deployed baseline remains backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, until a newer endpoint is verified. The next target is backend `2026.09.01-financial-clarity-v11` with schema `2026-09-financial-clarity-v4`; it retains the mandatory Gemini provider self-test and adds Bangkok date handling, test/production separation, settlement allocation detail, and shared wallet reconciliation. Deployment, backup-first migration, and real-device acceptance remain open in [`todo.md`](../todo.md). The release remains in controlled-use stabilization until those gates are recorded.
 
 Acceptance requires all of the following:
 

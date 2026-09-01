@@ -102,14 +102,14 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("กลับหน้าหลัก");
     expect(app).toContain("รอเจ้าของตรวจ");
     expect(app).toContain("รอเจ้าของยืนยันรับเงิน");
-    expect(app).toContain("ยอดคงค้างก่อนยืนยัน");
-    expect(app).toContain("ยอดคงค้างใหม่");
+    expect(app).toContain("เงินเจ้าของคงเหลือก่อนยืนยัน");
+    expect(app).toContain("เงินเจ้าของคงเหลือใหม่");
     expect(app).toContain('entityType: "sale"');
     expect(app).toContain('entityType: "settlement"');
     expect(app).toContain("setReviewSale(target)");
     expect(app).toContain("setFocusedSettlementId(target.id)");
     expect(app).toContain('impact="สถานะจะเปลี่ยนเป็นอยู่ระหว่างโต้แย้ง');
-    expect(app).toContain('impact="รายการจะถูกปฏิเสธและยอดคงค้างจะไม่ถูกตัด"');
+    expect(app).toContain('impact="รายการจะถูกปฏิเสธและยอดคงเหลือจะไม่ถูกตัด"');
     expect(app).toContain("onCancel={() => setReasonOpen(false)}");
   });
 
@@ -200,7 +200,7 @@ describe("role-aware UI contract", () => {
   });
 
   it("preloads the transparent splash asset and rotates the shell cache", () => {
-    expect(serviceWorker).toContain('const CACHE = "parawallet-shell-v6"');
+    expect(serviceWorker).toContain('const CACHE = "parawallet-shell-v7"');
     expect(serviceWorker).toContain("brand/splash-logo-transparent.png");
     expect(serviceWorker).not.toContain("brand/splash-logo.png`");
   });
@@ -328,16 +328,16 @@ describe("role-aware UI contract", () => {
     expect(app).toContain("บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าสวน");
     expect(app).toContain("ติดต่อเจ้าของสวนให้เพิ่มบัญชี Google นี้เป็นคนกรีด");
     expect(app).toContain("ยังไม่มีประวัติการส่งเงิน");
-    expect(app).toContain("ยังไม่มีข้อตกลงแบ่งรายได้");
+    expect(app).toContain("ยังไม่มีข้อตกลงสำหรับใช้งานจริง");
     expect(app).toContain("ไม่พบรายการในช่วงนี้");
     expect(app).toContain("โหลดรายงานไม่สำเร็จ");
     expect(app).toContain("โหลดรายงานที่มีรายการก่อน จึงจะดาวน์โหลดตารางได้");
   });
 
   it("does not expose raw workflow status or implementation identifiers", () => {
-    expect(app).toContain("labelStatus(agreement.status)");
+    expect(app).toContain('agreement.status === "active" ? "ใช้กับบิลใหม่"');
     expect(app).not.toContain("{agreement.status}");
-    expect(app).toContain("ข้อตกลงเวอร์ชัน");
+    expect(app).toContain("เวอร์ชันใหม่ใช้เฉพาะบิลหลังวันที่เริ่มมีผล");
     expect(app).not.toContain("agreementId.slice");
     expect(app).not.toContain("member.email || member.userId");
     expect(`${app}\n${api}\n${ocr}`).not.toContain("Gemini API Key");
@@ -376,9 +376,12 @@ describe("Thai UI terminology and role-specific destination labels", () => {
   });
 
   it("makes owner wallet relationships explicit", () => {
-    expect(app).toContain("ส่วนแบ่งทั้งหมดของฉัน");
-    expect(app).toContain("ได้รับแล้ว");
-    expect(app).toContain("ยังอยู่กับคนกรีด");
+    expect(app).toContain("ส่วนแบ่งสะสมที่ยืนยันแล้ว");
+    expect(app).toContain("เจ้าของได้รับสะสม");
+    expect(app).toContain("เงินเจ้าของคงเหลือทุกบิล");
+    expect(app).toContain('className="financial-proof"');
+    expect(app).toContain("แยกข้อมูลทดสอบแล้ว");
+    expect(app).toContain("ยอดนี้นำไปตัดบิลใดบ้าง");
   });
 });
 

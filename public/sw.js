@@ -1,4 +1,4 @@
-const CACHE = "parawallet-shell-v6";
+const CACHE = "parawallet-shell-v7";
 const BASE = "/ParaWallet/";
 const SHELL = [
   `${BASE}`,

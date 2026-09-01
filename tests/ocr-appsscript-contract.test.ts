@@ -15,7 +15,7 @@ type OcrResult = {
 const OCR = new Function(`
   function round_(value) { return Math.round((Number(value) + Number.EPSILON) * 100) / 100; }
   function numeric_(value) { var number = Number(value); return isFinite(number) ? number : 0; }
-  var PARAWALLET_RELEASE = "2026.09.01-ocr-provider-v10";
+  var PARAWALLET_RELEASE = "2026.09.01-financial-clarity-v11";
   var Config = { geminiModel: function () { return "gemini-3.7-flash"; }, geminiKey: function () { return "configured-for-unit-test"; } };
   ${ocrSource}
   return OCR;
@@ -61,7 +61,7 @@ describe("Apps Script OCR deterministic reference scenarios", () => {
         ok: true,
         provider: "gemini",
         model: "gemini-3.7-flash",
-        release: "2026.09.01-ocr-provider-v10",
+        release: "2026.09.01-financial-clarity-v11",
         imageInput: true,
         structuredOutput: true,
         code: "GEMINI_CONNECTION_OK",

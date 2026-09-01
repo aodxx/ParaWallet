@@ -19,6 +19,7 @@ Use this page to identify the current source of truth. A release number inside a
 | [`OCR-PROVIDER-V9-REMEDIATION-2026-08-30.md`](OCR-PROVIDER-V9-REMEDIATION-2026-08-30.md) | Production smoke-test failure, security finding, v9 fixes, credential rotation, and redeployment order |
 | [`OCR-PROVIDER-V10-PREDEPLOYMENT-SELF-TEST-2026-09-01.md`](OCR-PROVIDER-V10-PREDEPLOYMENT-SELF-TEST-2026-09-01.md) | Current v10 target, safe Gemini self-test, failure-code guide, and exact deployment order |
 | [`UX-AUDIT-REMEDIATION-2026-08-29.md`](UX-AUDIT-REMEDIATION-2026-08-29.md) | งานบังคับ 7 ชุด: ข้อบกพร่อง UX ของเจ้าของ/คนกรีด ลำดับแก้ เกณฑ์รับงาน และ Checklist กลาง |
+| [`FINANCIAL-CLARITY-REMEDIATION-2026-09-01.md`](FINANCIAL-CLARITY-REMEDIATION-2026-09-01.md) | แผนแก้ 7 ขั้นจากการตรวจ Google Sheet: เวลาไทย, แยก test/production, อธิบายการตัดบิล และสมการร่วมสองบทบาท |
 | [`RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md`](RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md) | เช็กลิสต์ปิดงานหลังชุด 7: ทดสอบมือถือจริง, Failure journey, หลักฐาน, ความลับ, Monitoring และ Sign-off |
 
 ## Technical contracts — current

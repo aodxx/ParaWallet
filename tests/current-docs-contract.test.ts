@@ -38,11 +38,14 @@ describe("current operating documentation contract", () => {
     }
   });
 
-  it("makes v10 and its provider self-test the single next backend target", () => {
-    for (const document of [readme, todo, manual, closure]) {
-      expect(document).toContain("2026.09.01-ocr-provider-v10");
+  it("makes v11 and its provider self-test/migration the single next backend target", () => {
+    for (const document of [readme, todo, manual]) {
+      expect(document).toContain("2026.09.01-financial-clarity-v11");
     }
+    expect(readme).toContain("2026-09-financial-clarity-v4");
+    expect(todo).toContain("migrateFinancialClarityV11()");
     expect(index).toContain("OCR-PROVIDER-V10-PREDEPLOYMENT-SELF-TEST-2026-09-01.md");
+    expect(index).toContain("FINANCIAL-CLARITY-REMEDIATION-2026-09-01.md");
     expect(providerV10).toContain("testGeminiProviderConnection()");
     expect(providerV10).toContain("GEMINI_CONNECTION_OK");
     expect(providerV10).toContain("does not call Vision, Google Sheets, Google Drive");

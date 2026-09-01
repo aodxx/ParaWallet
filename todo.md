@@ -30,7 +30,7 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 - [x] D11 Lottie loading, typography hierarchy, grid alignment, and non-overlapping state transitions deployed
 - [x] D12 Earthy Harmony palette, curved mobile header, prioritized dual wallets, and accessible Animated Circle Dock implemented
 - [x] D12.1 Tapper date formatting, settlement-card spacing, outdoor text contrast, screen-specific descriptions, wallet-heading alignment, and dock clearance implemented
-- [x] Automated verification passes 155 tests, TypeScript, Apps Script syntax, and production build
+- [x] Automated verification passes 159 tests, TypeScript, Apps Script syntax, and production build
 - [x] Current README, operating manual, roadmap, gap matrix, and document index synchronized
 
 ## Release closure — validation only
@@ -43,8 +43,9 @@ Use [`docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md`](docs/RELEASE-CLOSURE-ACCEP
 - [x] Run the first authorized v8 receipt smoke test; it correctly blocked saving but exposed provider/configuration failures (`VISION HTTP 401`, `Gemini HTTP 404`) and did not pass recognition acceptance
 - [ ] Revoke the credential mistakenly stored in `GEMINI_MODEL`, store a replacement only in `GEMINI_API_KEY`, delete the invalid optional Vision key, and never commit or record replacement secrets
 - [x] Merge the v9 provider-configuration protections; v9 was not deployed and is superseded by v10
-- [ ] Copy Apps Script `2026.09.01-ocr-provider-v10`, run editor-only `testGeminiProviderConnection()`, and require `GEMINI_CONNECTION_OK` before deployment
-- [ ] Deploy Apps Script `2026.09.01-ocr-provider-v10` and confirm `status=ok` with schema `2026-08-production-v3`
+- [ ] Copy Apps Script `2026.09.01-financial-clarity-v11`, run editor-only `testGeminiProviderConnection()`, and require `GEMINI_CONNECTION_OK` before deployment
+- [ ] Deploy Apps Script `2026.09.01-financial-clarity-v11` and confirm `status=ok` with schema `2026-09-financial-clarity-v4`
+- [ ] Run `previewFinancialClarityV11Migration()` then backup-first `migrateFinancialClarityV11()`; require `financialSchemaReady=true` and create a new production Agreement
 - [ ] Smoke-test one authorized receipt and confirm the Gemini provider returns reviewable fields without `GEMINI_HTTP_400`, `GEMINI_HTTP_401`, or `GEMINI_HTTP_404`
 - [ ] Complete one final real-device acceptance pass for Owner and Tapper after D12.1: login, curved-header layout, dock navigation, More sheet, localized dates, pending work, notification read, Sale review, bank transfer, cash handover, reconnect, and loading transitions
 - [ ] Confirm that any password or secret ever shared during testing has been rotated; do not record the replacement in this repository
