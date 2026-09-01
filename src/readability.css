@@ -1,0 +1,279 @@
+/* Outdoor readability v2: shared type scale, contrast, and financial focus */
+:root {
+  --text-primary: #243f2b;
+  --text-secondary: #526554;
+  --text-on-amber: #543b1f;
+  --focus-positive: #1f6634;
+  --focus-pending: #744a0e;
+  --focus-danger: #943f2d;
+}
+
+body {
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.page-heading p,
+.page-heading span,
+.panel-head p,
+.data-row span,
+.info-card p,
+.balance,
+.empty-state,
+.page-state,
+.calendar-toolbar p,
+.calendar-empty-selection,
+.calendar-no-data,
+.notification-copy small,
+.mobile-more-grid small,
+.member-row span,
+.member-row small,
+.sale-record-main span,
+.sale-record-main small,
+.completion-status span,
+.completion-summary dt,
+.report-download small {
+  color: var(--text-secondary);
+}
+
+.status {
+  border: 1px solid #c7d9c2;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.status.confirmed {
+  border-color: #abd1b2;
+  background: #dff2e2;
+  color: var(--focus-positive) !important;
+}
+
+.status.pending_owner_review,
+.status.pending_owner_confirmation {
+  border-color: #e7c875;
+  background: #fff0c7;
+  color: var(--focus-pending) !important;
+}
+
+.status.disputed {
+  border-color: #e4aa95;
+  background: #ffe5da;
+  color: var(--focus-danger) !important;
+}
+
+.form-error,
+.page-state.error {
+  color: var(--focus-danger);
+}
+
+.owner-wallet-pair article:last-child,
+.dual-wallet-grid article.wallet-owner,
+.owner-wallet-pair article:last-child p,
+.dual-wallet-grid .wallet-owner small,
+.dual-wallet-grid .wallet-owner span {
+  color: var(--text-on-amber);
+}
+
+.financial-proof .proof-result {
+  border: 1px solid #b8d5b4;
+  background: #e4f2df;
+}
+
+.financial-proof .proof-result strong {
+  color: var(--focus-positive);
+}
+
+.settlement-allocation {
+  border-color: #b8d3b1;
+  background: #f4faf1;
+}
+
+.agreement-row.active,
+.sale-record-card.needs-action {
+  border-color: #6f9d68;
+  background: #f1f8ed;
+}
+
+@media (max-width: 680px) {
+  body {
+    font-size: 16px;
+    line-height: 1.58;
+  }
+
+  .content {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .page-heading h1 { font-size: 28px; line-height: 1.25; }
+  .page-heading p,
+  .page-heading span { font-size: 14px; line-height: 1.55; }
+  .notice,
+  .test-data-notice small,
+  .transparency-note span,
+  .form-hint { font-size: 14px; line-height: 1.55; }
+  .test-data-notice strong { font-size: 15px; }
+
+  .panel { padding: 17px; }
+  .panel-head h2 { font-size: 22px; line-height: 1.3; }
+  .panel-head p { font-size: 14px; line-height: 1.55; }
+
+  .metric { min-height: 124px; padding: 16px; }
+  .metric small { font-size: 13px; line-height: 1.45; }
+  .metric strong { font-size: 23px; }
+  .metric span { font-size: 13px; line-height: 1.4; }
+
+  .card-title span { font-size: 18px; }
+  .card-title small { max-width: 140px; font-size: 13px; line-height: 1.4; }
+  .wallet-line > div:first-child,
+  .balance { font-size: 14px; line-height: 1.5; }
+
+  .data-row { padding: 15px; }
+  .data-row strong { font-size: 15px; line-height: 1.35; }
+  .data-row span { font-size: 14px; line-height: 1.5; }
+
+  .info-card { padding: 15px; }
+  .info-card h3 { font-size: 20px; }
+  .info-card p { font-size: 14px; line-height: 1.5; }
+
+  .filters label,
+  .form-grid label { font-size: 14px; line-height: 1.4; }
+  .filters input,
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea { font-size: 16px; line-height: 1.45; }
+
+  .primary,
+  .secondary,
+  .link-button,
+  .danger-button,
+  .record-tabs button { font-size: 15px; line-height: 1.35; }
+  .link-button { font-size: 14px; }
+  .eyebrow { font-size: 12px; }
+
+  .page-state strong,
+  .empty-state strong { font-size: 18px; }
+  .page-state > span,
+  .empty-state span { font-size: 14px; line-height: 1.6; }
+
+  .system-status { font-size: 14px; }
+  .system-status-copy strong { font-size: 15px; }
+  .system-status-copy small { font-size: 13px; }
+  .system-status-actions button { font-size: 14px; }
+
+  .dual-wallet-heading > span { font-size: 19px; }
+  .dual-wallet-heading small { font-size: 13px; line-height: 1.45; }
+  .dual-wallet-grid small { min-height: 38px; font-size: 13px; line-height: 1.45; }
+  .dual-wallet-grid strong { font-size: 26px; }
+  .dual-wallet-grid span { font-size: 13px; line-height: 1.45; }
+  .wallet-transferred { font-size: 13px; line-height: 1.45; }
+
+  .owner-wallet-pair article { min-height: 140px; padding: 16px; }
+  .owner-wallet-pair small { font-size: 13px; line-height: 1.4; }
+  .owner-wallet-pair strong { font-size: 27px; }
+  .owner-wallet-pair p { font-size: 13px; line-height: 1.45; }
+
+  .mobile-header-context small,
+  .header-connection,
+  .top-actions .role-badge { font-size: 12px; }
+  .mobile-header-context strong { font-size: 17px; }
+  .mobile-bottom-nav button,
+  .mobile-bottom-nav.has-scan-action > button { font-size: 13px; }
+  .mobile-bottom-nav button em { font-size: 11px; }
+  .mobile-scan-trigger-label,
+  .mobile-bottom-nav .scan-option,
+  .mobile-bottom-nav .scan-option strong { font-size: 13px !important; }
+
+  .tapper-secondary-actions button,
+  .quick-actions button { font-size: 14px; line-height: 1.4; }
+
+  .receipt-scan-steps b { font-size: 14px; }
+  .receipt-scan-steps small { font-size: 13px !important; }
+  .receipt-scan-status strong { font-size: 16px; }
+  .receipt-scan-status span,
+  .receipt-scan-status small,
+  .receipt-review-heading small { font-size: 14px !important; }
+  .receipt-technical-details { font-size: 12px; line-height: 1.5; }
+  .evidence-selected,
+  .receipt-placeholder { font-size: 14px; }
+  .receipt-placeholder.manual span { font-size: 13px; }
+  .sale-detail-grid small,
+  .review-confirmation small,
+  .agreement-reference { font-size: 13px; line-height: 1.5; }
+  .sale-review-summary small,
+  .sale-review-summary span,
+  .receipt-evidence-head small { font-size: 13px; line-height: 1.45; }
+
+  .sale-record-main > div > strong { font-size: 15px; }
+  .sale-record-main > strong { font-size: 19px; }
+  .sale-record-main span,
+  .sale-record-main small { font-size: 14px; }
+  .sale-primary-list > header strong { font-size: 18px; }
+  .sale-primary-list > header span,
+  .sale-primary-list > header em { font-size: 13px; }
+  .pending-work > div:first-child span,
+  .pending-work-actions button span,
+  .notification-copy small,
+  .notification-action { font-size: 13px !important; }
+
+  .completion-receipt h2,
+  .reason-dialog h2 { font-size: 22px; }
+  .completion-receipt p,
+  .reason-dialog p { font-size: 15px; }
+  .completion-status span,
+  .completion-summary dt,
+  .reason-impact span { font-size: 13px; }
+  .completion-status strong,
+  .completion-summary dd,
+  .reason-impact strong { font-size: 15px; }
+
+  .financial-proof small { min-height: auto; font-size: 13px; line-height: 1.45; }
+  .financial-proof strong { font-size: 17px; }
+  .financial-proof .proof-result::before { font-size: 13px; }
+  .settlement-allocation h3 { font-size: 17px; }
+  .settlement-allocation span strong { font-size: 14px; }
+  .settlement-allocation span small,
+  .settlement-allocation > small,
+  .settlement-allocation p { font-size: 13px; line-height: 1.45; }
+  .settlement-allocation > div > strong { font-size: 16px; }
+
+  .calendar-kicker,
+  .calendar-toolbar p,
+  .calendar-legend,
+  .calendar-weekday,
+  .calendar-day-count,
+  .calendar-day-receipt,
+  .calendar-selected-head > span,
+  .calendar-empty-selection,
+  .calendar-sale-card-main span,
+  .calendar-sale-card-main small,
+  .calendar-sale-card-actions .status,
+  .calendar-no-data { font-size: 13px; }
+  .calendar-day-number { font-size: 19px; }
+  .calendar-toolbar h3 { font-size: 25px; }
+  .calendar-selected-head h3 { font-size: 19px; }
+
+  .auth-card h1 { font-size: 30px; }
+  .auth-kicker,
+  .auth-copy p,
+  .google-signin span,
+  .auth-security-note strong,
+  .auth-security-note small { font-size: 14px; line-height: 1.55; }
+  .auth-rule,
+  .auth-footer { font-size: 12px; }
+  .developer-credit,
+  .developer-credit__link,
+  .mobile-more-sheet .developer-credit__label small { font-size: 12px; }
+}
+
+@media (max-width: 360px) {
+  .dual-wallet-grid,
+  .owner-wallet-pair { grid-template-columns: 1fr; }
+  .dual-wallet-grid small { min-height: auto; }
+  .owner-wallet-pair article { min-height: 124px; }
+  .financial-proof { grid-template-columns: 1fr; }
+  .financial-proof > span { display: none; }
+  .financial-proof .proof-result { grid-column: auto; }
+}
