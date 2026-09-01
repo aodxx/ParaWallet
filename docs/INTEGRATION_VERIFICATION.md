@@ -16,7 +16,7 @@ This is the current non-secret integration summary. Exact Spreadsheet IDs, Apps 
 | Google Drive evidence | Receipt and settlement evidence are stored privately and retrieved through authorized API actions |
 | Financial workflow | Controlled Sale → Owner confirmation → Settlement → Owner confirmation reconciled across ledger, allocations, notifications, and audit logs |
 | Reliability/UX | D9 pending work and notifications, D10 connection recovery, and D11 loading transitions are deployed |
-| Repository gate | 152 automated tests, TypeScript, Apps Script syntax, and production build pass |
+| Repository gate | 155 automated tests, TypeScript, Apps Script syntax, and production build pass |
 
 ## Repeatable release check
 
