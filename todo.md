@@ -30,7 +30,7 @@ Complete the seven workstreams in [`docs/UX-AUDIT-REMEDIATION-2026-08-29.md`](do
 - [x] D11 Lottie loading, typography hierarchy, grid alignment, and non-overlapping state transitions deployed
 - [x] D12 Earthy Harmony palette, curved mobile header, prioritized dual wallets, and accessible Animated Circle Dock implemented
 - [x] D12.1 Tapper date formatting, settlement-card spacing, outdoor text contrast, screen-specific descriptions, wallet-heading alignment, and dock clearance implemented
-- [x] Automated verification passes 152 tests, TypeScript, Apps Script syntax, and production build
+- [x] Automated verification passes 155 tests, TypeScript, Apps Script syntax, and production build
 - [x] Current README, operating manual, roadmap, gap matrix, and document index synchronized
 
 ## Release closure — validation only

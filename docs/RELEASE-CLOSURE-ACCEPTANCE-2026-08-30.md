@@ -92,7 +92,7 @@ Schema ที่ต้องพบ: `2026-08-production-v3`
 | ผ่าน | จุดตรวจ | เกณฑ์ |
 |---|---|---|
 | [ ] | Repository | Feature branch ผ่าน review และ Merge เข้า `main` แล้ว |
-| [ ] | Automated verification | `pnpm verify` ผ่าน 152 tests, TypeScript, Apps Script syntax และ production build |
+| [ ] | Automated verification | `pnpm verify` ผ่าน 155 tests, TypeScript, Apps Script syntax และ production build |
 | [ ] | GitHub Pages | Workflow ของ commit ที่ Merge สำเร็จ และ PWA เปิดได้จาก URL จริง |
 | [ ] | Frontend wording | หน้า production ใช้คำตามบทบาทและไม่มีคำเก่า เช่น `Gemini API Key`, `ข้อมูลและการตั้งค่า`, `ข้อตกลงฉบับที่` |
 | [ ] | Provider ก่อน Deploy | `testGeminiProviderConnection()` ตอบ `ok=true`, `imageInput=true`, `structuredOutput=true`, `code=GEMINI_CONNECTION_OK` โดยไม่แสดง secret |

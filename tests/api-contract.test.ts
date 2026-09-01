@@ -121,4 +121,41 @@ describe("Apps Script API contract", () => {
   it("explains when a notification target no longer exists", () => {
     expect(userMessageForApiError(new ApiError("NOTIFICATION_TARGET_NOT_FOUND", "internal entity id"))).toBe("ไม่พบรายการที่การแจ้งเตือนอ้างถึง รายการอาจถูกเปลี่ยนสถานะแล้ว กรุณารีเฟรชข้อมูล");
   });
+
+  it("explains that a receipt date is outside the active agreement instead of reporting a load failure", () => {
+    expect(userMessageForApiError(new ApiError("AGREEMENT_DATE_OUT_OF_RANGE", "internal"))).toBe("วันที่ขายอยู่นอกช่วงที่ข้อตกลงมีผล กรุณาตรวจวันที่ในบิล หรือให้เจ้าของสวนตรวจวันที่เริ่มใช้ข้อตกลง");
+  });
+
+  it("has actionable Thai copy for every user-facing business error group", () => {
+    const fallback = userMessageForApiError(new ApiError("UNRECOGNIZED_SERVER_CODE", "internal"));
+    const codes = [
+      "AUTH_REQUIRED", "USER_NOT_REGISTERED", "GARDEN_NOT_FOUND", "GARDEN_ACCESS_DENIED",
+      "OWNER_PERMISSION_REQUIRED", "TAPPER_PERMISSION_REQUIRED", "MEMBER_NOT_FOUND",
+      "AGREEMENT_EFFECTIVE_FROM_REQUIRED", "PERCENTAGES_MUST_SUM_TO_100", "TAPPER_REQUIRED",
+      "TAPPER_NOT_ACTIVE_MEMBER", "AGREEMENT_NOT_FOUND", "AGREEMENT_GARDEN_MISMATCH",
+      "AGREEMENT_NOT_ACTIVE", "AGREEMENT_DATE_OUT_OF_RANGE", "AGREEMENT_TAPPER_MISMATCH",
+      "OCR_PROVIDER_FAILED", "SALE_INPUT_INVALID", "DEDUCTION_INVALID", "SPLIT_BASE_NEGATIVE",
+      "SALE_NOT_FOUND", "SALE_NOT_REVIEWABLE", "LEDGER_IMBALANCE", "DISPUTE_REASON_REQUIRED",
+      "DISPUTE_NOT_FOUND", "DISPUTE_NOT_RESOLVABLE", "DISPUTE_DECISION_INVALID",
+      "SETTLEMENT_PERMISSION_DENIED", "SETTLEMENT_TAPPER_MISMATCH", "TAPPER_SETTLEMENT_REQUIRED",
+      "SETTLEMENT_AMOUNT_INVALID", "SETTLEMENT_METHOD_INVALID", "SETTLEMENT_EXCEEDS_OUTSTANDING",
+      "SETTLEMENT_NOT_FOUND", "SETTLEMENT_NOT_CONFIRMABLE", "SETTLEMENT_NOT_REJECTABLE",
+      "SETTLEMENT_NOT_CANCELLABLE", "SETTLEMENT_REJECTION_REASON_REQUIRED",
+      "SETTLEMENT_ALLOCATION_MISMATCH", "NOTIFICATION_NOT_FOUND",
+      "SCHEMA_MIGRATION_UNEXPECTED",
+    ];
+    codes.forEach((code) => {
+      const message = userMessageForApiError(new ApiError(code, `private:${code}`));
+      expect(message, code).not.toBe(fallback);
+      expect(message, code).not.toContain(code);
+      expect(message, code).not.toContain("private:");
+    });
+  });
+
+  it("uses an action-neutral fallback for an unknown server code", () => {
+    const message = userMessageForApiError(new ApiError("UNRECOGNIZED_SERVER_CODE", "private record"));
+    expect(message).toBe("ดำเนินการไม่สำเร็จ กรุณาลองอีกครั้ง หากยังไม่สำเร็จให้แจ้งผู้ดูแลระบบ");
+    expect(message).not.toContain("โหลดข้อมูล");
+    expect(message).not.toContain("UNRECOGNIZED_SERVER_CODE");
+  });
 });
