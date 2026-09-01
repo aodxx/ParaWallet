@@ -5,7 +5,7 @@
 **ผู้จัดทำคู่มือ:** Manus AI  
 **สถานะคู่มือ:** ใช้งานจริงแบบควบคุม — backend `2026.08.30-ocr-provider-v8` / frontend UX remediation ชุด 1–7
 
-**อัปเดตล่าสุด:** 30 สิงหาคม 2026
+**อัปเดตล่าสุด:** 1 กันยายน 2026
 
 > **ข้อสำคัญ:** ParaWallet เป็นระบบบัญชีดิจิทัลสำหรับติดตามสิทธิในเงินและยอดที่ต้องส่งมอบ ไม่ใช่ธนาคาร ไม่รับฝากเงินจริง และไม่โอนเงินจริงจากภายในแอป ผู้ใช้ยังต้องโอนเงินผ่านธนาคารหรือส่งเงินสดตามวิธีปฏิบัตินอกระบบ แล้วบันทึกหลักฐานใน ParaWallet
 
@@ -38,11 +38,11 @@ ParaWallet แยกความรับผิดชอบเป็นสี่
 | Tapper ใน Users | ใช่ | email, role และ status ถูกต้อง |
 | GardenMembers | ใช่ | Owner และ Tapper ผูกกับ garden เดียวกันและ active |
 | Production schema | ใช่ | diagnostics ต้องรายงาน `financialSchemaReady=true` และ `schemaVersion=2026-08-production-v3` |
-| Web App deployment | ใช่ | หลัง Deploy source ปัจจุบัน health ต้องรายงาน `release=2026.08.30-ocr-provider-v9` (ค่าก่อน Deploy ยังเป็น `2026.08.30-ocr-provider-v8`) |
+| Web App deployment | ใช่ | ก่อน Deploy ต้องให้ `testGeminiProviderConnection()` ผ่าน แล้ว health ต้องรายงาน `release=2026.09.01-ocr-provider-v10` (ค่าก่อน Deploy ยังเป็น `2026.08.30-ocr-provider-v8`) |
 
 ## 3. การเตรียม Apps Script และ Google Sheets
 
-ให้นำ `appsscript/Code.gs` จาก repository ไปไว้ใน Apps Script project เดิม แล้วกด Save จากนั้น deploy เป็น Web App โดยเลือกให้ Web App execute as เจ้าของสคริปต์ และกำหนดการเข้าถึงตามนโยบายบัญชีของโครงการ การ deploy ใหม่ควรสร้าง version ใหม่ ไม่ควรแก้ deployment โดยไม่บันทึก revision เพราะ GitHub และ Apps Script ไม่ซิงค์กันโดยอัตโนมัติ [4]
+ให้นำ `appsscript/Code.gs` จาก repository ไปไว้ใน Apps Script project เดิมแล้วกด Save ก่อน Deploy ให้เลือก `testGeminiProviderConnection()` จากรายการฟังก์ชันและกด Run ต้องได้ `ok=true`, `model=gemini-3.7-flash`, `imageInput=true`, `structuredOutput=true` และ `code=GEMINI_CONNECTION_OK` หากไม่ผ่านให้หยุดและแก้ตามรหัสที่ได้ ห้ามส่งภาพหน้าจอที่มี API key จากนั้นจึง deploy เป็น Web App โดยเลือกให้ Web App execute as เจ้าของสคริปต์ และกำหนดการเข้าถึงตามนโยบายบัญชีของโครงการ การ deploy ใหม่ควรสร้าง version ใหม่ ไม่ควรแก้ deployment โดยไม่บันทึก revision เพราะ GitHub และ Apps Script ไม่ซิงค์กันโดยอัตโนมัติ [4]
 
 เมื่อเริ่มระบบใหม่ ให้รัน bootstrap ที่มีอยู่ใน `Code.gs` เพื่อสร้างแท็บตาม Data Model จากนั้นตรวจชื่อแท็บและหัวคอลัมน์ทุกแท็บ ห้ามสรุปว่า bootstrap สำเร็จเพียงเพราะมีชื่อแท็บ เพราะ Google Sheets ที่มี header เก่าอยู่แล้วอาจไม่ถูกปรับอัตโนมัติ
 
@@ -181,7 +181,8 @@ Tapper ควรส่งเงินตามยอดคงค้างที�
 | ตรวจสอบ | ผ่านเมื่อ |
 |---|---|
 | Deployment | Web App ใช้ `Code.gs` revision ล่าสุดจาก repository |
-| Health | หลัง Deploy source ปัจจุบัน endpoint ตอบ `status=ok`, `release=2026.08.30-ocr-provider-v9` และ `schemaVersion=2026-08-production-v3` |
+| Gemini ก่อน Deploy | `testGeminiProviderConnection()` ตอบ `GEMINI_CONNECTION_OK` พร้อม `imageInput=true` และ `structuredOutput=true` |
+| Health | หลัง Deploy source ปัจจุบัน endpoint ตอบ `status=ok`, `release=2026.09.01-ocr-provider-v10` และ `schemaVersion=2026-08-production-v3` |
 | Diagnostics | `financialSchemaReady=true` และไม่มี schema mismatch |
 | OAuth | Owner และ Tapper login ด้วยบัญชีที่ลงทะเบียนได้ |
 | Authorization | Owner เห็นเฉพาะสวนของตน และ Tapper เห็นเฉพาะสวนที่ผูก |

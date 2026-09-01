@@ -1,7 +1,7 @@
 # Canonical OCR + Gemini architecture
 
 Current deployed backend release: `2026.08.30-ocr-provider-v8`
-Next deployment target: `2026.08.30-ocr-provider-v9` (pins the model in code, protects diagnostics, and separates provider errors)
+Next deployment target: `2026.09.01-ocr-provider-v10` (includes the undeployed v9 protections and adds a safe pre-deployment provider self-test)
 Schema: `2026-08-production-v3` — no Google Sheets migration
 
 This document is the only current design for ParaWallet receipt scanning. Historical OCR notes do not override it.
@@ -72,9 +72,10 @@ Build a private, consented golden set outside GitHub as real bills become availa
 Required release evidence:
 
 1. `pnpm verify` passes.
-2. After v9 deployment, `health.get` reports release `2026.08.30-ocr-provider-v9` and schema `2026-08-production-v3`.
-3. Owner-authenticated `diagnostics.get` reports `ocr.automaticReadingReady=true`, `ocr.model=gemini-3.7-flash`, and no configuration issues; otherwise the UI must offer manual entry.
-4. Diagnostics reports `financialSchemaReady=true`.
-5. Provider smoke tests use configured Vision and Gemini keys and confirm `store=false` behavior.
-6. Every real-bill mismatch is caught by the review/validation gate; no unverified Sale is written.
-7. Created test Sales remain `pending_owner_review` and controlled test records are cleaned using the audited test procedure.
+2. Before deployment, editor-only `testGeminiProviderConnection()` reports `ok=true`, `model=gemini-3.7-flash`, `imageInput=true`, `structuredOutput=true`, and `code=GEMINI_CONNECTION_OK` without writing Sheets/Drive or exposing provider data.
+3. After v10 deployment, `health.get` reports release `2026.09.01-ocr-provider-v10` and schema `2026-08-production-v3`.
+4. Owner-authenticated `diagnostics.get` reports `ocr.automaticReadingReady=true`, `ocr.model=gemini-3.7-flash`, and no configuration issues; otherwise the UI must offer manual entry.
+5. Diagnostics reports `financialSchemaReady=true`.
+6. Provider smoke tests confirm the receipt image path and `store=false` behavior; optional Vision is tested only when intentionally provisioned.
+7. Every real-bill mismatch is caught by the review/validation gate; no unverified Sale is written.
+8. Created test Sales remain `pending_owner_review` and controlled test records are cleaned using the audited test procedure.

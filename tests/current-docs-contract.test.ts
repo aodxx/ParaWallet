@@ -8,6 +8,7 @@ const manual = read("docs/PARAWALLET-REAL-USE-MANUAL.md");
 const uxAudit = read("docs/UX-AUDIT-REMEDIATION-2026-08-29.md");
 const closure = read("docs/RELEASE-CLOSURE-ACCEPTANCE-2026-08-30.md");
 const index = read("docs/INDEX.md");
+const providerV10 = read("docs/OCR-PROVIDER-V10-PREDEPLOYMENT-SELF-TEST-2026-09-01.md");
 
 describe("current operating documentation contract", () => {
   it("keeps the verified deployed backend and completed UX baseline current", () => {
@@ -35,5 +36,16 @@ describe("current operating documentation contract", () => {
     for (const required of ["มือถือคนกรีด", "มือถือเจ้าของสวน", "Failure journey", "หมุนเวียนความลับ", "เฝ้าดูเหตุขัดข้อง", "รักษาหลักฐาน"]) {
       expect(closure).toContain(required);
     }
+  });
+
+  it("makes v10 and its provider self-test the single next backend target", () => {
+    for (const document of [readme, todo, manual, closure]) {
+      expect(document).toContain("2026.09.01-ocr-provider-v10");
+    }
+    expect(index).toContain("OCR-PROVIDER-V10-PREDEPLOYMENT-SELF-TEST-2026-09-01.md");
+    expect(providerV10).toContain("testGeminiProviderConnection()");
+    expect(providerV10).toContain("GEMINI_CONNECTION_OK");
+    expect(providerV10).toContain("does not call Vision, Google Sheets, Google Drive");
+    expect(todo).toContain("v9 was not deployed and is superseded by v10");
   });
 });

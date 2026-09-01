@@ -15,14 +15,62 @@ type OcrResult = {
 const OCR = new Function(`
   function round_(value) { return Math.round((Number(value) + Number.EPSILON) * 100) / 100; }
   function numeric_(value) { var number = Number(value); return isFinite(number) ? number : 0; }
+  var PARAWALLET_RELEASE = "2026.09.01-ocr-provider-v10";
+  var Config = { geminiModel: function () { return "gemini-3.7-flash"; }, geminiKey: function () { return "configured-for-unit-test"; } };
   ${ocrSource}
   return OCR;
 `)() as {
   scored_: (provider: string, fields: Record<string, unknown>) => OcrResult;
   interactionText_: (body: Record<string, unknown>) => string;
+  providerErrorCode_: (error: unknown) => string;
+  providerConnectionTest_: () => Record<string, unknown>;
+  gemini_: (...args: unknown[]) => unknown;
+  responseShapeValid_: (fields: Record<string, unknown>) => boolean;
 };
 
 describe("Apps Script OCR deterministic reference scenarios", () => {
+  it("returns only allowlisted provider self-test error codes", () => {
+    expect(OCR.providerErrorCode_(new Error("GEMINI_HTTP_401"))).toBe("GEMINI_HTTP_401");
+    expect(OCR.providerErrorCode_(new Error("OCR_PROVIDER_INVALID_JSON"))).toBe("OCR_PROVIDER_INVALID_JSON");
+    expect(OCR.providerErrorCode_(new Error("OCR_PROVIDER_SCHEMA_MISMATCH"))).toBe("OCR_PROVIDER_SCHEMA_MISMATCH");
+    expect(OCR.providerErrorCode_(new Error("secret-looking provider response"))).toBe("GEMINI_SELF_TEST_FAILED");
+  });
+
+  it("requires every structured-output field that the production schema marks as required", () => {
+    const valid = { documentClass: "not_receipt", receiptType: "unknown", weightEntriesKg: [], uncertainFields: [], warnings: [], needsReview: true };
+    expect(OCR.responseShapeValid_(valid)).toBe(true);
+    expect(OCR.responseShapeValid_({ ...valid, needsReview: undefined })).toBe(false);
+    expect(OCR.responseShapeValid_({ ...valid, weightEntriesKg: "" })).toBe(false);
+  });
+
+  it("reports a successful image and structured-output provider self-test without model content", () => {
+    const originalGemini = OCR.gemini_;
+    OCR.gemini_ = () => ({
+      provider: "gemini:gemini-3.7-flash",
+      fields: {
+        documentClass: "not_receipt",
+        receiptType: "unknown",
+        weightEntriesKg: [],
+        uncertainFields: [],
+        warnings: [],
+        needsReview: true,
+      },
+    });
+    try {
+      expect(OCR.providerConnectionTest_()).toMatchObject({
+        ok: true,
+        provider: "gemini",
+        model: "gemini-3.7-flash",
+        release: "2026.09.01-ocr-provider-v10",
+        imageInput: true,
+        structuredOutput: true,
+        code: "GEMINI_CONNECTION_OK",
+      });
+    } finally {
+      OCR.gemini_ = originalGemini;
+    }
+  });
+
   it("reads structured JSON text from the last Interactions model output", () => {
     const text = OCR.interactionText_({
       steps: [
