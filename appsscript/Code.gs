@@ -15,7 +15,7 @@
 // Bump this identifier every time Code.gs is prepared for a production deploy.
 // health.get and diagnostics.get expose it so operators can prove which backend
 // revision is actually serving traffic without exposing source or credentials.
-var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v9";
+var PARAWALLET_RELEASE = "2026.09.01-ocr-provider-v10";
 var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";
 var PINNED_GEMINI_MODEL = "gemini-3.7-flash";
 
@@ -31,6 +31,14 @@ function setupParaWalletSheets() {
 // Run validateParaWalletSheets() to inspect schema without changing data.
 function validateParaWalletSheets() {
   return Repositories.validateSchema();
+}
+
+// Run testGeminiProviderConnection() from the Apps Script editor before
+// deploying a new Web App version. It exercises the same model, image input,
+// Interactions endpoint, and JSON Schema used by receipt extraction, but it
+// never writes to Sheets/Drive and never returns a credential or response body.
+function testGeminiProviderConnection() {
+  return OCR.providerConnectionTest_();
 }
 
 // =====================================================
@@ -409,6 +417,54 @@ var DriveStorage = {
 };
 
 var OCR = {
+  providerConnectionTest_: function () {
+    var startedAt = new Date().getTime();
+    var result = {
+      ok: false,
+      provider: "gemini",
+      model: Config.geminiModel(),
+      release: PARAWALLET_RELEASE,
+      imageInput: true,
+      structuredOutput: false,
+      code: "GEMINI_SELF_TEST_FAILED",
+      durationMs: 0
+    };
+    if (!Config.geminiKey()) {
+      result.code = "GEMINI_NOT_CONFIGURED";
+      result.durationMs = new Date().getTime() - startedAt;
+      return result;
+    }
+    try {
+      // A synthetic, non-receipt PNG keeps the self-test free of personal data.
+      // The response content is irrelevant; success means Gemini accepted an
+      // image and returned an object conforming to the production receipt schema.
+      var syntheticPng = "iVBORw0KGgoAAAANSUhEUgAAAGAAAABACAIAAABqVuVZAAAAxElEQVR42u3YwQ2CQBRFUTFWRAu2YJm0YAu0NFYglwUGSc5Zz2Jy81dvGmPc+O5+9gf+nUBBoCBQECgIFAQKAgWBgkBBoPDY82h+Pc/+56+sy3v7gQsKAgWBgkBBoCBQECgIFCaj/TYXFAQKAgWBgkBBoCBQEChcdVHMJfAoLigIFAQKAgWBgkBBoCBQsCgGFxQECgIFgYJAQaAgUBAoXHVR3OOQ1dEFBYGCQEGgIFAQKAgUBAoWxeCCgkBBoCBQECgIFD5IuhV33OUCVgAAAABJRU5ErkJggg==";
+      var extracted = this.gemini_(syntheticPng, "image/png", this.providerTestPrompt_(), { ok: false, text: "", errorCode: "VISION_NOT_USED" });
+      var fields = extracted && extracted.fields;
+      result.structuredOutput = Boolean(fields && typeof fields === "object" &&
+        ["rubber_receipt", "blank_template", "promotional_example", "not_receipt", "unreadable"].indexOf(fields.documentClass) >= 0 &&
+        ["weigh_ticket", "rubber_form", "unknown"].indexOf(fields.receiptType) >= 0 &&
+        Array.isArray(fields.weightEntriesKg) && Array.isArray(fields.uncertainFields) && Array.isArray(fields.warnings) &&
+        typeof fields.needsReview === "boolean");
+      result.ok = result.structuredOutput;
+      result.code = result.ok ? "GEMINI_CONNECTION_OK" : "GEMINI_STRUCTURED_OUTPUT_INVALID";
+    } catch (error) {
+      result.code = this.providerErrorCode_(error);
+    }
+    result.durationMs = new Date().getTime() - startedAt;
+    return result;
+  },
+  providerTestPrompt_: function () {
+    return [
+      "This is a provider connectivity self-test using a synthetic image. It is not a receipt and contains no user data.",
+      "Return one JSON object that follows the supplied schema. Set documentClass to not_receipt, receiptType to unknown, weightEntriesKg to an empty array, uncertainFields to an empty array, warnings to an empty array, needsReview to true, and every absent scalar to null."
+    ].join("\n");
+  },
+  providerErrorCode_: function (error) {
+    var message = error && error.message ? String(error.message) : String(error || "");
+    var safeCode = message.match(/^(GEMINI_HTTP_[0-9]{3}|OCR_PROVIDER_EMPTY_RESPONSE|OCR_PROVIDER_INVALID_JSON|OCR_PROVIDER_INVALID_RESPONSE|OCR_PROVIDER_SCHEMA_MISMATCH)$/);
+    return safeCode ? safeCode[1] : "GEMINI_SELF_TEST_FAILED";
+  },
   extract: function (fileBase64, mimeType) {
     var contentBase64 = String(fileBase64 || "").split(",").pop();
     var failures = [];
@@ -477,6 +533,13 @@ var OCR = {
       required: ["documentClass", "receiptType", "weightEntriesKg", "uncertainFields", "warnings", "needsReview"],
       additionalProperties: false
     };
+  },
+  responseShapeValid_: function (fields) {
+    return Boolean(fields && typeof fields === "object" &&
+      ["rubber_receipt", "blank_template", "promotional_example", "not_receipt", "unreadable"].indexOf(fields.documentClass) >= 0 &&
+      ["weigh_ticket", "rubber_form", "unknown"].indexOf(fields.receiptType) >= 0 &&
+      Array.isArray(fields.weightEntriesKg) && Array.isArray(fields.uncertainFields) && Array.isArray(fields.warnings) &&
+      typeof fields.needsReview === "boolean");
   },
   numberOrNull_: function (value) {
     if (value === null || value === undefined || value === "") return null;
@@ -589,6 +652,7 @@ var OCR = {
     var fields;
     try { fields = JSON.parse(text.replace(/```json|```/g, "").trim()); }
     catch (error) { throw new Error("OCR_PROVIDER_INVALID_JSON"); }
+    if (!this.responseShapeValid_(fields)) throw new Error("OCR_PROVIDER_SCHEMA_MISMATCH");
     fields.visionOcrUsed = Boolean(vision && vision.ok && vision.text);
     fields.visionOcrTextLength = vision && vision.ok ? String(vision.text).length : 0;
     if (vision && !vision.ok) fields.visionOcrError = vision.errorCode || "VISION_UNAVAILABLE";

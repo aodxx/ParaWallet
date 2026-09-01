@@ -75,11 +75,12 @@ These are editor-only functions and are not exposed as unauthenticated Web App a
 ```javascript
 setupParaWalletSheets();
 validateParaWalletSheets();
+testGeminiProviderConnection();
 previewParaWalletProductionSchemaRepair();
 repairParaWalletProductionSchema();
 ```
 
-`setupParaWalletSheets()` creates missing tabs and writes the exact Data Model headers. If an existing tab has a different header order, it fails with `SCHEMA_MISMATCH:<tab>` rather than overwriting data.
+`setupParaWalletSheets()` creates missing tabs and writes the exact Data Model headers. If an existing tab has a different header order, it fails with `SCHEMA_MISMATCH:<tab>` rather than overwriting data. `testGeminiProviderConnection()` is a non-persistent pre-deployment check: it sends a synthetic image through the same Gemini model, Interactions endpoint, and production JSON Schema, then returns only a safe status object. It is not routed through `doPost`.
 
 `previewParaWalletProductionSchemaRepair()` is read-only. `repairParaWalletProductionSchema()` accepts only the explicitly known legacy headers for Agreements, Gardens, Buyers, Sales, and Settlements, copies every changed sheet to a timestamped backup, semantically maps the existing rows, and refuses any unexpected schema.
 
@@ -89,4 +90,4 @@ Every authenticated action must resolve a registered user, verify garden ownersh
 
 Bank-transfer settlements store the uploaded slip in the configured Drive evidence folder and persist only `slipFileId` in the Settlements row and audit event. Cash settlements remain `pending_owner_confirmation` until the Owner explicitly confirms receipt on their device; only then are allocations and wallet debits written.
 
-The production baseline uses Google OpenID Connect ID tokens. `Auth.requireUser()` verifies issuer, audience, expiry, subject, verified email, active User status, role, and garden membership before protected work. `health.get` remains public, while `diagnostics.get` requires an authenticated Owner or admin and never returns raw Script Property values. The current source target is backend `2026.08.30-ocr-provider-v9` with schema `2026-08-production-v3`; see [`INDEX.md`](INDEX.md) for the deployed baseline, current acceptance evidence, and historical reports.
+The production baseline uses Google OpenID Connect ID tokens. `Auth.requireUser()` verifies issuer, audience, expiry, subject, verified email, active User status, role, and garden membership before protected work. `health.get` remains public, while `diagnostics.get` requires an authenticated Owner or admin and never returns raw Script Property values. The current source target is backend `2026.09.01-ocr-provider-v10` with schema `2026-08-production-v3`; see [`INDEX.md`](INDEX.md) for the deployed baseline, current acceptance evidence, and historical reports.

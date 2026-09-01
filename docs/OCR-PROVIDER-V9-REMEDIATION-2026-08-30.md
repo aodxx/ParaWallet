@@ -2,6 +2,8 @@
 
 Date: 30 August 2026
 
+> Historical source milestone: v9 was merged but not deployed. Its protections are included in `2026.09.01-ocr-provider-v10`, which supersedes v9 as the next deployment target and adds an editor-only provider self-test.
+
 ## Production evidence
 
 The first authenticated Tapper receipt smoke test against backend `2026.08.30-ocr-provider-v8` accepted and displayed the image, blocked financial submission, and returned provider warnings equivalent to Vision HTTP 401 and Gemini HTTP 404. The screen incorrectly described the configured provider failure as an unopened service.

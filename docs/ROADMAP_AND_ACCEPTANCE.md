@@ -1,10 +1,10 @@
 # ParaWallet Release Roadmap and Acceptance Gates
 
-Updated: 30 August 2026
+Updated: 1 September 2026
 
 ## Current release — stabilization
 
-The accepted deployed baseline is backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. Its first authorized receipt smoke test failed safely and exposed provider configuration defects; backend `2026.08.30-ocr-provider-v9` is the next deployment target. Remediation and the repeated smoke test remain open in [`todo.md`](../todo.md). Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass is recorded.
+The accepted deployed baseline is backend `2026.08.30-ocr-provider-v8`, schema `2026-08-production-v3`, and frontend UX remediation workstreams 1–7. Its first authorized receipt smoke test failed safely and exposed provider configuration defects. v9 was merged but not deployed; backend `2026.09.01-ocr-provider-v10` supersedes it as the next target and adds the mandatory provider self-test. Credential rotation, self-test, deployment, and the repeated receipt smoke test remain open in [`todo.md`](../todo.md). Core feature development is complete for the current scope. The release remains in controlled-use stabilization until the final real-device closure pass is recorded.
 
 Acceptance requires all of the following:
 

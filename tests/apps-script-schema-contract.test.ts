@@ -41,7 +41,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain("result.schema = Repositories.validateSchema();");
     expect(code).toContain("result.schemaMismatches");
     expect(code).toContain("result.financialSchemaReady");
-    expect(code).toContain('var PARAWALLET_RELEASE = "2026.08.30-ocr-provider-v9";');
+    expect(code).toContain('var PARAWALLET_RELEASE = "2026.09.01-ocr-provider-v10";');
     expect(code).toContain("automaticReadingReady: Boolean(Config.geminiKey())");
     expect(code).toContain('var PARAWALLET_SCHEMA_VERSION = "2026-08-production-v3";');
     expect(code).toContain("release: PARAWALLET_RELEASE");
@@ -78,6 +78,7 @@ describe("Apps Script schema safety contract", () => {
     expect(code).not.toContain('"https://generativelanguage.googleapis.com/v1/interactions"');
     expect(code).toContain('store: false');
     expect(code).toContain('response_format: { type: "text", mime_type: "application/json", schema: this.responseSchema_() }');
+    expect(code).toContain('if (!this.responseShapeValid_(fields)) throw new Error("OCR_PROVIDER_SCHEMA_MISMATCH")');
     expect(code).toContain('headers: { "x-goog-api-key": Config.geminiKey() }');
     expect(code).toContain('DOCUMENT_TEXT_DETECTION');
     expect(code).toContain('untrusted transcript');
@@ -87,6 +88,21 @@ describe("Apps Script schema safety contract", () => {
     expect(code).toContain('"VISION"');
     expect(code).toContain('"_HTTP_" + lastCode');
     expect(code).toContain('vision = { ok: false, text: "", errorCode: visionError }');
+  });
+
+  it("provides a private pre-deployment Gemini self-test without a web route or persistent writes", () => {
+    expect(code).toContain("function testGeminiProviderConnection()");
+    expect(code).toContain("return OCR.providerConnectionTest_();");
+    expect(code).toContain('code: "GEMINI_SELF_TEST_FAILED"');
+    expect(code).toContain('result.code = "GEMINI_NOT_CONFIGURED"');
+    expect(code).toContain('result.code = result.ok ? "GEMINI_CONNECTION_OK" : "GEMINI_STRUCTURED_OUTPUT_INVALID"');
+    expect(code).toContain('var extracted = this.gemini_(syntheticPng, "image/png", this.providerTestPrompt_()');
+    expect(code).not.toContain('case "testGeminiProviderConnection"');
+    expect(code).not.toContain('case "ocr.providerTest"');
+    const selfTest = code.match(/providerConnectionTest_: function \(\) \{[\s\S]*?\n  \},\n  providerTestPrompt_/)?.[0] || "";
+    expect(selfTest).not.toContain("DriveStorage");
+    expect(selfTest).not.toContain("Repositories");
+    expect(selfTest).not.toContain("getContentText");
   });
 
   it("does not score empty OCR fields as a successful extraction", () => {
